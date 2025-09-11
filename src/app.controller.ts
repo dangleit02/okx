@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post } from '@nestjs/common';
+import { Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { AppService } from './app.service';
 import { OkxService } from './okx.service';
 
@@ -18,14 +18,15 @@ export class AppController {
     return result;
   }
 
-  @Post('buy/:coin')
-  placeOrder(@Param() coin: string) {
-    return this.okxService.placeOrder(coin);
+  @Post('order-multiple/:coin')
+  placeMultipleOrders(@Param('coin') coin: string, @Query('testing') testing: string) {
+    const isTesting = testing !== 'false';
+    return this.okxService.placeMultipleOrders(coin, isTesting);
   }
 
-  @Post('sell/:coin')
-  placeOrderWithParam(@Param('coin') coin: string) {
-      this.okxService.placeTriggerOrder('AXS', 'sell', '5', '7.50', '7.45')
+  @Post('order-one/:coin')
+  placeOneOrder(@Param('coin') coin: string) {
+      this.okxService.placeOneOrder(coin, 'sell', '5', '7.50', '7.45')
         .then(console.log)
         .catch(console.error);
   }

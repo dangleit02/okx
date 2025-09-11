@@ -1,11 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import axios from 'axios';
+import { AppLogger } from './common/logger.service';
+import { min } from 'rxjs';
 
 @Injectable()
 export class OkxService {
-    constructor(private config: ConfigService) { }
+    constructor(private config: ConfigService, private readonly logger: AppLogger) { }
 
     private signRequest(secret: string, message: string) {
         return crypto.createHmac('sha256', secret).update(message).digest('base64');
@@ -31,35 +33,66 @@ export class OkxService {
         return response.data;
     }
 
-    async placeOrder(coin: string) {
-        const timestamp = new Date().toISOString();
-        const requestPath = '/api/v5/trade/order';
+    async placeMultipleOrders(coin: string, testing: boolean = true) { 
+        this.logger.log(`Starting to place multiple orders for ${coin}, testing mode: ${testing}`);
+        const coinConfig = this.config.get<any>(`coin.${coin}`);
+        this.logger.log(`Placing multiple orders for ${coin} with config: ${JSON.stringify(coinConfig)}`);
+        if (!coinConfig) {
+            throw new Error(`No configuration found for coin: ${JSON.stringify(coin)}`);
+        }
+        const { maxUsdt, currentPrice, minBuyPrice, maxBuyPrice, stopLossPrice, amountOfUsdtPerStep, riskPerTrade, addForTriggerPrice, szToFixed, priceToFixed } = coinConfig;
+        if (minBuyPrice >= maxBuyPrice) {
+            throw new Error(`Invalid configuration: minBuyPrice (${minBuyPrice}) must be less than maxBuyPrice (${maxBuyPrice})`);
+        }
+        if (amountOfUsdtPerStep <= 10) {
+            throw new Error(`Invalid configuration: amountOfUsdtPerStep (${amountOfUsdtPerStep}) must be greater than 10 USDT`);
+        }
+        if (stopLossPrice >= minBuyPrice) {
+            throw new Error(`Invalid configuration: stopLossPrice (${stopLossPrice}) must be less than minBuyPrice (${minBuyPrice})`);
+        }
+        const avarageBuyPrice = (minBuyPrice + maxBuyPrice) / 2; // 2.2655 USDT
+        const amountOfUsdtRisk = maxUsdt * riskPerTrade; // 30 USDT
+        const numberOfCoinToBuy = (amountOfUsdtRisk / (avarageBuyPrice - stopLossPrice));
+        const costByUsdt = numberOfCoinToBuy * avarageBuyPrice;
+        const numberOfSteps = costByUsdt / amountOfUsdtPerStep;
+        const priceDistanceBetweenEachStep = (maxBuyPrice - minBuyPrice) / numberOfSteps;
 
-        const body = {
-            instId: `${coin}-USDT`,
-            tdMode: 'cash',
-            side: 'buy',
-            ordType: 'market',
-            sz: '0.01',
-        };
+        const steps = Array.from({ length: numberOfSteps + 1 }, (_, i) => i);
 
-        const prehash = timestamp + 'POST' + requestPath + JSON.stringify(body);
-        const sign = this.signRequest(this.config.get<string>('okx.secretKey')!, prehash);
+        const data = [];
+        try {
+            for await (let step of steps) {
+                const timestamp = new Date().toISOString();
+                const requestPath = '/api/v5/trade/order-algo';
+                const orderPx = minBuyPrice + step * priceDistanceBetweenEachStep;
+                const triggerPx = orderPx - addForTriggerPrice; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
+                let sz;
+                if (orderPx >= currentPrice) {
+                    sz = amountOfUsdtPerStep / orderPx; // mua chắc chắn hơn
+                } else {
+                    sz = (amountOfUsdtPerStep / 2) / orderPx;
+                }
+
+                this.logger.log(`Placing order: Step ${step}, Order Price: ${orderPx.toFixed(szToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(priceToFixed)}`);
+                const res = await this.placeOneOrder(coin, 'buy', sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPx.toFixed(priceToFixed), testing);
+                
+                data.push({ data: res.data, step, body: res.body });
+            }
+
+            // stop loss
+            const res = await this.placeOneOrder(coin, 'sell', numberOfCoinToBuy.toFixed(szToFixed), stopLossPrice.toFixed(priceToFixed), null, testing);
+                
+            data.push({ data: res.data, step: 'stoploss', body: res.body });
+        } catch (error) {
+            this.logger.log('Error placing trigger order:', error.response?.data || error.message);
+            throw error;
+        }
 
 
-        const headers = {
-            'OK-ACCESS-KEY': this.config.get<string>('okx.apiKey'),
-            'OK-ACCESS-SIGN': sign,
-            'OK-ACCESS-TIMESTAMP': timestamp,
-            'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphrase'),
-            'Content-Type': 'application/json',
-        };
-
-        const res = await axios.post(this.config.get<string>('okx.baseUrl') + requestPath, body, { headers });
-        return res.data;
+        return data;
     }
 
-    async placeTriggerOrder(coin: string, side: 'buy' | 'sell', sz: string, triggerPx: string, orderPx: string) {
+    async placeOneOrder(coin: string, side: 'buy' | 'sell', sz: string, triggerPx: string, orderPx?: string, testing: boolean = true) {
         const timestamp = new Date().toISOString();
         const requestPath = '/api/v5/trade/order-algo';
 
@@ -70,8 +103,14 @@ export class OkxService {
             ordType: 'trigger', // lệnh kích hoạt
             sz,                   // khối lượng, ví dụ "5"
             triggerPx,            // giá kích hoạt
-            orderPx,              // giá đặt lệnh giới hạn khi trigger
         };
+
+        // Nếu orderPx null hoặc undefined thì dùng market (-1)
+        if (orderPx) {
+            body['orderPx'] = orderPx;  // lệnh limit
+        } else {
+            body['orderPx'] = '-1';     // khớp giá thị trường
+        }
 
         const prehash = timestamp + 'POST' + requestPath + JSON.stringify(body);
         const sign = this.signRequest(this.config.get<string>('okx.secretKey')!, prehash);
@@ -87,10 +126,13 @@ export class OkxService {
         const url = this.config.get<string>('okx.baseUrl') + requestPath;
 
         try {
-            const res = await axios.post(url, body, { headers });
-            return res.data;
+            let res;
+            if (!testing) {
+                res = await axios.post(url, body, { headers });
+            }
+            return { data: res?.data, body };
         } catch (error) {
-            console.error('Error placing trigger order:', error.response?.data || error.message);
+            this.logger.log('Error placing trigger order:', error.response?.data || error.message);
             throw error;
         }
     }

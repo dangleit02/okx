@@ -4,15 +4,18 @@ import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import okxConfig from './config/okx.config';
 import { OkxService } from './okx.service';
+import coinConfig from './config/coin.config';
+import config from './config/config';
+import { AppLogger } from './common/logger.service';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,   // để tất cả module đều truy cập được
-      load: [okxConfig],
+      load: [config, okxConfig, coinConfig],
     }),
   ],
   controllers: [AppController],
-  providers: [AppService, OkxService],
+  providers: [AppService, OkxService, AppLogger],
 })
 export class AppModule {}
