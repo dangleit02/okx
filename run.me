@@ -220,3 +220,17 @@ curl -X POST 'http://localhost:3000/order-one/AXS' \
 
   curl -X POST 'http://localhost:3000/order-multiple/ARB?testing=false' \
   -H "Content-Type: application/json" 
+
+# SHIB
+  curl -X POST 'http://localhost:3000/order-multiple/SHIB?testing=true' \
+  -H "Content-Type: application/json"
+
+  curl -X POST 'http://localhost:3000/order-multiple/SHIB?testing=false' \
+  -H "Content-Type: application/json" 
+
+# ADA
+  curl -X POST 'http://localhost:3000/order-multiple/ADA?testing=true' \
+  -H "Content-Type: application/json"
+
+  curl -X POST 'http://localhost:3000/order-multiple/ADA?testing=false' \
+  -H "Content-Type: application/json" 

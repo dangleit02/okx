@@ -54,7 +54,7 @@ export class OkxService {
         const amountOfUsdtRisk = maxUsdt * riskPerTrade; // 30 USDT
         const numberOfCoinToBuy = (amountOfUsdtRisk / (avarageBuyPrice - stopLossPrice));
         const costByUsdt = numberOfCoinToBuy * avarageBuyPrice;
-        const numberOfSteps = costByUsdt / amountOfUsdtPerStep;
+        const numberOfSteps = Math.ceil(costByUsdt / amountOfUsdtPerStep);
         const priceDistanceBetweenEachStep = (maxBuyPrice - minBuyPrice) / numberOfSteps;
 
         const steps = Array.from({ length: numberOfSteps + 1 }, (_, i) => i);
