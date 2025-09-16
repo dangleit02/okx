@@ -38,12 +38,31 @@ export class AppController {
     return { res1, res2 };
   }
 
+  @Post('cancel-orders/:coin')
+  async cancelOrdersForOneCoin(@Param('coin') coin: string) {
+    const res1 = await this.okxService.cancelOpenOrdersForOneCoin(coin, 'SPOT');
+    const res2 = await this.okxService.cancelOpenConditionalOrdersForOneCoin(coin, 'SPOT');
+    return { res1, res2 };
+  }
+
   @Post('order-all-for-up')
   async placeAllOrders( @Query('testing') testing: string) {
     const isTesting = testing !== 'false';
-    await this.okxService.cancelAllOpenOrders('SPOT');
-    await this.okxService.cancelAllOpenConditionalOrders('SPOT');
+    if (!isTesting) {
+      await this.okxService.cancelAllOpenOrders('SPOT');
+      await this.okxService.cancelAllOpenConditionalOrders('SPOT');
+    }
     return this.okxService.placeAllOrdersForUp(isTesting);
+  }
+
+  @Post('order-for-up-one-coin/:coin')
+  async placeOrdersForUpOneCoin(@Param('coin') coin: string, @Query('testing') testing: string) {
+    const isTesting = testing !== 'false';
+    if (!isTesting) {
+      await this.okxService.cancelOpenOrdersForOneCoin(coin, 'SPOT');
+      await this.okxService.cancelOpenConditionalOrdersForOneCoin(coin, 'SPOT');
+    }
+    return this.okxService.placeMultipleOrdersForUp(coin, isTesting);
   }
 
   @Post('sale/order-one/:coin')

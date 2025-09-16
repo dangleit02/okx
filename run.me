@@ -9,6 +9,15 @@
   curl -X POST 'http://localhost:3000/order-all-for-up?testing=false' \
     -H "Content-Type: application/json"
 
+# for up for one coin
+  curl -X POST 'http://localhost:3000/cancel-orders:AXS' \
+    -H "Content-Type: application/json"
+
+  curl -X POST 'http://localhost:3000/order-for-up-one-coin/AXS?testing=true' \
+    -H "Content-Type: application/json"
+
+  curl -X POST 'http://localhost:3000/order-for-up-one-coin/AXS?testing=false' \
+    -H "Content-Type: application/json"
 
 # AXS
   curl -X POST 'http://localhost:3000/order-multiple/AXS?testing=true' \

@@ -31,6 +31,66 @@ export class OkxService {
         };
     }
 
+    async cancelOpenOrdersForOneCoin(coin: string, instType: string = 'SPOT') {
+        const timestamp = new Date().toISOString();
+
+        // 1. Get open orders
+        const instId = `${coin}-USDT`; // coin cụ thể
+        const getPath = `/api/v5/trade/orders-pending?instType=${instType}&instId=${instId}`;
+        const getSign = this.sign(timestamp, 'GET', getPath);
+        const pendingRes = await axios.get(
+            this.config.get<string>('okx.baseUrl') + getPath,
+            {
+                headers: {
+                    'OK-ACCESS-KEY': this.config.get<string>('okx.apiKey'),
+                    'OK-ACCESS-SIGN': getSign,
+                    'OK-ACCESS-TIMESTAMP': timestamp,
+                    'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphrase'),
+                },
+            }
+        );
+
+        const orders = pendingRes.data.data;
+        if (!orders.length) return { msg: 'No open orders' };
+
+        // 2. Cancel in batch (20 each)
+        const batches = [];
+        for (let i = 0; i < orders.length; i += 20) {
+            const chunk = orders.slice(i, i + 20);
+            batches.push(chunk);
+        }
+
+        const results = [];
+        for (const batch of batches) {
+            const cancelBody = {
+                instId: batch[0].instId, // OKX yêu cầu cùng instId trong 1 batch
+                ordIds: batch.map(o => o.ordId),
+            };
+
+            const cancelPath = '/api/v5/trade/cancel-batch-orders';
+            const cancelTimestamp = new Date().toISOString();
+            const cancelSign = this.sign(cancelTimestamp, 'POST', cancelPath, JSON.stringify(cancelBody));
+
+            const res = await axios.post(
+                this.config.get<string>('okx.baseUrl') + cancelPath,
+                cancelBody,
+                {
+                    headers: {
+                        'OK-ACCESS-KEY': this.config.get<string>('okx.apiKey'),
+                        'OK-ACCESS-SIGN': cancelSign,
+                        'OK-ACCESS-TIMESTAMP': cancelTimestamp,
+                        'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphrase'),
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            results.push(res.data);
+        }
+
+        return results;
+    }
+
     async cancelAllOpenOrders(instType: string = 'SPOT') {
         const timestamp = new Date().toISOString();
 
@@ -87,6 +147,66 @@ export class OkxService {
             results.push(res.data);
         }
 
+        return results;
+    }
+
+    async cancelOpenConditionalOrdersForOneCoin(coin: string, instType: string = 'SPOT') {
+        const timestamp = new Date().toISOString();
+
+        // 1. Get open orders
+        const instId = `${coin}-USDT`; // coin cụ thể
+        const ordType = 'trigger';  // bắt buộc
+        const getPath = `/api/v5/trade/orders-algo-pending?instType=${instType}&ordType=${ordType}&instId=${instId}`;
+        const getSign = this.sign(timestamp, 'GET', getPath);
+        const getRes = await axios.get(
+            this.config.get<string>('okx.baseUrl') + getPath,
+            {
+                headers: {
+                    'OK-ACCESS-KEY': this.config.get<string>('okx.apiKey'),
+                    'OK-ACCESS-SIGN': getSign,
+                    'OK-ACCESS-TIMESTAMP': timestamp,
+                    'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphrase'),
+                },
+            }
+        );
+
+        const pendingOrders = getRes.data?.data || [];
+        if (pendingOrders.length === 0) {
+            this.logger.log('✅ No pending algo orders to cancel.');
+            return { message: 'No pending algo orders' };
+        }
+
+        // 2. Chuẩn hoá orders để huỷ
+        const ordersToCancel = pendingOrders.map((o: any) => ({
+            algoId: o.algoId,
+            instId: o.instId,
+        }));
+
+        this.logger.log(`Found ${ordersToCancel.length} pending algo orders. Cancelling...`);
+
+        // 3) OKX may accept at most N items per request—safe to chunk (use 20)
+        const chunks = this.chunk(ordersToCancel, 20);
+        const results: any[] = [];
+
+        for (const chunk of chunks) {
+            const bodyArray = chunk; // array of objects
+            const bodyString = JSON.stringify(bodyArray);
+
+            // IMPORTANT: use the exact same bodyString both for signature and for the HTTP body.
+            const cancelPath = '/api/v5/trade/cancel-algos';
+            const tsCancel = new Date().toISOString();
+            const headersCancel = this.buildHeaders(tsCancel, 'POST', cancelPath, bodyString);
+
+            const cancelRes = await axios.post(
+                this.config.get<string>('okx.baseUrl') + cancelPath,
+                bodyString,
+                { headers: headersCancel }
+            );
+            this.logger.log(`Cancel response: ${JSON.stringify(cancelRes.data, null, 2)}`);
+            results.push(cancelRes.data);
+
+            // 3. Gửi request huỷ tất cả
+        }
         return results;
     }
 
@@ -276,9 +396,9 @@ export class OkxService {
         try {
             for await (let step of steps) {
                 const orderPx = minBuyPrice + step * priceDistanceBetweenEachStep;
-                const triggerPx = orderPx - addForTriggerPrice; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
+                const triggerPx = orderPx - priceDistanceBetweenEachStep; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
                 const sz = amountOfUsdtPerStep / orderPx;
-                if (orderPx < currentPrice) {
+                if (triggerPx < currentPrice) {
                     continue
                 }
 
