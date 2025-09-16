@@ -31,9 +31,18 @@ export class AppController {
     return this.okxService.placeMultipleOrders(coin, isTesting);
   }
 
+  @Post('cancel-all-orders')
+  async cancelAllOrders() {
+    const res1 = await this.okxService.cancelAllOpenOrders('SPOT');
+    const res2 = await this.okxService.cancelAllOpenConditionalOrders('SPOT');
+    return { res1, res2 };
+  }
+
   @Post('order-all-for-up')
-  placeAllOrders( @Query('testing') testing: string) {
+  async placeAllOrders( @Query('testing') testing: string) {
     const isTesting = testing !== 'false';
+    await this.okxService.cancelAllOpenOrders('SPOT');
+    await this.okxService.cancelAllOpenConditionalOrders('SPOT');
     return this.okxService.placeAllOrdersForUp(isTesting);
   }
 
