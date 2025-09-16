@@ -1,9 +1,14 @@
-curl -X POST 'http://localhost:3000/order-one/AXS' \
-  -H "Content-Type: application/json"
+# all for up
+
+  curl -X POST 'http://localhost:3000/order-all-for-up?testing=true' \
+    -H "Content-Type: application/json"
+
+  curl -X POST 'http://localhost:3000/order-all-for-up?testing=false' \
+    -H "Content-Type: application/json"
 
 
 # AXS
-  curl -X POST 'http://localhost:3000/order-multiple/AXS?testing=false' \
+  curl -X POST 'http://localhost:3000/order-multiple/AXS?testing=true' \
   -H "Content-Type: application/json"
 
 
@@ -116,11 +121,11 @@ curl -X POST 'http://localhost:3000/order-one/AXS' \
   curl -X POST 'http://localhost:3000/order-multiple/TIA?testing=false' \
   -H "Content-Type: application/json" 
 
-# IMF
-  curl -X POST 'http://localhost:3000/order-multiple/IMF?testing=true' \
+# IMX
+  curl -X POST 'http://localhost:3000/order-multiple/IMX?testing=true' \
   -H "Content-Type: application/json"
 
-  curl -X POST 'http://localhost:3000/order-multiple/IMF?testing=false' \
+  curl -X POST 'http://localhost:3000/order-multiple/IMX?testing=false' \
   -H "Content-Type: application/json" 
 
 # MLN

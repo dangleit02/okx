@@ -192,9 +192,9 @@ export default () => ({
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
         },
-        IMF: {
+        IMX: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
-            currentPrice: 0.541, // Giá hiện tại (USDT)
+            currentPrice: 0.642, // Giá hiện tại (USDT)
             minBuyPrice: 0.451, // Giá mua thấp nhất (USDT)
             maxBuyPrice: 0.565, // Giá mua cao nhất (USDT)
             stopLossPrice: 0.333, // Giá dừng lỗ (USDT)
