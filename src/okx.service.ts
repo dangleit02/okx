@@ -396,7 +396,7 @@ export class OkxService {
         try {
             for await (let step of steps) {
                 const orderPx = minBuyPrice + step * priceDistanceBetweenEachStep;
-                const triggerPx = orderPx - priceDistanceBetweenEachStep; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
+                const triggerPx = orderPx - addForTriggerPrice * 10; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
                 const sz = amountOfUsdtPerStep / orderPx;
                 if (triggerPx < currentPrice) {
                     continue
