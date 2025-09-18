@@ -1,4 +1,39 @@
 export default () => ({
+    coinsForTakeProfit: [
+        'AXS'     ,
+        // 'STRK'    ,
+        // 'WLD'     ,
+        // 'DOT'     ,
+        // 'NEAR'    ,
+        'DOGS'    ,
+        'AEVO'    ,
+        'DYDX'    ,
+        'OP'      ,
+        'ENJ'     ,
+        'ID'      ,
+        'TNSR'    ,
+        'ETHW'    ,
+        'ORDI'    ,
+        'PEOPLE'  ,
+        'TIA'     ,
+        // 'IMX'     ,
+        'MLN'     ,
+        'MEME'    ,
+        'PYTH'    ,
+        // 'PEPE'    ,
+        'WIF'     ,
+        'FLOKI'   ,
+        'BONK'    ,
+        // 'DOGE'    ,
+        'BOME'    ,
+        // 'BIO'     ,
+        // 'POL'     ,
+        'MAGIC'   ,
+        'LDO'     ,
+        'ARB'     ,
+        // 'SHIB'    ,
+        // 'ADA'     ,
+    ],
     coin: {
         AXS: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -11,6 +46,9 @@ export default () => ({
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 37, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 2.524, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 2.369, // Giá chốt lời (USDT)
         },
         STRK: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -47,6 +85,9 @@ export default () => ({
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 8.6913005, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 4.46, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 4.095, // Giá chốt lời (USDT)
         },
         NEAR: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -71,6 +112,9 @@ export default () => ({
             addForTriggerPrice: 0.0000001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 7, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 572, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 0.0001415, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.000131, // Giá chốt lời (USDT)
         },
         AEVO: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -83,6 +127,9 @@ export default () => ({
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 131, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 0.1002, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.0907, // Giá chốt lời (USDT)
         },
         DYDX: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -95,6 +142,9 @@ export default () => ({
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 39, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 0.6592, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.5979, // Giá chốt lời (USDT)
         },
         OP: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -107,6 +157,9 @@ export default () => ({
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 24, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 0.8075, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.7288, // Giá chốt lời (USDT)
         },
         ENJ: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -119,6 +172,9 @@ export default () => ({
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 1328, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 0.0709, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.0662, // Giá chốt lời (USDT)
         },
         ID: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -131,6 +187,9 @@ export default () => ({
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 527, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 0.1671, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.1558, // Giá chốt lời (USDT)
         },
         TNSR: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -143,6 +202,9 @@ export default () => ({
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 358, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 0.1219, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.1145, // Giá chốt lời (USDT)
         },
         ETHW: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -155,6 +217,9 @@ export default () => ({
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 16, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 1.6285, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 1.5482, // Giá chốt lời (USDT)
         },
         ORDI: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -167,6 +232,9 @@ export default () => ({
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 2, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 10.286, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 9.234, // Giá chốt lời (USDT)
         },
         PEOPLE: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -179,6 +247,9 @@ export default () => ({
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 1565, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 0.02136, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.01968, // Giá chốt lời (USDT)
         },
         TIA: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -191,6 +262,9 @@ export default () => ({
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 49, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 1.784, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 1.654, // Giá chốt lời (USDT)
         },
         IMX: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -202,7 +276,10 @@ export default () => ({
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
-            priceToFixed: 3, // Số chữ số thập phân cho giá
+            priceToFixed: 3, // Số chữ số thập phân cho giá,
+            numberOfBoughtCoin: 54.5526, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 0.814, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.621, // Giá chốt lời (USDT)
         },
         MLN: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -215,6 +292,9 @@ export default () => ({
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 13, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 8.11, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 7.65, // Giá chốt lời (USDT)
         },
         MEME: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -227,6 +307,9 @@ export default () => ({
             addForTriggerPrice: 0.000001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 6, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 2319, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 0.002684, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.002462, // Giá chốt lời (USDT)
         },
         PYTH: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -239,6 +322,24 @@ export default () => ({
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 38, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 0.1703, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.1557, // Giá chốt lời (USDT)
+        },
+        ARB: {
+            maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
+            currentPrice: 0.5358, // Giá hiện tại (USDT)
+            minBuyPrice: 0.3557, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 0.5067, // Giá mua cao nhất (USDT)
+            stopLossPrice: 0.2452, // Giá dừng lỗ (USDT)
+            amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
+            riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
+            addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
+            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            priceToFixed: 4, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 36, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 0.5183, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.4834, // Giá chốt lời (USDT)
         },
         PEPE: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -263,6 +364,9 @@ export default () => ({
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 21, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 0.934, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.858, // Giá chốt lời (USDT)
         },
         FLOKI: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -275,6 +379,9 @@ export default () => ({
             addForTriggerPrice: 0.00000001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 8, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 125, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 0.00010015, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.00009281, // Giá chốt lời (USDT)
         },
         BONK: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -287,6 +394,9 @@ export default () => ({
             addForTriggerPrice: 0.000000001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 9, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 265, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 0.00002482, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.00002246, // Giá chốt lời (USDT)
         },
         DOGE: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -311,6 +421,9 @@ export default () => ({
             addForTriggerPrice: 0.000001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 6, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 5960, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 0.002115, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.00193, // Giá chốt lời (USDT)
         },
         BIO: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -347,6 +460,9 @@ export default () => ({
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 58, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 0.2133, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.1962, // Giá chốt lời (USDT)
         },
         LDO: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -359,18 +475,9 @@ export default () => ({
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
-        },
-        ARB: {
-            maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
-            currentPrice: 0.5358, // Giá hiện tại (USDT)
-            minBuyPrice: 0.3557, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 0.5067, // Giá mua cao nhất (USDT)
-            stopLossPrice: 0.2452, // Giá dừng lỗ (USDT)
-            amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
-            riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
-            addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
-            priceToFixed: 4, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 15, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 1.3012, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 1.1484, // Giá chốt lời (USDT)
         },
         SHIB: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)

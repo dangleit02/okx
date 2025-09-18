@@ -299,7 +299,7 @@ export class OkxService {
         return response.data;
     }
 
-    async placeMultipleOrders(coin: string, testing: boolean = true) {
+    async placeMultipleBuyOrders(coin: string, testing: boolean = true) {
         this.logger.log(`Starting to place multiple orders for ${coin}, testing mode: ${testing}`);
         const coinConfig = this.config.get<any>(`coin.${coin}`);
         this.logger.log(`Placing multiple orders for ${coin} with config: ${JSON.stringify(coinConfig)}`);
@@ -362,7 +362,7 @@ export class OkxService {
         return data;
     }
 
-    async placeMultipleOrdersForUp(coin: string, testing: boolean = true) {
+    async placeMultipleBuyOrdersForUp(coin: string, testing: boolean = true) {
         this.logger.log(`Starting to place multiple orders for ${coin}, testing mode: ${testing}`);
         const coinConfig = this.config.get<any>(`coin.${coin}`);
         this.logger.log(`Placing multiple orders for ${coin} with config: ${JSON.stringify(coinConfig)}`);
@@ -395,10 +395,11 @@ export class OkxService {
 
         try {
             for await (let step of steps) {
-                const orderPx = minBuyPrice + step * priceDistanceBetweenEachStep;
+                const previousOrderPx = minBuyPrice + (step - 1) * priceDistanceBetweenEachStep;
+                const orderPx = previousOrderPx + priceDistanceBetweenEachStep;
                 const triggerPx = orderPx - addForTriggerPrice * 10; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
                 const sz = amountOfUsdtPerStep / orderPx;
-                if (triggerPx < currentPrice) {
+                if (previousOrderPx < currentPrice) {
                     continue
                 }
 
@@ -421,7 +422,7 @@ export class OkxService {
         return data;
     }
 
-    async placeAllOrdersForUp(testing: boolean = true) {
+    async placeAllBuyOrdersForUp(testing: boolean = true) {
         this.logger.log(`Starting to place all orders for all coins, testing mode: ${testing}`);
         const coinConfig = this.config.get<any>(`coin`);
         if (!coinConfig) {
@@ -430,7 +431,83 @@ export class OkxService {
         const results = [];
         for await (const coin of Object.keys(coinConfig)) {
             this.logger.log(`Placing multiple orders for ${coin}`);
-            const res = await this.placeMultipleOrdersForUp(coin, testing);
+            const res = await this.placeMultipleBuyOrdersForUp(coin, testing);
+            results.push({ coin, result: res });
+        }
+        return results;
+    }
+
+    async placeMultipleSellOrdersForDown(coin: string, testing: boolean = true) {
+        this.logger.log(`Starting to place multiple orders for ${coin}, testing mode: ${testing}`);
+        const coinConfig = this.config.get<any>(`coin.${coin}`);
+        this.logger.log(`Placing multiple orders for ${coin} with config: ${JSON.stringify(coinConfig)}`);
+        if (!coinConfig) {
+            throw new Error(`No configuration found for coin: ${JSON.stringify(coin)}`);
+        }
+        const { maxUsdt, minBuyPrice, maxBuyPrice, stopLossPrice, amountOfUsdtPerStep, riskPerTrade, addForTriggerPrice, szToFixed, priceToFixed, numberOfBoughtCoin, maxTakeProfitPrice, minTakeProfitPrice } = coinConfig;
+        if (minBuyPrice >= maxBuyPrice) {
+            throw new Error(`Invalid configuration: minBuyPrice (${minBuyPrice}) must be less than maxBuyPrice (${maxBuyPrice})`);
+        }
+        if (amountOfUsdtPerStep <= 10) {
+            throw new Error(`Invalid configuration: amountOfUsdtPerStep (${amountOfUsdtPerStep}) must be greater than 10 USDT`);
+        }
+        if (stopLossPrice >= minBuyPrice) {
+            throw new Error(`Invalid configuration: stopLossPrice (${stopLossPrice}) must be less than minBuyPrice (${minBuyPrice})`);
+        }
+
+        if (!numberOfBoughtCoin || !maxTakeProfitPrice || !minTakeProfitPrice) {
+            throw new Error(`Invalid values for take profit`);
+        }
+
+        if (maxTakeProfitPrice < minTakeProfitPrice) {
+            throw new Error(`Invalid configuration: minTakeProfitPrice (${minTakeProfitPrice}) must be less than maxTakeProfitPrice (${maxTakeProfitPrice})`); 
+        }
+
+        const instId = `${coin}-USDT`;
+        const currentPrice = await this.getTicker(instId);
+        this.logger.log(`Current price: ${currentPrice}`);
+
+        const amountOfBoughtCoinByUsdt = numberOfBoughtCoin * currentPrice;
+        const numberOfSteps = Math.ceil(amountOfBoughtCoinByUsdt / (amountOfUsdtPerStep / 2));
+        const priceDistanceBetweenEachStep = (maxTakeProfitPrice - minTakeProfitPrice) / (numberOfSteps);
+
+        this.logger.log(`amountOfBoughtCoinByUsdt: ${amountOfBoughtCoinByUsdt}, numberOfSteps: ${numberOfSteps}, priceDistanceBetweenEachStep: ${priceDistanceBetweenEachStep}`)
+        const data = [];
+
+        try {
+            let totalSz = 0;
+            let previousOrderPx = maxTakeProfitPrice + priceDistanceBetweenEachStep;
+            while (totalSz < numberOfBoughtCoin) {
+                const triggerPx = previousOrderPx - priceDistanceBetweenEachStep;
+                const orderPx = triggerPx - addForTriggerPrice * 10; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
+                const sz = (amountOfUsdtPerStep / 2) / orderPx;
+
+                const res = await this.placeOneOrder(coin, 'sell', sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPx.toFixed(priceToFixed), testing);
+
+                data.push({ data: res.data, body: res.body });
+
+                totalSz += sz;
+                previousOrderPx = triggerPx;
+            }
+        } catch (error) {
+            this.logger.log('Error placing trigger order:', error.response?.data || error.message);
+            throw error;
+        }
+
+
+        return data;
+    }
+
+    async placeAllSellOrdersForDown(testing: boolean = true) {
+        this.logger.log(`Starting to place all orders for all coins, testing mode: ${testing}`);
+        const coins = this.config.get<any>(`coinsForTakeProfit`);
+        if (!coins) {
+            throw new Error(`No configuration found for coins: ${JSON.stringify(coins)}`);
+        }
+        const results = [];
+        for await (const coin of coins) {
+            this.logger.log(`Placing multiple orders for ${coin}`);
+            const res = await this.placeMultipleSellOrdersForDown(coin, testing);
             results.push({ coin, result: res });
         }
         return results;

@@ -28,7 +28,7 @@ export class AppController {
   @Post('order-multiple/:coin')
   placeMultipleOrders(@Param('coin') coin: string, @Query('testing') testing: string) {
     const isTesting = testing !== 'false';
-    return this.okxService.placeMultipleOrders(coin, isTesting);
+    return this.okxService.placeMultipleBuyOrders(coin, isTesting);
   }
 
   @Post('cancel-all-orders')
@@ -46,13 +46,13 @@ export class AppController {
   }
 
   @Post('order-all-for-up')
-  async placeAllOrders( @Query('testing') testing: string) {
+  async placeAllForUpOrders( @Query('testing') testing: string) {
     const isTesting = testing !== 'false';
     if (!isTesting) {
       await this.okxService.cancelAllOpenOrders('SPOT');
       await this.okxService.cancelAllOpenConditionalOrders('SPOT');
     }
-    return this.okxService.placeAllOrdersForUp(isTesting);
+    return this.okxService.placeAllBuyOrdersForUp(isTesting);
   }
 
   @Post('order-for-up-one-coin/:coin')
@@ -62,7 +62,19 @@ export class AppController {
       await this.okxService.cancelOpenOrdersForOneCoin(coin, 'SPOT');
       await this.okxService.cancelOpenConditionalOrdersForOneCoin(coin, 'SPOT');
     }
-    return this.okxService.placeMultipleOrdersForUp(coin, isTesting);
+    return this.okxService.placeMultipleBuyOrdersForUp(coin, isTesting);
+  }
+
+  @Post('order-all-for-down')
+  async placeAllForDownOrders( @Query('testing') testing: string) {
+    const isTesting = testing !== 'false';
+    return this.okxService.placeAllSellOrdersForDown(isTesting);
+  }
+
+  @Post('order-for-down-one-coin/:coin')
+  async placeOrdersForDownOneCoin(@Param('coin') coin: string, @Query('testing') testing: string) {
+    const isTesting = testing !== 'false';
+    return this.okxService.placeMultipleSellOrdersForDown(coin, isTesting);
   }
 
   @Post('sale/order-one/:coin')
