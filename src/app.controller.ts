@@ -68,12 +68,20 @@ export class AppController {
   @Post('order-all-for-down')
   async placeAllForDownOrders( @Query('testing') testing: string) {
     const isTesting = testing !== 'false';
+    if (!isTesting) {
+      await this.okxService.cancelAllOpenOrders('SPOT');
+      await this.okxService.cancelAllOpenConditionalOrders('SPOT');
+    }
     return this.okxService.placeAllSellOrdersForDown(isTesting);
   }
 
   @Post('order-for-down-one-coin/:coin')
   async placeOrdersForDownOneCoin(@Param('coin') coin: string, @Query('testing') testing: string) {
     const isTesting = testing !== 'false';
+    if (!isTesting) {
+      await this.okxService.cancelOpenOrdersForOneCoin(coin, 'SPOT');
+      await this.okxService.cancelOpenConditionalOrdersForOneCoin(coin, 'SPOT');
+    }
     return this.okxService.placeMultipleSellOrdersForDown(coin, isTesting);
   }
 

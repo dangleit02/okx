@@ -10,17 +10,17 @@
     -H "Content-Type: application/json"
 
 # buy for up for one coin
-  curl -X POST 'http://localhost:3000/cancel-orders:AXS' \
+  curl -X POST 'http://localhost:3000/cancel-orders/DOT' \
     -H "Content-Type: application/json"
 
-  curl -X POST 'http://localhost:3000/order-for-up-one-coin/AXS?testing=true' \
+  curl -X POST 'http://localhost:3000/order-for-up-one-coin/DOGS?testing=true' \
     -H "Content-Type: application/json"
 
   curl -X POST 'http://localhost:3000/order-for-up-one-coin/DOT?testing=false' \
     -H "Content-Type: application/json"
 
 
-# selluy all for down
+# sell all for down
 
   curl -X POST 'http://localhost:3000/order-all-for-down?testing=true' \
     -H "Content-Type: application/json"
@@ -28,8 +28,8 @@
   curl -X POST 'http://localhost:3000/order-all-for-down?testing=false' \
     -H "Content-Type: application/json"
 
-# sell for down for one coin
-  curl -X POST 'http://localhost:3000/order-for-down-one-coin/IMX?testing=true' \
+# sell for down for one coin  
+  curl -X POST 'http://localhost:3000/order-for-down-one-coin/DOGS?testing=true' \
     -H "Content-Type: application/json"
 
   curl -X POST 'http://localhost:3000/order-for-down-one-coin/DOT?testing=false' \

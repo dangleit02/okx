@@ -1,9 +1,44 @@
 export default () => ({
+    coinsForBuy: [
+        'AXS'     ,
+        'STRK'    ,
+        'WLD'     ,
+        'DOT'     ,
+        'NEAR'    ,
+        'DOGS'    ,
+        'AEVO'    ,
+        'DYDX'    ,
+        'OP'      ,
+        'ENJ'     ,
+        'ID'      ,
+        'TNSR'    ,
+        'ETHW'    ,
+        'ORDI'    ,
+        'PEOPLE'  ,
+        'TIA'     ,
+        'IMX'     ,
+        'MLN'     ,
+        'MEME'    ,
+        'PYTH'    ,
+        'PEPE'    ,
+        'WIF'     ,
+        'FLOKI'   ,
+        'BONK'    ,
+        'DOGE'    ,
+        'BOME'    ,
+        'BIO'     ,
+        'POL'     ,
+        'MAGIC'   ,
+        'LDO'     ,
+        'ARB'     ,
+        'SHIB'    ,
+        'ADA'     ,
+    ],
     coinsForTakeProfit: [
         'AXS'     ,
         // 'STRK'    ,
         // 'WLD'     ,
-        // 'DOT'     ,
+        'DOT'     ,
         // 'NEAR'    ,
         'DOGS'    ,
         'AEVO'    ,
@@ -16,7 +51,7 @@ export default () => ({
         'ORDI'    ,
         'PEOPLE'  ,
         'TIA'     ,
-        // 'IMX'     ,
+        'IMX'     ,
         'MLN'     ,
         'MEME'    ,
         'PYTH'    ,
@@ -33,6 +68,7 @@ export default () => ({
         'ARB'     ,
         // 'SHIB'    ,
         // 'ADA'     ,
+        'XLM',
     ],
     coin: {
         AXS: {
@@ -46,7 +82,7 @@ export default () => ({
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 37, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 36.86406091, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 2.524, // Giá chốt lời (USDT)
             minTakeProfitPrice: 2.369, // Giá chốt lời (USDT)
         },
@@ -86,7 +122,7 @@ export default () => ({
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 8.6913005, // Số lương coin đang sở hữu
-            maxTakeProfitPrice: 4.46, // Giá chốt lời (USDT)
+            maxTakeProfitPrice: 4.598, // Giá chốt lời (USDT)
             minTakeProfitPrice: 4.095, // Giá chốt lời (USDT)
         },
         NEAR: {
@@ -112,7 +148,7 @@ export default () => ({
             addForTriggerPrice: 0.0000001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 7, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 572, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 528598.0652, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.0001415, // Giá chốt lời (USDT)
             minTakeProfitPrice: 0.000131, // Giá chốt lời (USDT)
         },
@@ -127,7 +163,7 @@ export default () => ({
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 131, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 130.88205526, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.1002, // Giá chốt lời (USDT)
             minTakeProfitPrice: 0.0907, // Giá chốt lời (USDT)
         },
@@ -142,7 +178,7 @@ export default () => ({
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 39, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 38.96880076, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.6592, // Giá chốt lời (USDT)
             minTakeProfitPrice: 0.5979, // Giá chốt lời (USDT)
         },
@@ -157,7 +193,7 @@ export default () => ({
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 24, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 23.9760507, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.8075, // Giá chốt lời (USDT)
             minTakeProfitPrice: 0.7288, // Giá chốt lời (USDT)
         },
@@ -172,7 +208,7 @@ export default () => ({
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 1328, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 1327.789871, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.0709, // Giá chốt lời (USDT)
             minTakeProfitPrice: 0.0662, // Giá chốt lời (USDT)
         },
@@ -187,7 +223,7 @@ export default () => ({
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 527, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 526.5041014, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.1671, // Giá chốt lời (USDT)
             minTakeProfitPrice: 0.1558, // Giá chốt lời (USDT)
         },
@@ -202,7 +238,7 @@ export default () => ({
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 358, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 307.64203136, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.1219, // Giá chốt lời (USDT)
             minTakeProfitPrice: 0.1145, // Giá chốt lời (USDT)
         },
@@ -217,7 +253,7 @@ export default () => ({
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 16, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 15.1848, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 1.6285, // Giá chốt lời (USDT)
             minTakeProfitPrice: 1.5482, // Giá chốt lời (USDT)
         },
@@ -232,7 +268,7 @@ export default () => ({
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 2, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 1.8982866, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 10.286, // Giá chốt lời (USDT)
             minTakeProfitPrice: 9.234, // Giá chốt lời (USDT)
         },
@@ -247,7 +283,7 @@ export default () => ({
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 1565, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 1282.43400039, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.02136, // Giá chốt lời (USDT)
             minTakeProfitPrice: 0.01968, // Giá chốt lời (USDT)
         },
@@ -262,7 +298,7 @@ export default () => ({
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 49, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 48.6513456, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 1.784, // Giá chốt lời (USDT)
             minTakeProfitPrice: 1.654, // Giá chốt lời (USDT)
         },
@@ -278,7 +314,7 @@ export default () => ({
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá,
             numberOfBoughtCoin: 54.5526, // Số lương coin đang sở hữu
-            maxTakeProfitPrice: 0.814, // Giá chốt lời (USDT)
+            maxTakeProfitPrice: 0.880, // Giá chốt lời (USDT)
             minTakeProfitPrice: 0.621, // Giá chốt lời (USDT)
         },
         MLN: {
@@ -292,7 +328,7 @@ export default () => ({
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 13, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 12.68908, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 8.11, // Giá chốt lời (USDT)
             minTakeProfitPrice: 7.65, // Giá chốt lời (USDT)
         },
@@ -307,7 +343,7 @@ export default () => ({
             addForTriggerPrice: 0.000001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 6, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 2319, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 74.19016, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.002684, // Giá chốt lời (USDT)
             minTakeProfitPrice: 0.002462, // Giá chốt lời (USDT)
         },
@@ -322,7 +358,7 @@ export default () => ({
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 38, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 7.9624656, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.1703, // Giá chốt lời (USDT)
             minTakeProfitPrice: 0.1557, // Giá chốt lời (USDT)
         },
@@ -337,7 +373,7 @@ export default () => ({
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 36, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 35.4645649, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.5183, // Giá chốt lời (USDT)
             minTakeProfitPrice: 0.4834, // Giá chốt lời (USDT)
         },
@@ -364,7 +400,7 @@ export default () => ({
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 21, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 20.3828464, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.934, // Giá chốt lời (USDT)
             minTakeProfitPrice: 0.858, // Giá chốt lời (USDT)
         },
@@ -379,7 +415,7 @@ export default () => ({
             addForTriggerPrice: 0.00000001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 8, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 125, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 124087.612, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.00010015, // Giá chốt lời (USDT)
             minTakeProfitPrice: 0.00009281, // Giá chốt lời (USDT)
         },
@@ -394,7 +430,7 @@ export default () => ({
             addForTriggerPrice: 0.000000001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 9, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 265, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 264573.9716, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.00002482, // Giá chốt lời (USDT)
             minTakeProfitPrice: 0.00002246, // Giá chốt lời (USDT)
         },
@@ -421,7 +457,7 @@ export default () => ({
             addForTriggerPrice: 0.000001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 6, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 5960, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 5959.2288, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.002115, // Giá chốt lời (USDT)
             minTakeProfitPrice: 0.00193, // Giá chốt lời (USDT)
         },
@@ -460,7 +496,7 @@ export default () => ({
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 58, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 57.94200024, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.2133, // Giá chốt lời (USDT)
             minTakeProfitPrice: 0.1962, // Giá chốt lời (USDT)
         },
@@ -475,7 +511,7 @@ export default () => ({
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
-            numberOfBoughtCoin: 15, // Số lương coin đang sở hữu
+            numberOfBoughtCoin: 14.986, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 1.3012, // Giá chốt lời (USDT)
             minTakeProfitPrice: 1.1484, // Giá chốt lời (USDT)
         },
@@ -502,6 +538,15 @@ export default () => ({
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
+        },
+        XLM: {
+            amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
+            addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
+            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            priceToFixed: 5, // Số chữ số thập phân cho giá
+            numberOfBoughtCoin: 18.88870559, // Số lương coin đang sở hữu
+            maxTakeProfitPrice: 0.3912, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.3735, // Giá chốt lời (USDT)
         },
     },
 });
