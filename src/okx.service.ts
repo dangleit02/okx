@@ -31,7 +31,7 @@ export class OkxService {
         };
     }
 
-    async cancelOpenOrdersForOneCoin(coin: string, instType: string = 'SPOT') {
+    async cancelOpenOrdersForOneCoin(coin: string, instType: string = 'SPOT', side: 'buy' | 'sell' | null = null) {
         const timestamp = new Date().toISOString();
 
         // 1. Get open orders
@@ -53,9 +53,16 @@ export class OkxService {
         const orders = pendingRes.data.data;
         if (!orders.length) return { msg: 'No open orders' };
 
+        // 2. Filter theo side
+        let ordersBySide = side ? orders.filter((order: any) => order.side === side) : orders;
+
+        if (ordersBySide.length === 0) {
+            this.logger.log(`No ${side.toUpperCase()} orders to cancel`);
+            return { cancelled: [] };
+        }   
         // 2. Cancel in batch (20 each)
         const batches = [];
-        for (let i = 0; i < orders.length; i += 20) {
+        for (let i = 0; i < ordersBySide.length; i += 20) {
             const chunk = orders.slice(i, i + 20);
             batches.push(chunk);
         }
@@ -91,7 +98,7 @@ export class OkxService {
         return results;
     }
 
-    async cancelAllOpenOrders(instType: string = 'SPOT') {
+    async cancelAllOpenOrders(instType: string = 'SPOT', side: 'buy' | 'sell' | null = null) {
         const timestamp = new Date().toISOString();
 
         // 1. Get open orders
@@ -112,9 +119,16 @@ export class OkxService {
         const orders = pendingRes.data.data;
         if (!orders.length) return { msg: 'No open orders' };
 
+        // 2. Filter theo side
+        let ordersBySide = side ? orders.filter((order: any) => order.side === side) : orders;
+
+        if (ordersBySide.length === 0) {
+            this.logger.log(`No ${side.toUpperCase()} orders to cancel`);
+            return { cancelled: [] };
+        }      
         // 2. Cancel in batch (20 each)
         const batches = [];
-        for (let i = 0; i < orders.length; i += 20) {
+        for (let i = 0; i < ordersBySide.length; i += 20) {
             const chunk = orders.slice(i, i + 20);
             batches.push(chunk);
         }
@@ -150,7 +164,7 @@ export class OkxService {
         return results;
     }
 
-    async cancelOpenConditionalOrdersForOneCoin(coin: string, instType: string = 'SPOT') {
+    async cancelOpenConditionalOrdersForOneCoin(coin: string, instType: string = 'SPOT', side: 'buy' | 'sell' | null = null) {
         const timestamp = new Date().toISOString();
 
         // 1. Get open orders
@@ -172,12 +186,20 @@ export class OkxService {
 
         const pendingOrders = getRes.data?.data || [];
         if (pendingOrders.length === 0) {
-            this.logger.log('✅ No pending algo orders to cancel.');
+            this.logger.log(`✅ No pending algo orders to cancel for ${instId}.`);
             return { message: 'No pending algo orders' };
         }
 
+        // 2. Filter theo side
+        let ordersBySide = side ? pendingOrders.filter((order: any) => order.side === side) : pendingOrders;
+
+        if (ordersBySide.length === 0) {
+            this.logger.log(`No ${side.toUpperCase()} orders to cancel for ${instId}`);
+            return { cancelled: [] };
+        }        
+
         // 2. Chuẩn hoá orders để huỷ
-        const ordersToCancel = pendingOrders.map((o: any) => ({
+        const ordersToCancel = ordersBySide.map((o: any) => ({
             algoId: o.algoId,
             instId: o.instId,
         }));
@@ -210,7 +232,7 @@ export class OkxService {
         return results;
     }
 
-    async cancelAllOpenConditionalOrders(instType: string = 'SPOT') {
+    async cancelAllOpenConditionalOrders(instType: string = 'SPOT', side: 'buy' | 'sell' | null = null) {
         const timestamp = new Date().toISOString();
 
         // 1. Get open orders
@@ -235,11 +257,20 @@ export class OkxService {
             return { message: 'No pending algo orders' };
         }
 
-        // 2. Chuẩn hoá orders để huỷ
-        const ordersToCancel = pendingOrders.map((o: any) => ({
+        // 2. Filter theo side
+        let ordersBySide = side ? pendingOrders.filter((order: any) => order.side === side) : pendingOrders;
+
+        if (ordersBySide.length === 0) {
+            this.logger.log(`No ${side.toUpperCase()} orders to cancel`);
+            return { cancelled: [] };
+        }        
+
+        // 2. Chuẩn hoá orders để huỷ        
+        const ordersToCancel = ordersBySide.map((o: any) => ({
             algoId: o.algoId,
             instId: o.instId,
         }));
+        
 
         this.logger.log(`Found ${ordersToCancel.length} pending algo orders. Cancelling...`);
 
@@ -459,7 +490,9 @@ export class OkxService {
         this.logger.log(`Current price: ${currentPrice}`);
         const maxPrice = Math.min(currentPrice - addForTriggerPrice * 10, maxTakeProfitPrice);
         const data = [];
-
+        // stop loss
+        const res = await this.placeOneOrder(coin, 'sell', numberOfBoughtCoin, stopLossPrice.toFixed(priceToFixed), null, testing);
+        data.push({ data: res.data, step: 'stoploss', body: res.body });
         if (maxPrice <= minTakeProfitPrice) {
             return data;
         }
@@ -490,10 +523,7 @@ export class OkxService {
                 totalSz += sz;
                 previousOrderPx = triggerPx;
             }
-            // stop loss
-            const res = await this.placeOneOrder(coin, 'sell', numberOfCoinToBuy.toFixed(szToFixed), stopLossPrice.toFixed(priceToFixed), null, testing);
-
-            data.push({ data: res.data, step: 'stoploss', body: res.body });
+            
         } catch (error) {
             this.logger.log('Error placing trigger order:', error.response?.data || error.message);
             throw error;

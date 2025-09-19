@@ -69,8 +69,8 @@ export class AppController {
   async placeAllForDownOrders( @Query('testing') testing: string) {
     const isTesting = testing !== 'false';
     if (!isTesting) {
-      await this.okxService.cancelAllOpenOrders('SPOT');
-      await this.okxService.cancelAllOpenConditionalOrders('SPOT');
+      await this.okxService.cancelAllOpenOrders('SPOT', 'sell');
+      await this.okxService.cancelAllOpenConditionalOrders('SPOT', 'sell');
     }
     return this.okxService.placeAllSellOrdersForDown(isTesting);
   }
@@ -79,8 +79,8 @@ export class AppController {
   async placeOrdersForDownOneCoin(@Param('coin') coin: string, @Query('testing') testing: string) {
     const isTesting = testing !== 'false';
     if (!isTesting) {
-      await this.okxService.cancelOpenOrdersForOneCoin(coin, 'SPOT');
-      await this.okxService.cancelOpenConditionalOrdersForOneCoin(coin, 'SPOT');
+      await this.okxService.cancelOpenOrdersForOneCoin(coin, 'SPOT', 'sell');
+      await this.okxService.cancelOpenConditionalOrdersForOneCoin(coin, 'SPOT', 'sell');
     }
     return this.okxService.placeMultipleSellOrdersForDown(coin, isTesting);
   }
