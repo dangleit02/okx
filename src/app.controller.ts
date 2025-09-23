@@ -19,8 +19,8 @@ export class AppController {
   }
 
   @Get('balance')
-  async getBalance() {
-    const result = await this.okxService.getAccountBalance();
+  async getBalance(@Query('ccy') ccy?: string) {
+    const result = await this.okxService.getAccountBalance(ccy);
     console.log('Balance:', JSON.stringify(result, null, 2));
     return result;
   }
@@ -32,46 +32,34 @@ export class AppController {
   }
 
   @Post('cancel-all-orders')
-  async cancelAllOrders() {
-    const res1 = await this.okxService.cancelAllOpenOrders('SPOT');
-    const res2 = await this.okxService.cancelAllOpenConditionalOrders('SPOT');
+  async cancelAllOrders(@Query('sdie') side?: 'buy' | 'sell' | null) {
+    const res1 = await this.okxService.cancelAllOpenOrders('SPOT', side);
+    const res2 = await this.okxService.cancelAllOpenConditionalOrders('SPOT', side);
     return { res1, res2 };
   }
 
   @Post('cancel-orders/:coin')
-  async cancelOrdersForOneCoin(@Param('coin') coin: string) {
-    const res1 = await this.okxService.cancelOpenOrdersForOneCoin(coin, 'SPOT');
-    const res2 = await this.okxService.cancelOpenConditionalOrdersForOneCoin(coin, 'SPOT');
+  async cancelOrdersForOneCoin(@Param('coin') coin: string, @Query('sdie') side?: 'buy' | 'sell' | null) {
+    const res1 = await this.okxService.cancelOpenOrdersForOneCoin(coin, 'SPOT', side);
+    const res2 = await this.okxService.cancelOpenConditionalOrdersForOneCoin(coin, 'SPOT', side);
     return { res1, res2 };
   }
 
   @Post('order-all-for-up')
   async placeAllForUpOrders( @Query('testing') testing: string) {
     const isTesting = testing !== 'false';
-    if (!isTesting) {
-      await this.okxService.cancelAllOpenOrders('SPOT');
-      await this.okxService.cancelAllOpenConditionalOrders('SPOT');
-    }
     return this.okxService.placeAllBuyOrdersForUp(isTesting);
   }
 
   @Post('order-for-up-one-coin/:coin')
   async placeOrdersForUpOneCoin(@Param('coin') coin: string, @Query('testing') testing: string) {
     const isTesting = testing !== 'false';
-    if (!isTesting) {
-      await this.okxService.cancelOpenOrdersForOneCoin(coin, 'SPOT');
-      await this.okxService.cancelOpenConditionalOrdersForOneCoin(coin, 'SPOT');
-    }
     return this.okxService.placeMultipleBuyOrdersForUp(coin, isTesting);
   }
 
   @Post('order-all-for-down')
   async placeAllForDownOrders( @Query('testing') testing: string) {
     const isTesting = testing !== 'false';
-    if (!isTesting) {
-      await this.okxService.cancelAllOpenOrders('SPOT', 'sell');
-      await this.okxService.cancelAllOpenConditionalOrders('SPOT', 'sell');
-    }
     return this.okxService.placeAllSellOrdersForDown(isTesting);
   }
 

@@ -1,8 +1,26 @@
-# buy all for up
+# get balance
+  curl -X GET 'http://localhost:3000/balance?ccy=DOGS' \
+    -H "Content-Type: application/json"    
 
-  curl -X POST 'http://localhost:3000/cancel-all-orders' \
+# cancel order 
+  curl -X POST 'http://localhost:3000/cancel-orders/1INCH' \
     -H "Content-Type: application/json"
 
+  curl -X POST 'http://localhost:3000/cancel-all-orders?side=sell' \
+    -H "Content-Type: application/json"    
+
+  curl -X POST 'http://localhost:3000/cancel-orders/AEVO?side=sell' \
+    -H "Content-Type: application/json"
+
+  curl -X POST 'http://localhost:3000/cancel-all-orders?side=buy' \
+    -H "Content-Type: application/json"
+
+  curl -X POST 'http://localhost:3000/cancel-orders/AEVO?side=buy' \
+    -H "Content-Type: application/json"
+
+# buy all for up
+
+  
   curl -X POST 'http://localhost:3000/order-all-for-up?testing=true' \
     -H "Content-Type: application/json"
 
@@ -10,13 +28,11 @@
     -H "Content-Type: application/json"
 
 # buy for up for one coin
-  curl -X POST 'http://localhost:3000/cancel-orders/DOT' \
+  
+  curl -X POST 'http://localhost:3000/order-for-up-one-coin/PYTH?testing=true' \
     -H "Content-Type: application/json"
 
-  curl -X POST 'http://localhost:3000/order-for-up-one-coin/DOGS?testing=true' \
-    -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3000/order-for-up-one-coin/DOT?testing=false' \
+  curl -X POST 'http://localhost:3000/order-for-up-one-coin/PYTH?testing=false' \
     -H "Content-Type: application/json"
 
 
@@ -29,10 +45,10 @@
     -H "Content-Type: application/json"
 
 # sell for down for one coin  
-  curl -X POST 'http://localhost:3000/order-for-down-one-coin/DOGS?testing=true' \
+  curl -X POST 'http://localhost:3000/order-for-down-one-coin/ID?testing=true' \
     -H "Content-Type: application/json"
 
-  curl -X POST 'http://localhost:3000/order-for-down-one-coin/DOT?testing=false' \
+  curl -X POST 'http://localhost:3000/order-for-down-one-coin/ID?testing=false' \
     -H "Content-Type: application/json"
 
 # AXS

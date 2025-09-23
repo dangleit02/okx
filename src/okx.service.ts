@@ -310,9 +310,9 @@ export class OkxService {
         return parseFloat(res.data.data[0]?.last);
     }
 
-    async getAccountBalance() {
+    async getAccountBalance(ccy: string = null) {
         const method = 'GET';
-        const requestPath = '/api/v5/account/balance';
+        const requestPath = `/api/v5/account/balance?ccy=${ccy}`;
         const body = '';
         const timestamp = new Date().toISOString();
 
@@ -412,14 +412,30 @@ export class OkxService {
         }
         const avarageBuyPrice = (minBuyPrice + maxBuyPrice) / 2; // 2.2655 USDT
         const amountOfUsdtRisk = maxUsdt * riskPerTrade; // 30 USDT
-        const numberOfCoinToBuy = (amountOfUsdtRisk / (avarageBuyPrice - stopLossPrice));
-        const costByUsdt = numberOfCoinToBuy * avarageBuyPrice;
+        
+        const totalNnumberOfCoinWillBeBought = (amountOfUsdtRisk / (avarageBuyPrice - stopLossPrice));        
+        const data = [];
+        if (totalNnumberOfCoinWillBeBought > 0) {
+            // stop loss
+            const res = await this.placeOneOrder(coin, 'sell', totalNnumberOfCoinWillBeBought.toFixed(szToFixed), stopLossPrice.toFixed(priceToFixed), null, testing);
+
+            data.push({ data: res.data, step: 'stoploss', body: res.body });
+        }
+        const coinBalanceData = await this.getAccountBalance(coin);
+        const numberOfBoughtCoin = coinBalanceData?.data[0]?.details[0]?.availBal ?? 0;
+        const numberOfCoinWillBeBought =  totalNnumberOfCoinWillBeBought - numberOfBoughtCoin;
+        const costByUsdt = numberOfCoinWillBeBought * avarageBuyPrice;        
         const numberOfSteps = Math.ceil(costByUsdt / amountOfUsdtPerStep);
+        console.log(`avarageBuyPrice: ${avarageBuyPrice}, totalNnumberOfCoinWillBeBought: ${totalNnumberOfCoinWillBeBought}, numberOfBoughtCoin: ${numberOfBoughtCoin}, numberOfCoinWillBeBought: ${numberOfCoinWillBeBought}, costByUsdt: ${costByUsdt}, numberOfSteps: ${numberOfSteps}`)                
+        if (totalNnumberOfCoinWillBeBought <= 0) {
+            console.log(`totalNnumberOfCoinWillBeBought <= 0: ${totalNnumberOfCoinWillBeBought <= 0}`);
+            return data;
+        }
         const priceDistanceBetweenEachStep = (maxBuyPrice - minBuyPrice) / numberOfSteps;
+        console.log(`priceDistanceBetweenEachStep: ${priceDistanceBetweenEachStep}`);
 
         const steps = Array.from({ length: numberOfSteps + 1 }, (_, i) => i);
-
-        const data = [];
+        console.log('steps:', JSON.stringify(steps));
         const instId = `${coin}-USDT`;
         const currentPrice = await this.getTicker(instId);
         this.logger.log(`Current price: ${currentPrice}`);
@@ -428,8 +444,10 @@ export class OkxService {
             for await (let step of steps) {
                 const previousOrderPx = minBuyPrice + (step - 1) * priceDistanceBetweenEachStep;
                 const orderPx = previousOrderPx + priceDistanceBetweenEachStep;
-                const triggerPx = orderPx - addForTriggerPrice * 10; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
+                // const triggerPx = orderPx - addForTriggerPrice * 10; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
+                const triggerPx = orderPx - orderPx * 0.002; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
                 const sz = amountOfUsdtPerStep / orderPx;
+                console.log(`step: ${step}, previousOrderPx: ${previousOrderPx}, orderPx: ${orderPx}, currentPrice: ${currentPrice}, previousOrderPx < currentPrice: ${previousOrderPx < currentPrice}`);
                 if (previousOrderPx < currentPrice) {
                     continue
                 }
@@ -439,11 +457,7 @@ export class OkxService {
 
                 data.push({ data: res.data, step, body: res.body });
             }
-
-            // stop loss
-            const res = await this.placeOneOrder(coin, 'sell', numberOfCoinToBuy.toFixed(szToFixed), stopLossPrice.toFixed(priceToFixed), null, testing);
-
-            data.push({ data: res.data, step: 'stoploss', body: res.body });
+            
         } catch (error) {
             this.logger.log('Error placing trigger order:', error.response?.data || error.message);
             throw error;
@@ -461,6 +475,10 @@ export class OkxService {
         }
         const results = [];
         for await (const coin of coins) {
+            if (!testing) {
+                await this.cancelOpenOrdersForOneCoin(coin, 'SPOT');
+                await this.cancelOpenConditionalOrdersForOneCoin(coin, 'SPOT');
+            }                
             this.logger.log(`Placing multiple orders for ${coin}`);
             const res = await this.placeMultipleBuyOrdersForUp(coin, testing);
             results.push({ coin, result: res });
@@ -475,53 +493,68 @@ export class OkxService {
         if (!coinConfig) {
             throw new Error(`No configuration found for coin: ${JSON.stringify(coin)}`);
         }
-        const { numberOfCoinToBuy, stopLossPrice, amountOfUsdtPerStep, addForTriggerPrice, szToFixed, priceToFixed, numberOfBoughtCoin, maxTakeProfitPrice, minTakeProfitPrice } = coinConfig;        
+        const { minBuyPrice, maxBuyPrice, stopLossPrice, amountOfUsdtPerStep, addForTriggerPrice, szToFixed, priceToFixed, maxTakeProfitPrice } = coinConfig;        
 
-        if (!numberOfBoughtCoin || !maxTakeProfitPrice || !minTakeProfitPrice) {
+        if (minBuyPrice >= maxBuyPrice) {
+            throw new Error(`Invalid configuration: minBuyPrice (${minBuyPrice}) must be less than maxBuyPrice (${maxBuyPrice})`);
+        }
+
+        if (!maxTakeProfitPrice) {
             throw new Error(`Invalid values for take profit`);
         }
-
-        if (maxTakeProfitPrice < minTakeProfitPrice) {
-            throw new Error(`Invalid configuration: minTakeProfitPrice (${minTakeProfitPrice}) must be less than maxTakeProfitPrice (${maxTakeProfitPrice})`); 
-        }
-
+    
         const instId = `${coin}-USDT`;
         const currentPrice = await this.getTicker(instId);
         this.logger.log(`Current price: ${currentPrice}`);
-        const maxPrice = Math.min(currentPrice - addForTriggerPrice * 10, maxTakeProfitPrice);
+        // const maxPrice = Math.min(currentPrice - addForTriggerPrice * 10, maxTakeProfitPrice);
         const data = [];
         // stop loss
+        const coinBalanceData = await this.getAccountBalance(coin);
+        const numberOfBoughtCoin = coinBalanceData?.data[0]?.details[0].availBal;
+        this.logger.log(`numberOfBoughtCoin: ${numberOfBoughtCoin}`);
+        if (!numberOfBoughtCoin || numberOfBoughtCoin <= 0) {
+            return data;
+        }
         const res = await this.placeOneOrder(coin, 'sell', numberOfBoughtCoin, stopLossPrice.toFixed(priceToFixed), null, testing);
         data.push({ data: res.data, step: 'stoploss', body: res.body });
-        if (maxPrice <= minTakeProfitPrice) {
+        const minTakeProfitPrice = (minBuyPrice + maxBuyPrice) / 2.0;
+        const minPrice = Math.max(minTakeProfitPrice, maxBuyPrice);
+        if (maxTakeProfitPrice <= minPrice) {
             return data;
         }
         const amountOfBoughtCoinByUsdt = numberOfBoughtCoin * currentPrice;
-        const numberOfSteps = Math.ceil(amountOfBoughtCoinByUsdt / (amountOfUsdtPerStep / 2));
-        const priceDistanceBetweenEachStep = (maxPrice - minTakeProfitPrice) / (numberOfSteps);
+        const numberOfSteps = Math.ceil(amountOfBoughtCoinByUsdt / (amountOfUsdtPerStep / 2)) - 1;
+        const priceDistanceBetweenEachStep = (maxTakeProfitPrice - minTakeProfitPrice) / Math.max(numberOfSteps - 1, 1.0);
 
         this.logger.log(`amountOfBoughtCoinByUsdt: ${amountOfBoughtCoinByUsdt}, numberOfSteps: ${numberOfSteps}, priceDistanceBetweenEachStep: ${priceDistanceBetweenEachStep}`)
         
         try {
             let totalSz = 0;
-            let previousOrderPx = maxPrice + priceDistanceBetweenEachStep;
+            let previousOrderPx = maxTakeProfitPrice + priceDistanceBetweenEachStep;
             while (totalSz < numberOfBoughtCoin) {
                 const triggerPx = previousOrderPx - priceDistanceBetweenEachStep;
-                const orderPx = triggerPx - addForTriggerPrice * 10; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
-                if (orderPx >= currentPrice) {
-                    continue;
-                }
+                // const orderPx = triggerPx - addForTriggerPrice * 10; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
+                const orderPx = triggerPx - triggerPx*0.002;
+                previousOrderPx = triggerPx;
                 let sz = (amountOfUsdtPerStep / 2) / orderPx;
                 if (totalSz + 2* sz >= numberOfBoughtCoin) {
                     sz = numberOfBoughtCoin -  totalSz;
                 }
+                totalSz += sz;
+                this.logger.log(`sz: ${sz}, orderPx: ${orderPx}, totalSz: ${totalSz}`);
 
+                if (orderPx >= currentPrice) {
+                    continue;
+                }
+                if (orderPx <= maxBuyPrice) {
+                    break;
+                }
+
+                
                 const res = await this.placeOneOrder(coin, 'sell', sz.toString(), triggerPx.toFixed(priceToFixed), orderPx.toFixed(priceToFixed), testing);
 
                 data.push({ data: res.data, body: res.body });
 
-                totalSz += sz;
-                previousOrderPx = triggerPx;
             }
             
         } catch (error) {
@@ -541,6 +574,11 @@ export class OkxService {
         }
         const results = [];
         for await (const coin of coins) {
+            if (!testing) {
+                await this.cancelAllOpenOrders('SPOT', 'sell');
+                await this.cancelAllOpenConditionalOrders('SPOT', 'sell');
+            }
+                
             this.logger.log(`Placing multiple orders for ${coin}`);
             const res = await this.placeMultipleSellOrdersForDown(coin, testing);
             results.push({ coin, result: res });
