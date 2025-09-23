@@ -517,9 +517,13 @@ export class OkxService {
         }
         const res = await this.placeOneOrder(coin, 'sell', numberOfBoughtCoin, stopLossPrice.toFixed(priceToFixed), null, testing);
         data.push({ data: res.data, step: 'stoploss', body: res.body });
-        const minTakeProfitPrice = (minBuyPrice + maxBuyPrice) / 2.0;
-        const minPrice = Math.max(minTakeProfitPrice, maxBuyPrice);
-        if (maxTakeProfitPrice <= minPrice) {
+        // const minTakeProfitPrice = (minBuyPrice + maxBuyPrice) / 2.0;
+        // const minPrice = Math.max(minTakeProfitPrice, maxBuyPrice);
+        // if (maxTakeProfitPrice <= minPrice) {
+        //     return data;
+        // }
+        const minTakeProfitPrice = (maxTakeProfitPrice + maxBuyPrice) / 2.0;
+        if (maxTakeProfitPrice <= minTakeProfitPrice) {
             return data;
         }
         const amountOfBoughtCoinByUsdt = numberOfBoughtCoin * currentPrice;

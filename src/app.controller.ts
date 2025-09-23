@@ -77,13 +77,6 @@ export class AppController {
     return this.okxService.placeMultipleSellOrdersForDown(coin, isTesting);
   }
 
-  @Post('sale/order-one/:coin')
-  placeOneOrder(@Param('coin') coin: string, @Query('testing') testing: string) {
-    const isTesting = testing !== 'false';
-    this.okxService.placeOneOrder(coin, 'sell', '5', '7.50', '7.45', isTesting)
-      .then(console.log)
-      .catch(console.error);
-  }
 
   // @Post('buy-rebound-one/:coin')
   // async buyRebound(
