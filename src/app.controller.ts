@@ -54,6 +54,10 @@ export class AppController {
   @Post('order-for-up-one-coin/:coin')
   async placeOrdersForUpOneCoin(@Param('coin') coin: string, @Query('testing') testing: string) {
     const isTesting = testing !== 'false';
+    if (!isTesting) {
+          await this.okxService.cancelOpenOrdersForOneCoin(coin, 'SPOT');
+          await this.okxService.cancelOpenConditionalOrdersForOneCoin(coin, 'SPOT');
+      }
     return this.okxService.placeMultipleBuyOrdersForUp(coin, isTesting);
   }
 
