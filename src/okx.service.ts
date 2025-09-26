@@ -493,14 +493,14 @@ export class OkxService {
         if (!coinConfig) {
             throw new Error(`No configuration found for coin: ${JSON.stringify(coin)}`);
         }
-        const { minBuyPrice, maxBuyPrice, stopLossPrice, amountOfUsdtPerStep, addForTriggerPrice, szToFixed, priceToFixed, maxTakeProfitPrice } = coinConfig;        
+        const { minBuyPrice, maxBuyPrice, stopLossPrice, amountOfUsdtPerStep, addForTriggerPrice, szToFixed, priceToFixed, minTakeProfitPrice, maxTakeProfitPrice } = coinConfig;        
 
         if (minBuyPrice >= maxBuyPrice) {
             throw new Error(`Invalid configuration: minBuyPrice (${minBuyPrice}) must be less than maxBuyPrice (${maxBuyPrice})`);
         }
 
-        if (!maxTakeProfitPrice) {
-            throw new Error(`Invalid values for take profit`);
+        if (minTakeProfitPrice >= maxTakeProfitPrice) {
+            throw new Error(`Invalid configuration: minTakeProfitPrice (${minTakeProfitPrice}) must be less than maxTakeProfitPrice (${maxTakeProfitPrice})`);
         }
     
         const instId = `${coin}-USDT`;
@@ -522,35 +522,29 @@ export class OkxService {
         // if (maxTakeProfitPrice <= minPrice) {
         //     return data;
         // }
-        const minTakeProfitPrice = (maxTakeProfitPrice + maxBuyPrice) / 2.0;
-        if (maxTakeProfitPrice <= minTakeProfitPrice) {
-            return data;
-        }
+        // const minTakeProfitPrice = (maxTakeProfitPrice + maxBuyPrice) / 2.0;
+        // if (maxTakeProfitPrice <= minTakeProfitPrice) {
+        //     return data;
+        // }
         const amountOfBoughtCoinByUsdt = numberOfBoughtCoin * currentPrice;
-        const numberOfSteps = Math.ceil(amountOfBoughtCoinByUsdt / (amountOfUsdtPerStep / 2)) - 1;
-        const priceDistanceBetweenEachStep = (maxTakeProfitPrice - minTakeProfitPrice) / Math.max(numberOfSteps - 1, 1.0);
+        const numberOfSteps = Math.ceil(amountOfBoughtCoinByUsdt / amountOfUsdtPerStep);
+        const priceDistanceBetweenEachStep = (maxTakeProfitPrice - minTakeProfitPrice) / Math.max(numberOfSteps, 1.0);
 
         this.logger.log(`amountOfBoughtCoinByUsdt: ${amountOfBoughtCoinByUsdt}, numberOfSteps: ${numberOfSteps}, priceDistanceBetweenEachStep: ${priceDistanceBetweenEachStep}`)
         
         try {
             let totalSz = 0;
-            let previousOrderPx = maxTakeProfitPrice + priceDistanceBetweenEachStep;
+            let previousOrderPx = minTakeProfitPrice - priceDistanceBetweenEachStep;
             while (totalSz < numberOfBoughtCoin) {
-                const triggerPx = previousOrderPx - priceDistanceBetweenEachStep;
+                const triggerPx = previousOrderPx + priceDistanceBetweenEachStep;
                 // const orderPx = triggerPx - addForTriggerPrice * 10; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
                 const orderPx = triggerPx - triggerPx*0.002;
                 previousOrderPx = triggerPx;
-                let sz = (amountOfUsdtPerStep / 2) / orderPx;
-                if (totalSz + 2* sz >= numberOfBoughtCoin) {
-                    sz = numberOfBoughtCoin -  totalSz;
-                }
+                let sz = (amountOfUsdtPerStep) / orderPx;
                 totalSz += sz;
                 this.logger.log(`sz: ${sz}, orderPx: ${orderPx}, totalSz: ${totalSz}`);
 
                 if (orderPx >= currentPrice) {
-                    continue;
-                }
-                if (orderPx <= maxBuyPrice) {
                     break;
                 }
 

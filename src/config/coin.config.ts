@@ -31,7 +31,7 @@ export default () => ({
         'ORDI',
         'LDO',
         'PENDLE',
-        'ETHFI',
+        // 'ETHFI',
         'PYTH',
     ],
     coinsForTakeProfit: [
@@ -76,9 +76,9 @@ export default () => ({
         AXS: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 2.678, // Giá hiện tại (USDT)
-            minBuyPrice: 2.09, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 2.365, // Giá mua cao nhất (USDT)
-            stopLossPrice: 1.887, // Giá dừng lỗ (USDT)
+            minBuyPrice: 1.844, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 2.129, // Giá mua cao nhất (USDT)
+            stopLossPrice: 1.726, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
@@ -91,8 +91,8 @@ export default () => ({
         STRK: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 0.1349, // Giá hiện tại (USDT)
-            minBuyPrice: 0.1075, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 0.1229, // Giá mua cao nhất (USDT)
+            minBuyPrice: 0.1092, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 0.1168, // Giá mua cao nhất (USDT)
             stopLossPrice: 0.0955, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
@@ -115,8 +115,8 @@ export default () => ({
         DOT: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 4.225, // Giá hiện tại (USDT)
-            minBuyPrice: 3.598, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 4.091, // Giá mua cao nhất (USDT)
+            minBuyPrice: 3.582, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 3.867, // Giá mua cao nhất (USDT)
             stopLossPrice: 2.995, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
@@ -130,8 +130,8 @@ export default () => ({
         NEAR: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             // currentPrice: 2.713, // Giá hiện tại (USDT)
-            minBuyPrice: 2.247, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 2.954, // Giá mua cao nhất (USDT)
+            minBuyPrice: 2.438, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 2.763, // Giá mua cao nhất (USDT)
             stopLossPrice: 1.789, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
@@ -142,8 +142,8 @@ export default () => ({
         DOGS: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 0.0001415, // Giá hiện tại (USDT)
-            minBuyPrice: 0.0001148, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 0.0001277, // Giá mua cao nhất (USDT)
+            minBuyPrice: 0.0001093, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 0.0001211, // Giá mua cao nhất (USDT)
             stopLossPrice: 0.0001038, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
@@ -172,8 +172,8 @@ export default () => ({
         DYDX: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 0.6455, // Giá hiện tại (USDT)
-            minBuyPrice: 0.5374, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 0.6487, // Giá mua cao nhất (USDT)
+            minBuyPrice: 0.5323, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 0.5786, // Giá mua cao nhất (USDT)
             stopLossPrice: 0.4075, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
@@ -187,9 +187,9 @@ export default () => ({
         OP: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 0.7776, // Giá hiện tại (USDT)
-            minBuyPrice: 0.6196, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 0.728, // Giá mua cao nhất (USDT)
-            stopLossPrice: 0.4488, // Giá dừng lỗ (USDT)
+            minBuyPrice: 0.471, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 0.5993, // Giá mua cao nhất (USDT)
+            stopLossPrice: 0.4075, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
@@ -202,10 +202,10 @@ export default () => ({
         ENJ: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 0.0701, // Giá hiện tại (USDT)
-            minBuyPrice: 0.0603, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 0.0645, // Giá mua cao nhất (USDT)
-            stopLossPrice: 0.0576, // Giá dừng lỗ (USDT)
-            amountOfUsdtPerStep: 20, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
+            minBuyPrice: 0.0562, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 0.0604, // Giá mua cao nhất (USDT)
+            stopLossPrice: 0.0545, // Giá dừng lỗ (USDT)
+            amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
@@ -217,9 +217,9 @@ export default () => ({
         ID: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 0.1704, // Giá hiện tại (USDT)
-            minBuyPrice: 0.1468, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 0.1638, // Giá mua cao nhất (USDT)
-            stopLossPrice: 0.134, // Giá dừng lỗ (USDT)
+            minBuyPrice: 0.1313, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 0.1471, // Giá mua cao nhất (USDT)
+            stopLossPrice: 0.1249, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
@@ -232,9 +232,9 @@ export default () => ({
         TNSR: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 0.1281, // Giá hiện tại (USDT)
-            minBuyPrice: 0.1001, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 0.1108, // Giá mua cao nhất (USDT)
-            stopLossPrice: 0.0926, // Giá dừng lỗ (USDT)
+            minBuyPrice: 0.0789, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 0.0990, // Giá mua cao nhất (USDT)
+            stopLossPrice: 0.0746, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
@@ -277,8 +277,8 @@ export default () => ({
         ORDI: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 9.703, // Giá hiện tại (USDT)
-            minBuyPrice: 6.112, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 9.226, // Giá mua cao nhất (USDT)
+            minBuyPrice: 8.058, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 8.576, // Giá mua cao nhất (USDT)
             stopLossPrice: 5.434, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
@@ -292,8 +292,8 @@ export default () => ({
         PEOPLE: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 0.01972, // Giá hiện tại (USDT)
-            minBuyPrice: 0.01568, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 0.01881, // Giá mua cao nhất (USDT)
+            minBuyPrice: 0.01198, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 0.01708, // Giá mua cao nhất (USDT)
             stopLossPrice: 0.00954, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
@@ -307,9 +307,9 @@ export default () => ({
         TIA: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 1.861, // Giá hiện tại (USDT)
-            minBuyPrice: 1.406, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 1.592, // Giá mua cao nhất (USDT)
-            stopLossPrice: 1.295, // Giá dừng lỗ (USDT)
+            minBuyPrice: 1.207, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 1.435, // Giá mua cao nhất (USDT)
+            stopLossPrice: 1.127, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
@@ -331,16 +331,16 @@ export default () => ({
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá,
             numberOfBoughtCoin: 40.42689, // Số lương coin đang sở hữu
-            maxTakeProfitPrice: 0.631, // Giá chốt lời (USDT)
-            minTakeProfitPrice: 0.621, // Giá chốt lời (USDT)
+            maxTakeProfitPrice: 0.835, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.663, // Giá chốt lời (USDT)
         },
         MLN: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 8.23, // Giá hiện tại (USDT)
-            minBuyPrice: 7.01, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 7.78, // Giá mua cao nhất (USDT)
-            stopLossPrice: 6.52, // Giá dừng lỗ (USDT)
-            amountOfUsdtPerStep: 20, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
+            minBuyPrice: 6.56, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 7.17, // Giá mua cao nhất (USDT)
+            stopLossPrice: 6.36, // Giá dừng lỗ (USDT)
+            amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
@@ -382,8 +382,8 @@ export default () => ({
         ARB: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 0.4693, // Giá hiện tại (USDT)
-            minBuyPrice: 0.3475, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 0.4566, // Giá mua cao nhất (USDT)
+            minBuyPrice: 0.3142, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 0.4295, // Giá mua cao nhất (USDT)
             stopLossPrice: 0.2452, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
@@ -397,7 +397,7 @@ export default () => ({
         PEPE: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 0.00001194, // Giá hiện tại (USDT)
-            minBuyPrice: 0.00000824, // Giá mua thấp nhất (USDT)
+            minBuyPrice: 0.00000866, // Giá mua thấp nhất (USDT)
             maxBuyPrice: 0.00001001, // Giá mua cao nhất (USDT)
             stopLossPrice: 0.00000514, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
@@ -409,7 +409,7 @@ export default () => ({
         WIF: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 0.973, // Giá hiện tại (USDT)
-            minBuyPrice: 0.618, // Giá mua thấp nhất (USDT)
+            minBuyPrice: 0.696, // Giá mua thấp nhất (USDT)
             maxBuyPrice: 0.834, // Giá mua cao nhất (USDT)
             stopLossPrice: 0.293, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
@@ -424,7 +424,7 @@ export default () => ({
         FLOKI: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             // currentPrice: 0.00010645, // Giá hiện tại (USDT)
-            minBuyPrice: 0.00005782, // Giá mua thấp nhất (USDT)
+            minBuyPrice: 0.00007602, // Giá mua thấp nhất (USDT)
             maxBuyPrice: 0.00009010, // Giá mua cao nhất (USDT)
             stopLossPrice: 0.00004534, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
@@ -439,7 +439,7 @@ export default () => ({
         BONK: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             // currentPrice: 0.0000261, // Giá hiện tại (USDT)
-            minBuyPrice: 0.00001098, // Giá mua thấp nhất (USDT)
+            minBuyPrice: 0.00001808, // Giá mua thấp nhất (USDT)
             maxBuyPrice: 0.00002120, // Giá mua cao nhất (USDT)
             stopLossPrice: 0.00000858, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
@@ -466,7 +466,7 @@ export default () => ({
         BOME: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 0.002256, // Giá hiện tại (USDT)
-            minBuyPrice: 0.00141, // Giá mua thấp nhất (USDT)
+            minBuyPrice: 0.001528, // Giá mua thấp nhất (USDT)
             maxBuyPrice: 0.001862, // Giá mua cao nhất (USDT)
             stopLossPrice: 0.00088, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
@@ -493,8 +493,8 @@ export default () => ({
         POL: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 0.2833, // Giá hiện tại (USDT)
-            minBuyPrice: 0.1893, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 0.2351, // Giá mua cao nhất (USDT)
+            minBuyPrice: 0.2035, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 0.2186, // Giá mua cao nhất (USDT)
             stopLossPrice: 0.162, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
@@ -520,7 +520,7 @@ export default () => ({
         LDO: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 1.2701, // Giá hiện tại (USDT)
-            minBuyPrice: 0.8364, // Giá mua thấp nhất (USDT)
+            minBuyPrice: 0.999, // Giá mua thấp nhất (USDT)
             maxBuyPrice: 1.1761, // Giá mua cao nhất (USDT)
             stopLossPrice: 0.5999, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
@@ -535,8 +535,8 @@ export default () => ({
         SHIB: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             currentPrice: 0.00001377, // Giá hiện tại (USDT)
-            minBuyPrice: 0.0000111, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 0.00001240, // Giá mua cao nhất (USDT)
+            minBuyPrice: 0.00001115, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 0.00001177, // Giá mua cao nhất (USDT)
             stopLossPrice: 0.00000989, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
@@ -550,7 +550,7 @@ export default () => ({
             minBuyPrice: 0.6759, // Giá mua thấp nhất (USDT)
             maxBuyPrice: 0.8499, // Giá mua cao nhất (USDT)
             stopLossPrice: 0.4967, // Giá dừng lỗ (USDT)
-            amountOfUsdtPerStep: 22, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
+            amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
@@ -616,9 +616,9 @@ export default () => ({
         APT: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             // currentPrice: 0.8589, // Giá hiện tại (USDT)
-            minBuyPrice: 4.075, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 4.422, // Giá mua cao nhất (USDT)
-            stopLossPrice: 3.71, // Giá dừng lỗ (USDT)
+            minBuyPrice: 3.680, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 4.049, // Giá mua cao nhất (USDT)
+            stopLossPrice: 3.538, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
@@ -652,8 +652,8 @@ export default () => ({
         SAND: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             // currentPrice: 0.8589, // Giá hiện tại (USDT)
-            minBuyPrice: 0.2487, // Giá mua thấp nhất (USDT)
-            maxBuyPrice: 0.2816, // Giá mua cao nhất (USDT)
+            minBuyPrice: 0.2436, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 0.2625, // Giá mua cao nhất (USDT)
             stopLossPrice: 0.2148, // Giá dừng lỗ (USDT)
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)

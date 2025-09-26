@@ -32,14 +32,14 @@ export class AppController {
   }
 
   @Post('cancel-all-orders')
-  async cancelAllOrders(@Query('sdie') side?: 'buy' | 'sell' | null) {
+  async cancelAllOrders(@Query('side') side?: 'buy' | 'sell' | null) {
     const res1 = await this.okxService.cancelAllOpenOrders('SPOT', side);
     const res2 = await this.okxService.cancelAllOpenConditionalOrders('SPOT', side);
     return { res1, res2 };
   }
 
   @Post('cancel-orders/:coin')
-  async cancelOrdersForOneCoin(@Param('coin') coin: string, @Query('sdie') side?: 'buy' | 'sell' | null) {
+  async cancelOrdersForOneCoin(@Param('coin') coin: string, @Query('side') side?: 'buy' | 'sell' | null) {
     const res1 = await this.okxService.cancelOpenOrdersForOneCoin(coin, 'SPOT', side);
     const res2 = await this.okxService.cancelOpenConditionalOrdersForOneCoin(coin, 'SPOT', side);
     return { res1, res2 };
