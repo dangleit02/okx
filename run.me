@@ -31,8 +31,8 @@ addBuySurprisePrice=true" \
 
 # buy at price for all
   curl -X POST "http://localhost:3000/buy-at-price-all-coins?\
-testing=false&\
-removeExistingBuyOrders=false&\
+testing=true&\
+removeExistingBuyOrders=true&\
 addBuyWhenUp=false&\
 addBuySurprisePrice=true" \
   -H "Content-Type: application/json"

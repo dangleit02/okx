@@ -1,5 +1,29 @@
 export default () => ({
-    coinsForBuy: [  
+    coinsForBuy: [
+        // TOP 100
+        'BTC',
+        'ETH',
+        'XRP',
+        'BNB',
+        'SOL',
+        'DOGE',
+        'ADA',  
+        'LINK',
+        'AVAX',
+        'XLM',
+        'SUI',
+        'BCH',
+        'DOT',
+        'UNI',
+        'AAVE',
+        'OKB',
+        'PEPE',
+        'WLD',
+        'BONK',
+        'PYTH',
+        'PENDLE',
+        'FLOKI',
+        'WIF',
         // da mua   
         'ENJ'     ,
         'APT'     ,
@@ -50,7 +74,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 27.30434391, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 2.524, // Giá chốt lời (USDT)
@@ -65,7 +89,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 4, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
         },
         WLD: {
@@ -77,7 +101,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 3, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
         },
         DOT: {
@@ -89,7 +113,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 7.3835415, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 4.598, // Giá chốt lời (USDT)
@@ -104,7 +128,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 8, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
         },
         DOGS: {
@@ -116,7 +140,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0000001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 3, // Số chữ số thập phân cho khối lượng
             priceToFixed: 7, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 311717.9202, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.0001415, // Giá chốt lời (USDT)
@@ -131,7 +155,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 4, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 70.94205526, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.1029, // Giá chốt lời (USDT)
@@ -146,7 +170,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 38.96880076, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.6336, // Giá chốt lời (USDT)
@@ -161,7 +185,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 4, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 23.9760507, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.8075, // Giá chốt lời (USDT)
@@ -176,7 +200,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 3, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 1186.547871, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.0709, // Giá chốt lời (USDT)
@@ -191,7 +215,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 3, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 490.3821014, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.1635, // Giá chốt lời (USDT)
@@ -206,7 +230,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 4, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 617.38213136, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.1219, // Giá chốt lời (USDT)
@@ -221,7 +245,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 4, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 3.9782, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 1.6285, // Giá chốt lời (USDT)
@@ -236,7 +260,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 4, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 3.9782, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 1.6285, // Giá chốt lời (USDT)
@@ -251,7 +275,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 4, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 1.3144866, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 10.286, // Giá chốt lời (USDT)
@@ -266,7 +290,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 708.32533239, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.02136, // Giá chốt lời (USDT)
@@ -281,7 +305,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 4, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 45.2692456, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 1.784, // Giá chốt lời (USDT)
@@ -296,7 +320,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá,
             numberOfBoughtCoin: 40.42689, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.905, // Giá chốt lời (USDT)
@@ -311,7 +335,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 6.498015, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 8.11, // Giá chốt lời (USDT)
@@ -326,7 +350,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.000001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 3, // Số chữ số thập phân cho khối lượng
             priceToFixed: 6, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 74.19016, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.002684, // Giá chốt lời (USDT)
@@ -341,7 +365,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 3, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 37.9624656, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.1703, // Giá chốt lời (USDT)
@@ -356,7 +380,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 4, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 23.8659649, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.5183, // Giá chốt lời (USDT)
@@ -371,7 +395,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.000000001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 3, // Số chữ số thập phân cho khối lượng
             priceToFixed: 9, // Số chữ số thập phân cho giá
         },
         WIF: {
@@ -383,7 +407,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 3, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 13.9528464, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.934, // Giá chốt lời (USDT)
@@ -398,7 +422,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.00000001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 3, // Số chữ số thập phân cho khối lượng
             priceToFixed: 8, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 64117.612, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.00010015, // Giá chốt lời (USDT)
@@ -413,7 +437,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.000000001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 3, // Số chữ số thập phân cho khối lượng
             priceToFixed: 9, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 264573.9716, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.00002482, // Giá chốt lời (USDT)
@@ -428,7 +452,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
         },
         BOME: {
@@ -440,7 +464,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.000001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 3, // Số chữ số thập phân cho khối lượng
             priceToFixed: 6, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 3109.2288, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.002115, // Giá chốt lời (USDT)
@@ -455,7 +479,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 3, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
         },
         POL: {
@@ -467,7 +491,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 2, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
         },
         MAGIC: {
@@ -479,7 +503,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 29.79941124, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.2133, // Giá chốt lời (USDT)
@@ -494,7 +518,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 4, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 14.986, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 1.3012, // Giá chốt lời (USDT)
@@ -509,7 +533,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.000000001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 3, // Số chữ số thập phân cho khối lượng
             priceToFixed: 9, // Số chữ số thập phân cho giá
         },
         ADA: {
@@ -521,13 +545,13 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 4, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
         },
         XLM: {
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
             numberOfBoughtCoin: 18.88870559, // Số lương coin đang sở hữu
             maxTakeProfitPrice: 0.3912, // Giá chốt lời (USDT)
@@ -542,7 +566,7 @@ export default () => ({
             amountOfUsdtPerStep: 22, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
         },
         SUI: {
@@ -554,7 +578,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 4, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
         },
         PENDLE: {
@@ -566,7 +590,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 3, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
         },
         YGG: {
@@ -578,7 +602,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 5, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
         },
         APT: {
@@ -590,7 +614,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 4, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
         },
         ZENT: {
@@ -614,7 +638,7 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.000001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 6, // Số chữ số thập phân cho giá
         },
         SAND: {
@@ -626,8 +650,48 @@ export default () => ({
             amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
-            szToFixed: 1, // Số chữ số thập phân cho khối lượng
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
         },
+        BTC: {
+            szToFixed: 7, // Số chữ số thập phân cho khối lượng
+            priceToFixed: 1, // Số chữ số thập phân cho giá            
+        },
+        ETH: {
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
+            priceToFixed: 2, // Số chữ số thập phân cho giá            
+        },
+        XRP: {
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
+            priceToFixed: 4, // Số chữ số thập phân cho giá            
+        },
+        BNB: {
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
+            priceToFixed: 1, // Số chữ số thập phân cho giá            
+        },
+        SOL: {
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
+            priceToFixed: 2, // Số chữ số thập phân cho giá 
+        },
+        LINK: {
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
+            priceToFixed: 3, // Số chữ số thập phân cho giá 
+        },
+        AVAX: {
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
+            priceToFixed: 3, // Số chữ số thập phân cho giá 
+        },
+        BCH: {
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
+            priceToFixed: 1, // Số chữ số thập phân cho giá 
+        },
+        AAVE: {
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
+            priceToFixed: 2, // Số chữ số thập phân cho giá 
+        },
+        OKB: {
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
+            priceToFixed: 2, // Số chữ số thập phân cho giá 
+        },     
     },
 });

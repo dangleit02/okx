@@ -522,10 +522,10 @@ export class OkxService {
             return data;
         }
 
-        const totalNnumberOfCoinWillBeBought = numberOfUSDT / currentPrice;
 
         const orderPrice = currentPrice * (1 - surprisePricePercentage);
         const triggerPx = orderPrice + orderPrice * 0.002;
+        const totalNnumberOfCoinWillBeBought = numberOfUSDT / orderPrice;
         this.logger.log(`Placing surprise price order for ${coin} at percentage: ${surprisePricePercentage * 100}%, px: ${orderPrice}, testing mode: ${testing}`);
         const res = await this.placeOneOrder(coin, 'buy', totalNnumberOfCoinWillBeBought.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPrice.toFixed(priceToFixed), testing);
         data.push({ data: res.data, step: `surprise_${(surprisePricePercentage * 100).toFixed(1)}%`, body: res.body });
