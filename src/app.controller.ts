@@ -29,8 +29,76 @@ export class AppController {
     return result;
   }
 
+  @Post('buy-at-price/:coin')
+  async buyAtPrice(
+    @Param('coin') coin: string,
+    @Query('testing') testing: string,
+    @Query('removeExistingBuyOrders') removeExistingBuyOrders: string, // 'true' or 'false' remove existing buy orders before placing new ones
+    @Query('addBuyWhenUp') addBuyWhenUp: string, // 'true' or 'false' add take profit order
+    @Query('addBuySurprisePrice') addBuySurprisePrice: string, // 'true' or 'false' add surprise price order
+  ) {
+   const results = [];
+    const isTesting = testing !== 'false';
+    if (!isTesting) {
+      if (removeExistingBuyOrders === 'true') {
+        const res1 = await this.okxService.cancelAllTypeOfOpenOrdersForOneCoin(coin, 'SPOT', 'buy');
+        console.log('Cancel existing buy orders:', JSON.stringify(res1, null, 2));
+        results.push({ coin, action: 'cancel_existing_buy_orders', result: res1 });
+      }
+    }
+    if (addBuyWhenUp === 'true') {
+      const res2 = await this.okxService.placeMultipleBuyOrdersForUp(coin, isTesting);
+      console.log('Place multiple buy orders for up:', JSON.stringify(res2, null, 2));
+      results.push({ coin, action: 'place_multiple_buy_orders_for_up', result: res2 });
+    }
+    if (addBuySurprisePrice === 'true') {
+      const res4 = await this.okxService.placeSurprisePriceBuyOrder(coin, isTesting);
+      console.log('Place surprise price buy order:', JSON.stringify(res4, null, 2));
+      results.push({ coin, action: 'place_surprise_price_buy_order', result: res4 });
+    }
+    return results;
+  }
+
+  @Post('buy-at-price-all-coins')
+  async buyAtPriceForAllCoins(
+    @Query('testing') testing: string,
+    @Query('removeExistingBuyOrders') removeExistingBuyOrders: string, // 'true' or 'false' remove existing buy orders before placing new ones
+    @Query('addBuyWhenUp') addBuyWhenUp: string, // 'true' or 'false' add take profit order
+    @Query('addBuySurprisePrice') addBuySurprisePrice: string, // 'true' or 'false' add surprise price order
+  ) {
+    this.logger.log(`Starting to place all orders for all coins, testing mode: ${testing}`);
+    const coins = this.config.get<any>(`coinsForBuy`);
+    if (!coins) {
+      throw new Error(`No configuration found for coins: ${JSON.stringify(coins)}`);
+    }
+    this.logger.log(`Coins to process: ${JSON.stringify(coins)}`);
+    const isTesting = testing !== 'false';
+    const results = [];
+    for await (const coin of coins) {
+      this.logger.log(`Processing coin: ${coin}`);
+      if (!isTesting) {
+        if (removeExistingBuyOrders === 'true') {
+          const res1 = await this.okxService.cancelAllTypeOfOpenOrdersForOneCoin(coin, 'SPOT', 'buy');
+          console.log('Cancel existing buy orders:', JSON.stringify(res1, null, 2));
+          results.push({ coin, action: 'cancel_existing_buy_orders', result: res1 });
+        }
+      }
+      if (addBuyWhenUp === 'true') {
+        const res2 = await this.okxService.placeMultipleBuyOrdersForUp(coin, isTesting);
+        console.log('Place multiple buy orders for up:', JSON.stringify(res2, null, 2));
+        results.push({ coin, action: 'place_multiple_buy_orders_for_up', result: res2 });
+      }
+      if (addBuySurprisePrice === 'true') {
+        const res4 = await this.okxService.placeSurprisePriceBuyOrder(coin, isTesting);
+        console.log('Place surprise price buy order:', JSON.stringify(res4, null, 2));
+        results.push({ coin, action: 'place_surprise_price_buy_order', result: res4 });
+      }
+    }
+    return results;
+  }
+
   @Post('sell-at-price/:coin')
-  async saveAtPrice(
+  async saleAtPrice(
     @Param('coin') coin: string,
     @Query('testing') testing: string,
     @Query('removeExistingSellOrders') removeExistingSellOrders: string, // 'true' or 'false' remove existing sell orders before placing new ones 
@@ -38,26 +106,31 @@ export class AppController {
     @Query('addSellStopLoss') addSellStopLoss: string, // 'true' or 'false' add stop loss order
     @Query('addSellSurprisePrice') addSellSurprisePrice: string, // 'true' or 'false' add surprise price order
   ) {
+    const results = [];
     const isTesting = testing !== 'false';
     if (!isTesting) {
       if (removeExistingSellOrders === 'true') {
         const res1 = await this.okxService.cancelAllTypeOfOpenOrdersForOneCoin(coin, 'SPOT', 'sell');
         console.log('Cancel existing sell orders:', JSON.stringify(res1, null, 2));
+        results.push({ coin, action: 'cancel_existing_sell_orders', result: res1 });
       }
     }
     if (addSellWhenDown === 'true') {
       const res2 = await this.okxService.placeMultipleSellOrdersForDown(coin, isTesting);
       console.log('Place multiple sell orders for down:', JSON.stringify(res2, null, 2));
+      results.push({ coin, action: 'place_multiple_sell_orders_for_down', result: res2 });
     }
     if (addSellSurprisePrice === 'true') {
       const res4 = await this.okxService.placeSurprisePriceSellOrder(coin, isTesting);
       console.log('Place surprise price sell order:', JSON.stringify(res4, null, 2));
+      results.push({ coin, action: 'place_surprise_price_sell_order', result: res4 });
     }
     if (addSellStopLoss === 'true') {
       const res3 = await this.okxService.placeStopLossOrder(coin, isTesting);
       console.log('Place stop loss order:', JSON.stringify(res3, null, 2));
+      results.push({ coin, action: 'place_stop_loss_order', result: res3 });
     }
-    return { message: `Sell orders for ${coin} have been placed.` };
+    return results;
   }
 
   @Post('sell-at-price-all-coins')

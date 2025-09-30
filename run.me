@@ -3,20 +3,38 @@
     -H "Content-Type: application/json"    
 
 # saveAtPrice
-  curl -X POST "http://localhost:3000/sell-at-price/IMX?\
+  curl -X POST "http://localhost:3000/sell-at-price/POL?\
 testing=true&\
-removeExistingSellOrders=true&\
+removeExistingSellOrders=false&\
 addSellWhenDown=false&\
-addSellStopLoss=true&\
+addSellStopLoss=false&\
 addSellSurprisePrice=true" \
   -H "Content-Type: application/json"
 
-  curl -X POST "http://localhost:3000/sell-at-price/IMX?\
+  
+# save at price for all
+  curl -X POST "http://localhost:3000/sell-at-price-all-coins?\
 testing=false&\
 removeExistingSellOrders=true&\
-addSellWhenDown=true&\
-addSellStopLoss=true&\
+addSellWhenDown=false&\
+addSellStopLoss=false&\
 addSellSurprisePrice=true" \
+  -H "Content-Type: application/json"
+
+# buy at price
+  curl -X POST "http://localhost:3000/buy-at-price/MLN?\
+testing=true&\
+removeExistingBuyOrders=false&\
+addBuyWhenUp=false&\
+addBuySurprisePrice=true" \
+  -H "Content-Type: application/json"
+
+# buy at price for all
+  curl -X POST "http://localhost:3000/buy-at-price-all-coins?\
+testing=false&\
+removeExistingBuyOrders=false&\
+addBuyWhenUp=false&\
+addBuySurprisePrice=true" \
   -H "Content-Type: application/json"
 
 # cancel order 
