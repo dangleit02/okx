@@ -2,6 +2,23 @@
   curl -X GET 'http://localhost:3000/balance?ccy=DOGS' \
     -H "Content-Type: application/json"    
 
+# saveAtPrice
+  curl -X POST "http://localhost:3000/sell-at-price/IMX?\
+testing=true&\
+removeExistingSellOrders=true&\
+addSellWhenDown=false&\
+addSellStopLoss=true&\
+addSellSurprisePrice=true" \
+  -H "Content-Type: application/json"
+
+  curl -X POST "http://localhost:3000/sell-at-price/IMX?\
+testing=false&\
+removeExistingSellOrders=true&\
+addSellWhenDown=true&\
+addSellStopLoss=true&\
+addSellSurprisePrice=true" \
+  -H "Content-Type: application/json"
+
 # cancel order 
   curl -X POST 'http://localhost:3000/cancel-orders/1INCH' \
     -H "Content-Type: application/json"
@@ -29,10 +46,10 @@
 
 # buy for up for one coin
   
-  curl -X POST 'http://localhost:3000/order-for-up-one-coin/PYTH?testing=true' \
+  curl -X POST 'http://localhost:3000/order-for-up-one-coin/APT?testing=true' \
     -H "Content-Type: application/json"
 
-  curl -X POST 'http://localhost:3000/order-for-up-one-coin/BONK?testing=false' \
+  curl -X POST 'http://localhost:3000/order-for-up-one-coin/SHIB?testing=false' \
     -H "Content-Type: application/json"
 
 
@@ -48,7 +65,7 @@
   curl -X POST 'http://localhost:3000/order-for-down-one-coin/IMX?testing=true' \
     -H "Content-Type: application/json"
 
-  curl -X POST 'http://localhost:3000/order-for-down-one-coin/AEVO?testing=false' \
+  curl -X POST 'http://localhost:3000/order-for-down-one-coin/IMX?testing=false' \
     -H "Content-Type: application/json"
 
 # AXS

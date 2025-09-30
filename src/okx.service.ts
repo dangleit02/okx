@@ -31,6 +31,12 @@ export class OkxService {
         };
     }
 
+    async cancelAllTypeOfOpenOrdersForOneCoin(coin: string, instType: string = 'SPOT', side: 'buy' | 'sell' | null = null) {
+        const res1 = await this.cancelOpenOrdersForOneCoin(coin, instType, side);
+        const res2 = await this.cancelOpenConditionalOrdersForOneCoin(coin, instType, side);
+        return { res1, res2 };
+    }
+
     async cancelOpenOrdersForOneCoin(coin: string, instType: string = 'SPOT', side: 'buy' | 'sell' | null = null) {
         const timestamp = new Date().toISOString();
 
@@ -96,6 +102,12 @@ export class OkxService {
         }
 
         return results;
+    }
+
+    async cancelAllTypeOfOpenOrders(instType: string = 'SPOT', side: 'buy' | 'sell' | null = null) {
+        const res1 = await this.cancelAllOpenOrders(instType, side);
+        const res2 = await this.cancelAllOpenConditionalOrders(instType, side);
+        return { res1, res2 };
     }
 
     async cancelAllOpenOrders(instType: string = 'SPOT', side: 'buy' | 'sell' | null = null) {
@@ -486,6 +498,77 @@ export class OkxService {
         return results;
     }
 
+    async placeSurprisePriceSellOrder(coin: string, testing: boolean = true) {
+        const data = [];
+        const coinConfig = this.config.get<any>(`coin.${coin}`);
+        this.logger.log(`Placing surprise price order for ${coin} with config: ${JSON.stringify(coinConfig)}`);
+        if (!coinConfig) {
+            throw new Error(`No configuration found for coin: ${JSON.stringify(coin)}`);
+        }
+        const { amountOfUsdtPerStep, priceToFixed, szToFixed } = coinConfig;        
+        
+        const surprisePricePercentage = [0.5, 0.4,0.3,0.2,0.1] // % so với giá hiện tại
+        const percentageOfNUmberOfBoughtCoinToSell = 0.2; // 20% số coin đã mua sẽ bán ở mỗi mức giá bất ngờ
+        this.logger.log(`Placing surprise price order for ${coin}, testing mode: ${testing}`);
+        const currentPrice = await this.getTicker(`${coin}-USDT`);
+        this.logger.log(`Current price: ${currentPrice}`);
+        if (!currentPrice || currentPrice <= 0) {
+            throw new Error(`Invalid current price fetched for ${coin}-USDT: ${currentPrice}`);
+        }
+        // get balance
+        const coinBalanceData = await this.getAccountBalance(coin);
+        const numberOfBoughtCoin = coinBalanceData?.data[0]?.details[0].availBal;
+        this.logger.log(`numberOfBoughtCoin: ${numberOfBoughtCoin}`);
+        if (!numberOfBoughtCoin || numberOfBoughtCoin <= 0) {
+            return data;
+        }   
+        let totalNnumberOfCoinWillBeSell = 0;
+        for (const percentage of surprisePricePercentage) {            
+            if (totalNnumberOfCoinWillBeSell > numberOfBoughtCoin) {
+                this.logger.log(`totalNnumberOfCoinWillBeSell: ${totalNnumberOfCoinWillBeSell} > numberOfBoughtCoin: ${numberOfBoughtCoin}, break the loop`);
+                break;
+            }        
+            
+            const orderPrice = currentPrice * (1 + percentage);
+            const triggerPx = orderPrice - orderPrice * 0.002;
+            // minimum number of coin to sell must greater than amountOfUsdtPerStep in config     
+            let sz =  numberOfBoughtCoin * percentageOfNUmberOfBoughtCoinToSell; 
+            if (sz * orderPrice < amountOfUsdtPerStep) {
+                sz = amountOfUsdtPerStep / orderPrice;
+            }
+            totalNnumberOfCoinWillBeSell += sz;
+            this.logger.log(`Placing surprise price order for ${coin} at percentage: ${percentage*100}%, sz: ${sz}, px: ${orderPrice}, testing mode: ${testing}`);
+            const res = await this.placeOneOrder(coin, 'sell', sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPrice.toFixed(priceToFixed), testing);
+            data.push({ data: res.data, step: `surprise_${(percentage*100).toFixed(1)}%`, body: res.body });
+        }
+        return data;
+    }
+
+    async placeStopLossOrder(coin: string, testing: boolean = true) {
+        this.logger.log(`Starting to place stop loss order for ${coin}, testing mode: ${testing}`);
+        const coinConfig = this.config.get<any>(`coin.${coin}`);
+        this.logger.log(`Placing stop loss order for ${coin} with config: ${JSON.stringify(coinConfig)}`);
+        if (!coinConfig) {
+            throw new Error(`No configuration found for coin: ${JSON.stringify(coin)}`);
+        }
+        const { stopLossPrice, priceToFixed } = coinConfig;        
+
+        const instId = `${coin}-USDT`;
+        const currentPrice = await this.getTicker(instId);
+        this.logger.log(`Current price: ${currentPrice}`);
+        const data = [];
+        // stop loss
+        const coinBalanceData = await this.getAccountBalance(coin);
+        const numberOfBoughtCoin = coinBalanceData?.data[0]?.details[0].availBal;
+        this.logger.log(`numberOfBoughtCoin: ${numberOfBoughtCoin}`);
+        if (!numberOfBoughtCoin || numberOfBoughtCoin <= 0) {
+            return data;
+        }
+        const res = await this.placeOneOrder(coin, 'sell', numberOfBoughtCoin, stopLossPrice.toFixed(priceToFixed), null, testing);
+        data.push({ data: res.data, step: 'stoploss', body: res.body });
+        return data;
+    }
+
     async placeMultipleSellOrdersForDown(coin: string, testing: boolean = true) {
         this.logger.log(`Starting to place multiple orders for ${coin}, testing mode: ${testing}`);
         const coinConfig = this.config.get<any>(`coin.${coin}`);
@@ -515,8 +598,8 @@ export class OkxService {
         if (!numberOfBoughtCoin || numberOfBoughtCoin <= 0) {
             return data;
         }
-        const res = await this.placeOneOrder(coin, 'sell', numberOfBoughtCoin, stopLossPrice.toFixed(priceToFixed), null, testing);
-        data.push({ data: res.data, step: 'stoploss', body: res.body });
+        // const res = await this.placeOneOrder(coin, 'sell', numberOfBoughtCoin, stopLossPrice.toFixed(priceToFixed), null, testing);
+        // data.push({ data: res.data, step: 'stoploss', body: res.body });
         // const minTakeProfitPrice = (minBuyPrice + maxBuyPrice) / 2.0;
         // const minPrice = Math.max(minTakeProfitPrice, maxBuyPrice);
         // if (maxTakeProfitPrice <= minPrice) {
@@ -571,12 +654,7 @@ export class OkxService {
             throw new Error(`No configuration found for coins: ${JSON.stringify(coins)}`);
         }
         const results = [];
-        for await (const coin of coins) {
-            if (!testing) {
-                await this.cancelAllOpenOrders('SPOT', 'sell');
-                await this.cancelAllOpenConditionalOrders('SPOT', 'sell');
-            }
-                
+        for await (const coin of coins) {                            
             this.logger.log(`Placing multiple orders for ${coin}`);
             const res = await this.placeMultipleSellOrdersForDown(coin, testing);
             results.push({ coin, result: res });

@@ -35,42 +35,24 @@ export default () => ({
         'PYTH',
     ],
     coinsForTakeProfit: [
-        'AXS'     ,
-        // 'STRK'    ,
-        // 'WLD'     ,
-        'DOT'     ,
-        // 'NEAR'    ,
-        'DOGS'    ,
-        'AEVO'    ,
-        'DYDX'    ,
-        'OP'      ,
         'ENJ'     ,
+        'APT'     ,
+        'MLN'    ,
+        'DOGS'     ,
+        'TNSR'     ,
+        'AXS'    ,
+        'STRK'    ,
+        'TIA'    ,
+        'SHIB'    ,
+        'SAND'      ,
         'ID'      ,
-        'TNSR'    ,
-        'ETHW'    ,
-        'ORDI'    ,
-        'PEOPLE'  ,
-        'TIA'     ,
-        'IMX'     ,
-        'MLN'     ,
-        // 'MEME'    ,
-        'PYTH'    ,
-        // 'PEPE'    ,
-        'WIF'     ,
-        'FLOKI'   ,
-        // 'BONK'    ,
-        // 'DOGE'    ,
-        'BOME'    ,
-        // 'BIO'     ,
-        // 'POL'     ,
-        'MAGIC'   ,
-        'LDO'     ,
+        'POL'    ,
+        // 'IMX'    ,
+        'NEAR'    ,
+        'DYDX'  ,
+        'ETHW'     ,
+        'PEOPLE'     ,
         'ARB'     ,
-        // 'SHIB'    ,
-        // 'ADA'     ,
-        //  'XLM',
-        // 'UNI'     ,
-        // 'SUI'     ,
     ],
     coin: {
         AXS: {
@@ -331,8 +313,8 @@ export default () => ({
             szToFixed: 1, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá,
             numberOfBoughtCoin: 40.42689, // Số lương coin đang sở hữu
-            maxTakeProfitPrice: 0.835, // Giá chốt lời (USDT)
-            minTakeProfitPrice: 0.663, // Giá chốt lời (USDT)
+            maxTakeProfitPrice: 0.905, // Giá chốt lời (USDT)
+            minTakeProfitPrice: 0.715, // Giá chốt lời (USDT)
         },
         MLN: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
