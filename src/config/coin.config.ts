@@ -57,7 +57,7 @@ export default () => ({
         'SAND'      ,
         'ID'      ,
         'POL'    ,
-        // 'IMX'    ,
+        'IMX'    ,
         'NEAR'    ,
         'DYDX'  ,
         'ETHW'     ,

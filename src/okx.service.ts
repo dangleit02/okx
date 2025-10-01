@@ -543,7 +543,7 @@ export class OkxService {
         const { amountOfUsdtPerStep, priceToFixed, szToFixed } = coinConfig;
 
         const surprisePricePercentage = [0.5, 0.4, 0.3, 0.2, 0.1] // % so với giá hiện tại
-        const percentageOfNUmberOfBoughtCoinToSell = 0.2; // 20% số coin đã mua sẽ bán ở mỗi mức giá bất ngờ
+        const percentageOfNUmberOfBoughtCoinToSell = 0.1; // 10% số coin đã mua sẽ bán ở mỗi mức giá bất ngờ
         this.logger.log(`Placing surprise price order for ${coin}, testing mode: ${testing}`);
         const currentPrice = await this.getTicker(`${coin}-USDT`);
         this.logger.log(`Current price: ${currentPrice}`);
@@ -575,6 +575,55 @@ export class OkxService {
             this.logger.log(`Placing surprise price order for ${coin} at percentage: ${percentage * 100}%, sz: ${sz}, px: ${orderPrice}, testing mode: ${testing}`);
             const res = await this.placeOneOrder(coin, 'sell', sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPrice.toFixed(priceToFixed), testing);
             data.push({ data: res.data, step: `surprise_${(percentage * 100).toFixed(1)}%`, body: res.body });
+        }
+        return data;
+    }
+
+    async placeTakeProfitOrder(coin: string, testing: boolean = true) {
+        const data = [];
+        const coinConfig = this.config.get<any>(`coin.${coin}`);
+        this.logger.log(`Placing surprise price order for ${coin} with config: ${JSON.stringify(coinConfig)}`);
+        if (!coinConfig) {
+            throw new Error(`No configuration found for coin: ${JSON.stringify(coin)}`);
+        }
+        const { amountOfUsdtPerStep, priceToFixed, szToFixed } = coinConfig;
+
+        const takeProfitPricePercentage = [0.5, 0.4, 0.3, 0.2, 0.1] // % so với giá hiện tại
+        const percentageOfNUmberOfBoughtCoinToSell = 0.1; // 10% số coin đã mua sẽ bán ở mỗi mức giá take profit
+        this.logger.log(`Placing take profit price order for ${coin}, testing mode: ${testing}`);
+        const currentPrice = await this.getTicker(`${coin}-USDT`);
+        this.logger.log(`Current price: ${currentPrice}`);
+        if (!currentPrice || currentPrice <= 0) {
+            throw new Error(`Invalid current price fetched for ${coin}-USDT: ${currentPrice}`);
+        }
+        // get balance
+        const coinBalanceData = await this.getAccountBalance(coin);
+        const numberOfBoughtCoin = coinBalanceData?.data[0]?.details[0].availBal;
+        this.logger.log(`numberOfBoughtCoin: ${numberOfBoughtCoin}`);
+        if (!numberOfBoughtCoin || numberOfBoughtCoin <= 0) {
+            return data;
+        }
+        const accAvgPx = coinBalanceData?.data[0]?.details[0].accAvgPx;
+        const avarageCost = coinBalanceData?.data[0]?.details[0].openAvgPx;
+        this.logger.log(`accAvgPx: ${accAvgPx}, avarageCost: ${avarageCost}`);
+        let totalNnumberOfCoinWillBeSell = 0;
+        for (const percentage of takeProfitPricePercentage) {
+            if (totalNnumberOfCoinWillBeSell > numberOfBoughtCoin) {
+                this.logger.log(`totalNnumberOfCoinWillBeSell: ${totalNnumberOfCoinWillBeSell} > numberOfBoughtCoin: ${numberOfBoughtCoin}, break the loop`);
+                break;
+            }
+
+            const orderPrice = avarageCost * (1 + percentage);
+            const triggerPx = orderPrice - orderPrice * 0.002;
+            // minimum number of coin to sell must greater than amountOfUsdtPerStep in config     
+            let sz = numberOfBoughtCoin * percentageOfNUmberOfBoughtCoinToSell;
+            if (sz * orderPrice < amountOfUsdtPerStep) {
+                sz = amountOfUsdtPerStep / orderPrice;
+            }
+            totalNnumberOfCoinWillBeSell += sz;
+            this.logger.log(`Placing take profit price order for ${coin} at percentage: ${percentage * 100}%, sz: ${sz}, px: ${orderPrice}, testing mode: ${testing}`);
+            const res = await this.placeOneOrder(coin, 'sell', sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPrice.toFixed(priceToFixed), testing);
+            data.push({ data: res.data, step: `take_profit_${(percentage * 100).toFixed(1)}%`, body: res.body });
         }
         return data;
     }

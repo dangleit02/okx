@@ -2,23 +2,25 @@
   curl -X GET 'http://localhost:3000/balance?ccy=DOGS' \
     -H "Content-Type: application/json"    
 
-# saveAtPrice
-  curl -X POST "http://localhost:3000/sell-at-price/POL?\
+# sell At Price
+  curl -X POST "http://localhost:3000/sell-at-price/DOGS?\
 testing=true&\
 removeExistingSellOrders=false&\
 addSellWhenDown=false&\
 addSellStopLoss=false&\
-addSellSurprisePrice=true" \
+addSellSurprisePrice=false&\
+addSellTakeProfit=true" \
   -H "Content-Type: application/json"
 
   
-# save at price for all
+# sell at price for all
   curl -X POST "http://localhost:3000/sell-at-price-all-coins?\
 testing=false&\
 removeExistingSellOrders=true&\
 addSellWhenDown=false&\
 addSellStopLoss=false&\
-addSellSurprisePrice=true" \
+addSellSurprisePrice=true&\
+addSellTakeProfit=true" \
   -H "Content-Type: application/json"
 
 # buy at price
@@ -31,7 +33,7 @@ addBuySurprisePrice=true" \
 
 # buy at price for all
   curl -X POST "http://localhost:3000/buy-at-price-all-coins?\
-testing=true&\
+testing=false&\
 removeExistingBuyOrders=true&\
 addBuyWhenUp=false&\
 addBuySurprisePrice=true" \

@@ -1,8 +1,6 @@
 import { Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { AppService } from './app.service';
 import { OkxService } from './okx.service';
-import { OkxWsMultiTradingService } from './okx-ws-multi-trading.service';
-import { OkxWsOneTradingService } from './okx-ws-one-trading.service';
 import { ConfigService } from '@nestjs/config';
 import { AppLogger } from './common/logger.service';
 
@@ -13,8 +11,6 @@ export class AppController {
     private readonly okxService: OkxService,
     private config: ConfigService,
     private readonly logger: AppLogger,
-    // private readonly tradingOneService: OkxWsOneTradingService,
-    // private readonly tradingMultipleService: OkxWsMultiTradingService,
   ) { }
 
   @Get()
@@ -37,8 +33,13 @@ export class AppController {
     @Query('addBuyWhenUp') addBuyWhenUp: string, // 'true' or 'false' add take profit order
     @Query('addBuySurprisePrice') addBuySurprisePrice: string, // 'true' or 'false' add surprise price order
   ) {
-   const results = [];
+    const results = [];
     const isTesting = testing !== 'false';
+    await this.buyOneCoin(isTesting, removeExistingBuyOrders, coin, results, addBuyWhenUp, addBuySurprisePrice);
+    return results;
+  }
+
+  private async buyOneCoin(isTesting: boolean, removeExistingBuyOrders: string, coin: string, results: any[], addBuyWhenUp: string, addBuySurprisePrice: string) {
     if (!isTesting) {
       if (removeExistingBuyOrders === 'true') {
         const res1 = await this.okxService.cancelAllTypeOfOpenOrdersForOneCoin(coin, 'SPOT', 'buy');
@@ -52,11 +53,10 @@ export class AppController {
       results.push({ coin, action: 'place_multiple_buy_orders_for_up', result: res2 });
     }
     if (addBuySurprisePrice === 'true') {
-      const res4 = await this.okxService.placeSurprisePriceBuyOrder(coin, isTesting);
-      console.log('Place surprise price buy order:', JSON.stringify(res4, null, 2));
-      results.push({ coin, action: 'place_surprise_price_buy_order', result: res4 });
+      const res3 = await this.okxService.placeSurprisePriceBuyOrder(coin, isTesting);
+      console.log('Place surprise price buy order:', JSON.stringify(res3, null, 2));
+      results.push({ coin, action: 'place_surprise_price_buy_order', result: res3 });
     }
-    return results;
   }
 
   @Post('buy-at-price-all-coins')
@@ -76,23 +76,7 @@ export class AppController {
     const results = [];
     for await (const coin of coins) {
       this.logger.log(`Processing coin: ${coin}`);
-      if (!isTesting) {
-        if (removeExistingBuyOrders === 'true') {
-          const res1 = await this.okxService.cancelAllTypeOfOpenOrdersForOneCoin(coin, 'SPOT', 'buy');
-          console.log('Cancel existing buy orders:', JSON.stringify(res1, null, 2));
-          results.push({ coin, action: 'cancel_existing_buy_orders', result: res1 });
-        }
-      }
-      if (addBuyWhenUp === 'true') {
-        const res2 = await this.okxService.placeMultipleBuyOrdersForUp(coin, isTesting);
-        console.log('Place multiple buy orders for up:', JSON.stringify(res2, null, 2));
-        results.push({ coin, action: 'place_multiple_buy_orders_for_up', result: res2 });
-      }
-      if (addBuySurprisePrice === 'true') {
-        const res4 = await this.okxService.placeSurprisePriceBuyOrder(coin, isTesting);
-        console.log('Place surprise price buy order:', JSON.stringify(res4, null, 2));
-        results.push({ coin, action: 'place_surprise_price_buy_order', result: res4 });
-      }
+      await this.buyOneCoin(isTesting, removeExistingBuyOrders, coin, results, addBuyWhenUp, addBuySurprisePrice);
     }
     return results;
   }
@@ -105,9 +89,15 @@ export class AppController {
     @Query('addSellWhenDown') addSellWhenDown: string, // 'true' or 'false' add take profit order
     @Query('addSellStopLoss') addSellStopLoss: string, // 'true' or 'false' add stop loss order
     @Query('addSellSurprisePrice') addSellSurprisePrice: string, // 'true' or 'false' add surprise price order
+    @Query('addSellTakeProfit') addSellTakeProfit: string, // 'true' or 'false' add take profit order
   ) {
     const results = [];
     const isTesting = testing !== 'false';
+    await this._SellOneCoin(isTesting, removeExistingSellOrders, coin, results, addSellWhenDown, addSellSurprisePrice, addSellStopLoss, addSellTakeProfit);
+    return results;
+  }
+
+  private async _SellOneCoin(isTesting: boolean, removeExistingSellOrders: string, coin: string, results: any[], addSellWhenDown: string, addSellSurprisePrice: string, addSellStopLoss: string, addSellTakeProfit?: string) {
     if (!isTesting) {
       if (removeExistingSellOrders === 'true') {
         const res1 = await this.okxService.cancelAllTypeOfOpenOrdersForOneCoin(coin, 'SPOT', 'sell');
@@ -121,16 +111,20 @@ export class AppController {
       results.push({ coin, action: 'place_multiple_sell_orders_for_down', result: res2 });
     }
     if (addSellSurprisePrice === 'true') {
-      const res4 = await this.okxService.placeSurprisePriceSellOrder(coin, isTesting);
-      console.log('Place surprise price sell order:', JSON.stringify(res4, null, 2));
-      results.push({ coin, action: 'place_surprise_price_sell_order', result: res4 });
+      const res3 = await this.okxService.placeSurprisePriceSellOrder(coin, isTesting);
+      console.log('Place surprise price sell order:', JSON.stringify(res3, null, 2));
+      results.push({ coin, action: 'place_surprise_price_sell_order', result: res3 });
     }
     if (addSellStopLoss === 'true') {
-      const res3 = await this.okxService.placeStopLossOrder(coin, isTesting);
-      console.log('Place stop loss order:', JSON.stringify(res3, null, 2));
-      results.push({ coin, action: 'place_stop_loss_order', result: res3 });
+      const res4 = await this.okxService.placeStopLossOrder(coin, isTesting);
+      console.log('Place stop loss order:', JSON.stringify(res4, null, 2));
+      results.push({ coin, action: 'place_stop_loss_order', result: res4 });
     }
-    return results;
+    if (addSellTakeProfit === 'true') {
+      const res5 = await this.okxService.placeTakeProfitOrder(coin, isTesting);
+      console.log('Place take profit order:', JSON.stringify(res5, null, 2));
+      results.push({ coin, action: 'place_take_profit_order', result: res5 });
+    }
   }
 
   @Post('sell-at-price-all-coins')
@@ -140,6 +134,7 @@ export class AppController {
     @Query('addSellWhenDown') addSellWhenDown: string, // 'true' or 'false' add take profit order
     @Query('addSellStopLoss') addSellStopLoss: string, // 'true' or 'false' add stop loss order
     @Query('addSellSurprisePrice') addSellSurprisePrice: string, // 'true' or 'false' add surprise price order
+    @Query('addSellTakeProfit') addSellTakeProfit: string, // 'true' or 'false' add take profit order
   ) {
     const isTesting = testing !== 'false';
 
@@ -152,28 +147,7 @@ export class AppController {
     const results = [];
     for await (const coin of coins) {
       this.logger.log(`Processing coin: ${coin}`);
-      if (!isTesting) {
-        if (removeExistingSellOrders === 'true') {
-          const res1 = await this.okxService.cancelAllTypeOfOpenOrdersForOneCoin(coin, 'SPOT', 'sell');
-          console.log('Cancel existing sell orders:', JSON.stringify(res1, null, 2));
-          results.push({ coin, action: 'cancel_existing_sell_orders', result: res1 });
-        }
-      }
-      if (addSellWhenDown === 'true') {
-        const res2 = await this.okxService.placeMultipleSellOrdersForDown(coin, isTesting);
-        console.log('Place multiple sell orders for down:', JSON.stringify(res2, null, 2));
-        results.push({ coin, action: 'place_multiple_sell_orders_for_down', result: res2 });
-      }
-      if (addSellSurprisePrice === 'true') {
-        const res4 = await this.okxService.placeSurprisePriceSellOrder(coin, isTesting);
-        console.log('Place surprise price sell order:', JSON.stringify(res4, null, 2));
-        results.push({ coin, action: 'place_surprise_price_sell_order', result: res4 });
-      }
-      if (addSellStopLoss === 'true') {
-        const res3 = await this.okxService.placeStopLossOrder(coin, isTesting);
-        console.log('Place stop loss order:', JSON.stringify(res3, null, 2));
-        results.push({ coin, action: 'place_stop_loss_order', result: res3 });
-      }
+      await this._SellOneCoin(isTesting, removeExistingSellOrders, coin, results, addSellWhenDown, addSellSurprisePrice, addSellStopLoss, addSellTakeProfit);
     }
 
     return results;
