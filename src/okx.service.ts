@@ -614,7 +614,7 @@ export class OkxService {
             }
 
             const orderPrice = avarageCost * (1 + percentage);
-            const triggerPx = orderPrice - orderPrice * 0.002;
+            const triggerPx = orderPrice > currentPrice ? orderPrice - orderPrice * 0.002 : orderPrice + orderPrice * 0.002;
             // minimum number of coin to sell must greater than amountOfUsdtPerStep in config     
             let sz = numberOfBoughtCoin * percentageOfNUmberOfBoughtCoinToSell;
             if (sz * orderPrice < amountOfUsdtPerStep) {
