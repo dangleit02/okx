@@ -25,24 +25,36 @@ export default () => ({
         'FLOKI',
         'WIF',
         // da mua   
-        'ENJ'     ,
         'APT'     ,
+        'ENJ'     ,
         'MLN'    ,
         'DOGS'     ,
         'TNSR'     ,
         'AXS'    ,
         'STRK'    ,
         'TIA'    ,
-        'SHIB'    ,
         'SAND'      ,
+        'SHIB'    ,
         'ID'      ,
         'POL'    ,
-        'IMX'    ,
+        'ARB'     ,
         'NEAR'    ,
+        'IMX'    ,
         'DYDX'  ,
         'ETHW'     ,
         'PEOPLE'     ,
-        'ARB'     ,
+        'LDO',
+        'MEME',
+        'ORDI',
+        // 'ULTI',
+        'BOME',
+        'OP',
+        'AEVO',
+        'SUSHI',
+        '1INCH',
+        'ALGO',
+        'MAGIC',
+        'ETC',
     ],
     coinsForTakeProfit: [
         'ENJ'     ,
@@ -56,6 +68,7 @@ export default () => ({
         'SHIB'    ,
         'SAND'      ,
         'ID'      ,
+        'DOT',
         'POL'    ,
         'IMX'    ,
         'NEAR'    ,
@@ -692,6 +705,18 @@ export default () => ({
         OKB: {
             szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 2, // Số chữ số thập phân cho giá 
-        },     
+        },   
+        SUSHI: {
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
+            priceToFixed: 4, // Số chữ số thập phân cho giá 
+        },   
+        ALGO: {
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
+            priceToFixed: 2, // Số chữ số thập phân cho giá 
+        },
+        ETC: {
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
+            priceToFixed: 2, // Số chữ số thập phân cho giá 
+        },
     },
 });

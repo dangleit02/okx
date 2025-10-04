@@ -31,13 +31,13 @@ export class OkxService {
         };
     }
 
-    async cancelAllTypeOfOpenOrdersForOneCoin(coin: string, instType: string = 'SPOT', side: 'buy' | 'sell' | null = null) {
-        const res1 = await this.cancelOpenOrdersForOneCoin(coin, instType, side);
-        const res2 = await this.cancelOpenConditionalOrdersForOneCoin(coin, instType, side);
+    async cancelAllTypeOfOpenOrdersForOneCoin(coin: string, instType: string = 'SPOT', side: 'buy' | 'sell' | null = null, onlyForDown: boolean = false) {
+        const res1 = await this.cancelOpenOrdersForOneCoin(coin, instType, side, onlyForDown);
+        const res2 = await this.cancelOpenConditionalOrdersForOneCoin(coin, instType, side, onlyForDown);
         return { res1, res2 };
     }
 
-    async cancelOpenOrdersForOneCoin(coin: string, instType: string = 'SPOT', side: 'buy' | 'sell' | null = null) {
+    async cancelOpenOrdersForOneCoin(coin: string, instType: string = 'SPOT', side: 'buy' | 'sell' | null = null, onlyForDown: boolean = false) {
         const timestamp = new Date().toISOString();
 
         // 1. Get open orders
@@ -61,6 +61,14 @@ export class OkxService {
 
         // 2. Filter theo side
         let ordersBySide = side ? orders.filter((order: any) => order.side === side) : orders;
+        const currentPrice = await this.getTicker(instId);
+        this.logger.log(`Current price for ${instId}: ${currentPrice}`);
+        if (!currentPrice || currentPrice <= 0) {
+            throw new Error(`Invalid current price fetched for ${instId}: ${currentPrice}`);
+        }
+        if (onlyForDown && side === 'sell') {
+            ordersBySide = ordersBySide.filter((order: any) => order.price < currentPrice);
+        }
 
         if (ordersBySide.length === 0) {
             this.logger.log(`No ${side.toUpperCase()} orders to cancel`);
@@ -104,79 +112,78 @@ export class OkxService {
         return results;
     }
 
-    async cancelAllTypeOfOpenOrders(instType: string = 'SPOT', side: 'buy' | 'sell' | null = null) {
-        const res1 = await this.cancelAllOpenOrders(instType, side);
-        const res2 = await this.cancelAllOpenConditionalOrders(instType, side);
-        return { res1, res2 };
+    cancelAllTypeOfOpenOrders(instType: string = 'SPOT', side: 'buy' | 'sell' | null = null) {
+        // const res1 = await this.cancelAllOpenOrders(instType, side);
+        return this.cancelAllOpenConditionalOrders(instType, side);
     }
 
-    async cancelAllOpenOrders(instType: string = 'SPOT', side: 'buy' | 'sell' | null = null) {
-        const timestamp = new Date().toISOString();
+    // async cancelAllOpenOrders(instType: string = 'SPOT', side: 'buy' | 'sell' | null = null) {
+    //     const timestamp = new Date().toISOString();
 
-        // 1. Get open orders
-        const getPath = `/api/v5/trade/orders-pending?instType=${instType}`;
-        const getSign = this.sign(timestamp, 'GET', getPath);
-        const pendingRes = await axios.get(
-            this.config.get<string>('okx.baseUrl') + getPath,
-            {
-                headers: {
-                    'OK-ACCESS-KEY': this.config.get<string>('okx.apiKey'),
-                    'OK-ACCESS-SIGN': getSign,
-                    'OK-ACCESS-TIMESTAMP': timestamp,
-                    'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphrase'),
-                },
-            }
-        );
+    //     // 1. Get open orders
+    //     const getPath = `/api/v5/trade/orders-pending?instType=${instType}`;
+    //     const getSign = this.sign(timestamp, 'GET', getPath);
+    //     const pendingRes = await axios.get(
+    //         this.config.get<string>('okx.baseUrl') + getPath,
+    //         {
+    //             headers: {
+    //                 'OK-ACCESS-KEY': this.config.get<string>('okx.apiKey'),
+    //                 'OK-ACCESS-SIGN': getSign,
+    //                 'OK-ACCESS-TIMESTAMP': timestamp,
+    //                 'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphrase'),
+    //             },
+    //         }
+    //     );
 
-        const orders = pendingRes.data.data;
-        if (!orders.length) return { msg: 'No open orders' };
+    //     const orders = pendingRes.data.data;
+    //     if (!orders.length) return { msg: 'No open orders' };
 
-        // 2. Filter theo side
-        let ordersBySide = side ? orders.filter((order: any) => order.side === side) : orders;
+    //     // 2. Filter theo side
+    //     let ordersBySide = side ? orders.filter((order: any) => order.side === side) : orders;
 
-        if (ordersBySide.length === 0) {
-            this.logger.log(`No ${side.toUpperCase()} orders to cancel`);
-            return { cancelled: [] };
-        }
-        // 2. Cancel in batch (20 each)
-        const batches = [];
-        for (let i = 0; i < ordersBySide.length; i += 20) {
-            const chunk = orders.slice(i, i + 20);
-            batches.push(chunk);
-        }
+    //     if (ordersBySide.length === 0) {
+    //         this.logger.log(`No ${side.toUpperCase()} orders to cancel`);
+    //         return { cancelled: [] };
+    //     }
+    //     // 2. Cancel in batch (20 each)
+    //     const batches = [];
+    //     for (let i = 0; i < ordersBySide.length; i += 20) {
+    //         const chunk = orders.slice(i, i + 20);
+    //         batches.push(chunk);
+    //     }
 
-        const results = [];
-        for (const batch of batches) {
-            const cancelBody = {
-                instId: batch[0].instId, // OKX yêu cầu cùng instId trong 1 batch
-                ordIds: batch.map(o => o.ordId),
-            };
+    //     const results = [];
+    //     for (const batch of batches) {
+    //         const cancelBody = {
+    //             instId: batch[0].instId, // OKX yêu cầu cùng instId trong 1 batch
+    //             ordIds: batch.map(o => o.ordId),
+    //         };
 
-            const cancelPath = '/api/v5/trade/cancel-batch-orders';
-            const cancelTimestamp = new Date().toISOString();
-            const cancelSign = this.sign(cancelTimestamp, 'POST', cancelPath, JSON.stringify(cancelBody));
+    //         const cancelPath = '/api/v5/trade/cancel-batch-orders';
+    //         const cancelTimestamp = new Date().toISOString();
+    //         const cancelSign = this.sign(cancelTimestamp, 'POST', cancelPath, JSON.stringify(cancelBody));
 
-            const res = await axios.post(
-                this.config.get<string>('okx.baseUrl') + cancelPath,
-                cancelBody,
-                {
-                    headers: {
-                        'OK-ACCESS-KEY': this.config.get<string>('okx.apiKey'),
-                        'OK-ACCESS-SIGN': cancelSign,
-                        'OK-ACCESS-TIMESTAMP': cancelTimestamp,
-                        'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphrase'),
-                        'Content-Type': 'application/json',
-                    },
-                }
-            );
+    //         const res = await axios.post(
+    //             this.config.get<string>('okx.baseUrl') + cancelPath,
+    //             cancelBody,
+    //             {
+    //                 headers: {
+    //                     'OK-ACCESS-KEY': this.config.get<string>('okx.apiKey'),
+    //                     'OK-ACCESS-SIGN': cancelSign,
+    //                     'OK-ACCESS-TIMESTAMP': cancelTimestamp,
+    //                     'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphrase'),
+    //                     'Content-Type': 'application/json',
+    //                 },
+    //             }
+    //         );
 
-            results.push(res.data);
-        }
+    //         results.push(res.data);
+    //     }
 
-        return results;
-    }
+    //     return results;
+    // }
 
-    async cancelOpenConditionalOrdersForOneCoin(coin: string, instType: string = 'SPOT', side: 'buy' | 'sell' | null = null) {
+    async cancelOpenConditionalOrdersForOneCoin(coin: string, instType: string = 'SPOT', side: 'buy' | 'sell' | null = null, onlyForDown: boolean = false) {
         const timestamp = new Date().toISOString();
 
         // 1. Get open orders
@@ -204,7 +211,13 @@ export class OkxService {
 
         // 2. Filter theo side
         let ordersBySide = side ? pendingOrders.filter((order: any) => order.side === side) : pendingOrders;
-
+        const currentPrice = await this.getTicker(instId);
+        if (!currentPrice || currentPrice <= 0) {
+            throw new Error(`Invalid current price fetched for ${instId}: ${currentPrice}`);
+        }
+        if (onlyForDown && side === 'sell') {
+            ordersBySide = ordersBySide.filter((order: any) => order.triggerPx < currentPrice);
+        }
         if (ordersBySide.length === 0) {
             this.logger.log(`No ${side.toUpperCase()} orders to cancel for ${instId}`);
             return { cancelled: [] };
@@ -525,7 +538,7 @@ export class OkxService {
 
         const orderPrice = currentPrice * (1 - surprisePricePercentage);
         const triggerPx = orderPrice + orderPrice * 0.002;
-        const totalNnumberOfCoinWillBeBought = numberOfUSDT / orderPrice;
+        const totalNnumberOfCoinWillBeBought = (numberOfUSDT/2.0) / orderPrice;
         this.logger.log(`Placing surprise price order for ${coin} at percentage: ${surprisePricePercentage * 100}%, px: ${orderPrice}, testing mode: ${testing}`);
         const res = await this.placeOneOrder(coin, 'buy', totalNnumberOfCoinWillBeBought.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPrice.toFixed(priceToFixed), testing);
         data.push({ data: res.data, step: `surprise_${(surprisePricePercentage * 100).toFixed(1)}%`, body: res.body });
@@ -579,7 +592,7 @@ export class OkxService {
         return data;
     }
 
-    async placeTakeProfitOrder(coin: string, testing: boolean = true) {
+    async placeTakeProfitOrder(coin: string, onlyForDown: boolean, testing: boolean = true) {
         const data = [];
         const coinConfig = this.config.get<any>(`coin.${coin}`);
         this.logger.log(`Placing surprise price order for ${coin} with config: ${JSON.stringify(coinConfig)}`);
@@ -588,8 +601,8 @@ export class OkxService {
         }
         const { amountOfUsdtPerStep, priceToFixed, szToFixed } = coinConfig;
 
-        const takeProfitPricePercentage = [0.5, 0.4, 0.3, 0.2, 0.1] // % so với giá hiện tại
-        const percentageOfNUmberOfBoughtCoinToSell = 0.1; // 10% số coin đã mua sẽ bán ở mỗi mức giá take profit
+        const takeProfitPricePercentage = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05] // % so với giá hiện tại
+        const percentageOfNUmberOfBoughtCoinToSell = 0.05; // 10% số coin đã mua sẽ bán ở mỗi mức giá take profit
         this.logger.log(`Placing take profit price order for ${coin}, testing mode: ${testing}`);
         const currentPrice = await this.getTicker(`${coin}-USDT`);
         this.logger.log(`Current price: ${currentPrice}`);
@@ -615,13 +628,21 @@ export class OkxService {
 
             const orderPrice = avarageCost * (1 + percentage);
             const triggerPx = orderPrice > currentPrice ? orderPrice - orderPrice * 0.002 : orderPrice + orderPrice * 0.002;
+            if (onlyForDown && orderPrice >= currentPrice) {
+                this.logger.log(`at percentage: ${percentage * 100}%,onlyForDown is true and orderPrice: ${orderPrice} >= currentPrice: ${currentPrice} and triggerPx: ${triggerPx}, not order`);
+                continue;
+            }
+            if (onlyForDown && triggerPx >= currentPrice) {
+                this.logger.log(`at percentage: ${percentage * 100}%,onlyForDown is true and triggerPx: ${triggerPx} >= currentPrice: ${currentPrice}, not order`);
+                continue;
+            }
             // minimum number of coin to sell must greater than amountOfUsdtPerStep in config     
             let sz = numberOfBoughtCoin * percentageOfNUmberOfBoughtCoinToSell;
             if (sz * orderPrice < amountOfUsdtPerStep) {
                 sz = amountOfUsdtPerStep / orderPrice;
             }
             totalNnumberOfCoinWillBeSell += sz;
-            this.logger.log(`Placing take profit price order for ${coin} at percentage: ${percentage * 100}%, sz: ${sz}, px: ${orderPrice}, testing mode: ${testing}`);
+            this.logger.log(`Placing take profit price order for ${coin} at percentage: ${percentage * 100}%, sz: ${sz}, px: ${orderPrice} and triggerPx: ${triggerPx}, testing mode: ${testing}`);
             const res = await this.placeOneOrder(coin, 'sell', sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPrice.toFixed(priceToFixed), testing);
             data.push({ data: res.data, step: `take_profit_${(percentage * 100).toFixed(1)}%`, body: res.body });
         }

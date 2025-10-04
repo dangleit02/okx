@@ -3,6 +3,7 @@ import { AppService } from './app.service';
 import { OkxService } from './okx.service';
 import { ConfigService } from '@nestjs/config';
 import { AppLogger } from './common/logger.service';
+import * as _ from 'lodash';
 
 @Controller()
 export class AppController {
@@ -67,10 +68,11 @@ export class AppController {
     @Query('addBuySurprisePrice') addBuySurprisePrice: string, // 'true' or 'false' add surprise price order
   ) {
     this.logger.log(`Starting to place all orders for all coins, testing mode: ${testing}`);
-    const coins = this.config.get<any>(`coinsForBuy`);
+    let coins = this.config.get<any>(`coinsForBuy`);
     if (!coins) {
       throw new Error(`No configuration found for coins: ${JSON.stringify(coins)}`);
     }
+    coins= _.uniq(coins);
     this.logger.log(`Coins to process: ${JSON.stringify(coins)}`);
     const isTesting = testing !== 'false';
     const results = [];
@@ -82,7 +84,7 @@ export class AppController {
   }
 
   @Post('sell-at-price/:coin')
-  async saleAtPrice(
+  async sellAtPrice(
     @Param('coin') coin: string,
     @Query('testing') testing: string,
     @Query('removeExistingSellOrders') removeExistingSellOrders: string, // 'true' or 'false' remove existing sell orders before placing new ones 
@@ -90,17 +92,18 @@ export class AppController {
     @Query('addSellStopLoss') addSellStopLoss: string, // 'true' or 'false' add stop loss order
     @Query('addSellSurprisePrice') addSellSurprisePrice: string, // 'true' or 'false' add surprise price order
     @Query('addSellTakeProfit') addSellTakeProfit: string, // 'true' or 'false' add take profit order
+    @Query('onlyForDown') onlyForDown: string, // 'true' or 'false' only add sell orders for down strategy
   ) {
     const results = [];
     const isTesting = testing !== 'false';
-    await this._SellOneCoin(isTesting, removeExistingSellOrders, coin, results, addSellWhenDown, addSellSurprisePrice, addSellStopLoss, addSellTakeProfit);
+    await this._SellOneCoin(isTesting, removeExistingSellOrders, coin, results, addSellWhenDown, addSellSurprisePrice, addSellStopLoss, addSellTakeProfit, onlyForDown);
     return results;
   }
 
-  private async _SellOneCoin(isTesting: boolean, removeExistingSellOrders: string, coin: string, results: any[], addSellWhenDown: string, addSellSurprisePrice: string, addSellStopLoss: string, addSellTakeProfit?: string) {
+  private async _SellOneCoin(isTesting: boolean, removeExistingSellOrders: string, coin: string, results: any[], addSellWhenDown: string, addSellSurprisePrice: string, addSellStopLoss: string, addSellTakeProfit: string, onlyForDown: string) {
     if (!isTesting) {
       if (removeExistingSellOrders === 'true') {
-        const res1 = await this.okxService.cancelAllTypeOfOpenOrdersForOneCoin(coin, 'SPOT', 'sell');
+        const res1 = await this.okxService.cancelAllTypeOfOpenOrdersForOneCoin(coin, 'SPOT', 'sell', onlyForDown === 'true');
         console.log('Cancel existing sell orders:', JSON.stringify(res1, null, 2));
         results.push({ coin, action: 'cancel_existing_sell_orders', result: res1 });
       }
@@ -121,35 +124,37 @@ export class AppController {
       results.push({ coin, action: 'place_stop_loss_order', result: res4 });
     }
     if (addSellTakeProfit === 'true') {
-      const res5 = await this.okxService.placeTakeProfitOrder(coin, isTesting);
+      const res5 = await this.okxService.placeTakeProfitOrder(coin, onlyForDown === 'true', isTesting);
       console.log('Place take profit order:', JSON.stringify(res5, null, 2));
       results.push({ coin, action: 'place_take_profit_order', result: res5 });
     }
   }
 
   @Post('sell-at-price-all-coins')
-  async saveAtPriceAllCoins(
+  async sellAtPriceAllCoins(
     @Query('testing') testing: string,
     @Query('removeExistingSellOrders') removeExistingSellOrders: string, // 'true' or 'false' remove existing sell orders before placing new ones 
     @Query('addSellWhenDown') addSellWhenDown: string, // 'true' or 'false' add take profit order
     @Query('addSellStopLoss') addSellStopLoss: string, // 'true' or 'false' add stop loss order
     @Query('addSellSurprisePrice') addSellSurprisePrice: string, // 'true' or 'false' add surprise price order
     @Query('addSellTakeProfit') addSellTakeProfit: string, // 'true' or 'false' add take profit order
+    @Query('onlyForDown') onlyForDown: string, // 'true' or 'false' only add sell orders for down strategy
   ) {
     const isTesting = testing !== 'false';
 
     this.logger.log(`Starting to place all orders for all coins, testing mode: ${testing}`);
-    const coins = this.config.get<any>(`coinsForTakeProfit`);
+    let coins = this.config.get<any>(`coinsForTakeProfit`);
     if (!coins) {
       throw new Error(`No configuration found for coins: ${JSON.stringify(coins)}`);
     }
+    coins= _.uniq(coins);
     this.logger.log(`Coins to process: ${JSON.stringify(coins)}`);
     const results = [];
     for await (const coin of coins) {
       this.logger.log(`Processing coin: ${coin}`);
-      await this._SellOneCoin(isTesting, removeExistingSellOrders, coin, results, addSellWhenDown, addSellSurprisePrice, addSellStopLoss, addSellTakeProfit);
+      await this._SellOneCoin(isTesting, removeExistingSellOrders, coin, results, addSellWhenDown, addSellSurprisePrice, addSellStopLoss, addSellTakeProfit, onlyForDown);
     }
-
+    
     return results;
   }
 
