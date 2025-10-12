@@ -956,6 +956,36 @@ export class OkxService {
         }
     }
 
+    async sellOneCoin(isTesting: boolean, removeExistingSellOrders: string, coin: string, results: any[], addSellWhenDown: string, addSellSurprisePrice: string, addSellStopLoss: string, addSellTakeProfit: string, onlyForDown: string, justOneOrder: string) {
+        if (!isTesting) {
+            if (removeExistingSellOrders === 'true') {
+                const res1 = await this.cancelAllTypeOfOpenOrdersForOneCoin(coin, 'SPOT', 'sell', onlyForDown === 'true');
+                this.logger.log('Cancel existing sell orders:', JSON.stringify(res1, null, 2));
+                results.push({ coin, action: 'cancel_existing_sell_orders', result: res1 });
+            }
+        }
+        if (addSellWhenDown === 'true') {
+            const res2 = await this.placeMultipleSellOrdersForDown(coin, isTesting);
+            this.logger.log('Place multiple sell orders for down:', JSON.stringify(res2, null, 2));
+            results.push({ coin, action: 'place_multiple_sell_orders_for_down', result: res2 });
+        }
+        if (addSellSurprisePrice === 'true') {
+            const res3 = await this.placeSurprisePriceSellOrder(coin, isTesting);
+            this.logger.log('Place surprise price sell order:', JSON.stringify(res3, null, 2));
+            results.push({ coin, action: 'place_surprise_price_sell_order', result: res3 });
+        }
+        if (addSellStopLoss === 'true') {
+            const res4 = await this.placeStopLossOrder(coin, isTesting);
+            this.logger.log('Place stop loss order:', JSON.stringify(res4, null, 2));
+            results.push({ coin, action: 'place_stop_loss_order', result: res4 });
+        }
+        if (addSellTakeProfit === 'true') {
+            const res5 = await this.placeTakeProfitOrder(coin, onlyForDown === 'true', justOneOrder === 'true', isTesting);
+            this.logger.log('Place take profit order:', JSON.stringify(res5, null, 2));
+            results.push({ coin, action: 'place_take_profit_order', result: res5 });
+        }
+    }
+
     // Helper to chunk arrays
     private chunk<T>(arr: T[], n: number): T[][] {
         const out: T[][] = [];
