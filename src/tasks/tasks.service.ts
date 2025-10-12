@@ -40,7 +40,7 @@ export class TasksService {
                 await this.okxService.sellOneCoin(isTesting, removeExistingSellOrders, coin, results, addSellWhenDown, addSellSurprisePrice, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder);
             }
 
-            this.logger.log(`Successfully auto sell for down ${Date.now}`)
+            this.logger.log(`Successfully auto sell for down ${Date.now()}`)
         } catch (error) {
             this.logger.log(`autoSendDailyReport, ${error.message}`)
             throw error;
