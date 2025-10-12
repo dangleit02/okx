@@ -166,11 +166,14 @@ export class OkxWsMultiTradingService implements OnModuleInit, OnModuleDestroy {
 
     getCoinConfig(coin: string): OrderStep[] {
         const coinConfig = this.config.get<any>(`coin.${coin}`);
+        const maxUsdt = this.config.get<number>('maxUsdt');
+        const riskPerTrade = this.config.get<number>('riskPerTrade');
+        const amountOfUsdtPerStep = this.config.get<number>('amountOfUsdtPerStep');
         this.logger.log(`Placing multiple orders for ${coin} with config: ${JSON.stringify(coinConfig)}`);
         if (!coinConfig) {
             throw new Error(`No configuration found for coin: ${JSON.stringify(coin)}`);
         }
-        const { maxUsdt, minBuyPrice, maxBuyPrice, stopLossPrice, amountOfUsdtPerStep, riskPerTrade, szToFixed, priceToFixed } = coinConfig;
+        const { minBuyPrice, maxBuyPrice, stopLossPrice, szToFixed, priceToFixed } = coinConfig;
         if (minBuyPrice >= maxBuyPrice) {
             throw new Error(`Invalid configuration: minBuyPrice (${minBuyPrice}) must be less than maxBuyPrice (${maxBuyPrice})`);
         }

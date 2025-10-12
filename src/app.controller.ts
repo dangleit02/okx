@@ -22,7 +22,7 @@ export class AppController {
   @Get('balance')
   async getBalance(@Query('ccy') ccy?: string) {
     const result = await this.okxService.getAccountBalance(ccy);
-    console.log('Balance:', JSON.stringify(result, null, 2));
+    this.logger.log('Balance:', JSON.stringify(result, null, 2));
     return result;
   }
 
@@ -33,30 +33,37 @@ export class AppController {
     @Query('removeExistingBuyOrders') removeExistingBuyOrders: string, // 'true' or 'false' remove existing buy orders before placing new ones
     @Query('addBuyWhenUp') addBuyWhenUp: string, // 'true' or 'false' add take profit order
     @Query('addBuySurprisePrice') addBuySurprisePrice: string, // 'true' or 'false' add surprise price order
+    @Query('numberOfUSDT') numberOfUSDT: number, // number of USDT to use for this coin
+    @Query('autobuy') autobuy: string,
   ) {
     const results = [];
     const isTesting = testing !== 'false';
-    await this.buyOneCoin(isTesting, removeExistingBuyOrders, coin, results, addBuyWhenUp, addBuySurprisePrice);
+    await this.buyOneCoin(isTesting, removeExistingBuyOrders, coin, results, addBuyWhenUp, addBuySurprisePrice, numberOfUSDT, autobuy);
     return results;
   }
 
-  private async buyOneCoin(isTesting: boolean, removeExistingBuyOrders: string, coin: string, results: any[], addBuyWhenUp: string, addBuySurprisePrice: string) {
+  private async buyOneCoin(isTesting: boolean, removeExistingBuyOrders: string, coin: string, results: any[], addBuyWhenUp: string, addBuySurprisePrice: string, numberOfUSDT: number, autobuy: string) {
     if (!isTesting) {
       if (removeExistingBuyOrders === 'true') {
         const res1 = await this.okxService.cancelAllTypeOfOpenOrdersForOneCoin(coin, 'SPOT', 'buy');
-        console.log('Cancel existing buy orders:', JSON.stringify(res1, null, 2));
+        this.logger.log('Cancel existing buy orders:', JSON.stringify(res1, null, 2));
         results.push({ coin, action: 'cancel_existing_buy_orders', result: res1 });
       }
     }
     if (addBuyWhenUp === 'true') {
       const res2 = await this.okxService.placeMultipleBuyOrdersForUp(coin, isTesting);
-      console.log('Place multiple buy orders for up:', JSON.stringify(res2, null, 2));
+      this.logger.log('Place multiple buy orders for up:', JSON.stringify(res2, null, 2));
       results.push({ coin, action: 'place_multiple_buy_orders_for_up', result: res2 });
     }
     if (addBuySurprisePrice === 'true') {
-      const res3 = await this.okxService.placeSurprisePriceBuyOrder(coin, isTesting);
-      console.log('Place surprise price buy order:', JSON.stringify(res3, null, 2));
+      const res3 = await this.okxService.placeSurprisePriceBuyOrder(coin, numberOfUSDT, isTesting);
+      this.logger.log('Place surprise price buy order:', JSON.stringify(res3, null, 2));
       results.push({ coin, action: 'place_surprise_price_buy_order', result: res3 });
+    }
+    if (autobuy === 'true') {
+      const res4 = await this.okxService.autobuy(coin, isTesting);
+      this.logger.log('Palce auto buy order:', JSON.stringify(res4, null, 2));
+      results.push({ coin, action: 'place_aoto_buy_order', result: res4 });
     }
   }
 
@@ -66,6 +73,8 @@ export class AppController {
     @Query('removeExistingBuyOrders') removeExistingBuyOrders: string, // 'true' or 'false' remove existing buy orders before placing new ones
     @Query('addBuyWhenUp') addBuyWhenUp: string, // 'true' or 'false' add take profit order
     @Query('addBuySurprisePrice') addBuySurprisePrice: string, // 'true' or 'false' add surprise price order
+    @Query('numberOfUSDT') numberOfUSDT: number, // number of USDT to use for this coin
+    @Query('autobuy') autobuy: string,
   ) {
     this.logger.log(`Starting to place all orders for all coins, testing mode: ${testing}`);
     let coins = this.config.get<any>(`coinsForBuy`);
@@ -78,7 +87,7 @@ export class AppController {
     const results = [];
     for await (const coin of coins) {
       this.logger.log(`Processing coin: ${coin}`);
-      await this.buyOneCoin(isTesting, removeExistingBuyOrders, coin, results, addBuyWhenUp, addBuySurprisePrice);
+      await this.buyOneCoin(isTesting, removeExistingBuyOrders, coin, results, addBuyWhenUp, addBuySurprisePrice, numberOfUSDT, autobuy);
     }
     return results;
   }
@@ -93,39 +102,40 @@ export class AppController {
     @Query('addSellSurprisePrice') addSellSurprisePrice: string, // 'true' or 'false' add surprise price order
     @Query('addSellTakeProfit') addSellTakeProfit: string, // 'true' or 'false' add take profit order
     @Query('onlyForDown') onlyForDown: string, // 'true' or 'false' only add sell orders for down strategy
+    @Query('justOneOrder') justOneOrder: string, // 'true' or 'false' only add one order for each type
   ) {
     const results = [];
     const isTesting = testing !== 'false';
-    await this._SellOneCoin(isTesting, removeExistingSellOrders, coin, results, addSellWhenDown, addSellSurprisePrice, addSellStopLoss, addSellTakeProfit, onlyForDown);
+    await this._SellOneCoin(isTesting, removeExistingSellOrders, coin, results, addSellWhenDown, addSellSurprisePrice, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder);
     return results;
   }
 
-  private async _SellOneCoin(isTesting: boolean, removeExistingSellOrders: string, coin: string, results: any[], addSellWhenDown: string, addSellSurprisePrice: string, addSellStopLoss: string, addSellTakeProfit: string, onlyForDown: string) {
+  private async _SellOneCoin(isTesting: boolean, removeExistingSellOrders: string, coin: string, results: any[], addSellWhenDown: string, addSellSurprisePrice: string, addSellStopLoss: string, addSellTakeProfit: string, onlyForDown: string, justOneOrder: string) {
     if (!isTesting) {
       if (removeExistingSellOrders === 'true') {
         const res1 = await this.okxService.cancelAllTypeOfOpenOrdersForOneCoin(coin, 'SPOT', 'sell', onlyForDown === 'true');
-        console.log('Cancel existing sell orders:', JSON.stringify(res1, null, 2));
+        this.logger.log('Cancel existing sell orders:', JSON.stringify(res1, null, 2));
         results.push({ coin, action: 'cancel_existing_sell_orders', result: res1 });
       }
     }
     if (addSellWhenDown === 'true') {
       const res2 = await this.okxService.placeMultipleSellOrdersForDown(coin, isTesting);
-      console.log('Place multiple sell orders for down:', JSON.stringify(res2, null, 2));
+      this.logger.log('Place multiple sell orders for down:', JSON.stringify(res2, null, 2));
       results.push({ coin, action: 'place_multiple_sell_orders_for_down', result: res2 });
     }
     if (addSellSurprisePrice === 'true') {
       const res3 = await this.okxService.placeSurprisePriceSellOrder(coin, isTesting);
-      console.log('Place surprise price sell order:', JSON.stringify(res3, null, 2));
+      this.logger.log('Place surprise price sell order:', JSON.stringify(res3, null, 2));
       results.push({ coin, action: 'place_surprise_price_sell_order', result: res3 });
     }
     if (addSellStopLoss === 'true') {
       const res4 = await this.okxService.placeStopLossOrder(coin, isTesting);
-      console.log('Place stop loss order:', JSON.stringify(res4, null, 2));
+      this.logger.log('Place stop loss order:', JSON.stringify(res4, null, 2));
       results.push({ coin, action: 'place_stop_loss_order', result: res4 });
     }
     if (addSellTakeProfit === 'true') {
-      const res5 = await this.okxService.placeTakeProfitOrder(coin, onlyForDown === 'true', isTesting);
-      console.log('Place take profit order:', JSON.stringify(res5, null, 2));
+      const res5 = await this.okxService.placeTakeProfitOrder(coin, onlyForDown === 'true', justOneOrder === 'true', isTesting);
+      this.logger.log('Place take profit order:', JSON.stringify(res5, null, 2));
       results.push({ coin, action: 'place_take_profit_order', result: res5 });
     }
   }
@@ -139,6 +149,7 @@ export class AppController {
     @Query('addSellSurprisePrice') addSellSurprisePrice: string, // 'true' or 'false' add surprise price order
     @Query('addSellTakeProfit') addSellTakeProfit: string, // 'true' or 'false' add take profit order
     @Query('onlyForDown') onlyForDown: string, // 'true' or 'false' only add sell orders for down strategy
+    @Query('justOneOrder') justOneOrder: string, // 'true' or 'false' only add one order for each type
   ) {
     const isTesting = testing !== 'false';
 
@@ -152,7 +163,7 @@ export class AppController {
     const results = [];
     for await (const coin of coins) {
       this.logger.log(`Processing coin: ${coin}`);
-      await this._SellOneCoin(isTesting, removeExistingSellOrders, coin, results, addSellWhenDown, addSellSurprisePrice, addSellStopLoss, addSellTakeProfit, onlyForDown);
+      await this._SellOneCoin(isTesting, removeExistingSellOrders, coin, results, addSellWhenDown, addSellSurprisePrice, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder);
     }
     
     return results;

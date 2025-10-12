@@ -2,35 +2,63 @@
   curl -X GET 'http://localhost:3030/balance?ccy=DOGS' \
     -H "Content-Type: application/json"    
 
-# sell At Price
-  curl -X POST "http://localhost:3030/sell-at-price/SHIB?\
+# sell At Price for up 
+curl -X POST "http://localhost:3030/sell-at-price/ENA?\
+testing=false&\
+removeExistingSellOrders=true&\
+addSellWhenDown=false&\
+addSellStopLoss=false&\
+addSellSurprisePrice=true&\
+addSellTakeProfit=true&\
+onlyForDown=false&\
+justOneOrder=false" \
+  -H "Content-Type: application/json"
+
+# sell at price for all for up
+curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
+testing=false&\
+removeExistingSellOrders=true&\
+addSellWhenDown=false&\
+addSellStopLoss=false&\
+addSellSurprisePrice=true&\
+addSellTakeProfit=true&\
+onlyForDown=false&\
+justOneOrder=false" \
+  -H "Content-Type: application/json"
+
+# sell At Price for down 
+curl -X POST "http://localhost:3030/sell-at-price/ENA?\
 testing=false&\
 removeExistingSellOrders=true&\
 addSellWhenDown=false&\
 addSellStopLoss=false&\
 addSellSurprisePrice=false&\
 addSellTakeProfit=true&\
-onlyForDown=true" \
+onlyForDown=true&\
+justOneOrder=false" \
   -H "Content-Type: application/json"
 
-  
-# sell at price for all
-  curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
+# sell at price for all for down
+curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
 testing=false&\
-removeExistingSellOrders=false&\
+removeExistingSellOrders=true&\
 addSellWhenDown=false&\
 addSellStopLoss=false&\
 addSellSurprisePrice=false&\
 addSellTakeProfit=true&\
-onlyForDown=true" \
+onlyForDown=true&\
+justOneOrder=false" \
   -H "Content-Type: application/json"
 
+
 # buy at price
-  curl -X POST "http://localhost:3030/buy-at-price/MLN?\
-testing=true&\
-removeExistingBuyOrders=false&\
+curl -X POST "http://localhost:3030/buy-at-price/BONK?\
+testing=false&\
+removeExistingBuyOrders=true&\
 addBuyWhenUp=false&\
-addBuySurprisePrice=true" \
+addBuySurprisePrice=false&\
+numberOfUSDT=200&\
+autobuy=true" \
   -H "Content-Type: application/json"
 
 # buy at price for all
@@ -38,7 +66,8 @@ addBuySurprisePrice=true" \
 testing=false&\
 removeExistingBuyOrders=true&\
 addBuyWhenUp=false&\
-addBuySurprisePrice=true" \
+addBuySurprisePrice=false&\
+numberOfUSDT=200" \
   -H "Content-Type: application/json"
 
 # cancel order 

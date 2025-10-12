@@ -32,85 +32,96 @@ export class OkxService {
     }
 
     async cancelAllTypeOfOpenOrdersForOneCoin(coin: string, instType: string = 'SPOT', side: 'buy' | 'sell' | null = null, onlyForDown: boolean = false) {
-        const res1 = await this.cancelOpenOrdersForOneCoin(coin, instType, side, onlyForDown);
+        // const res1 = await this.cancelOpenOrdersForOneCoin(coin, instType, side, onlyForDown);
         const res2 = await this.cancelOpenConditionalOrdersForOneCoin(coin, instType, side, onlyForDown);
-        return { res1, res2 };
+        return { res2 };
     }
 
-    async cancelOpenOrdersForOneCoin(coin: string, instType: string = 'SPOT', side: 'buy' | 'sell' | null = null, onlyForDown: boolean = false) {
-        const timestamp = new Date().toISOString();
+    // async cancelOpenOrdersForOneCoin(coin: string, instType: string = 'SPOT', side: 'buy' | 'sell' | null = null, onlyForDown: boolean = false) {
+    //     const timestamp = new Date().toISOString();
 
-        // 1. Get open orders
-        const instId = `${coin}-USDT`; // coin cụ thể
-        const getPath = `/api/v5/trade/orders-pending?instType=${instType}&instId=${instId}`;
-        const getSign = this.sign(timestamp, 'GET', getPath);
-        const pendingRes = await axios.get(
-            this.config.get<string>('okx.baseUrl') + getPath,
-            {
-                headers: {
-                    'OK-ACCESS-KEY': this.config.get<string>('okx.apiKey'),
-                    'OK-ACCESS-SIGN': getSign,
-                    'OK-ACCESS-TIMESTAMP': timestamp,
-                    'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphrase'),
-                },
-            }
-        );
+    //     // 1. Get open orders
+    //     const instId = `${coin}-USDT`; // coin cụ thể
+    //     const getPath = `/api/v5/trade/orders-pending?instType=${instType}&instId=${instId}`;
+    //     const getSign = this.sign(timestamp, 'GET', getPath);
+    //     const pendingRes = await axios.get(
+    //         this.config.get<string>('okx.baseUrl') + getPath,
+    //         {
+    //             headers: {
+    //                 'OK-ACCESS-KEY': this.config.get<string>('okx.apiKey'),
+    //                 'OK-ACCESS-SIGN': getSign,
+    //                 'OK-ACCESS-TIMESTAMP': timestamp,
+    //                 'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphrase'),
+    //             },
+    //         }
+    //     );
+    //     this.logger.log(`pendingRes ${JSON.stringify(pendingRes.data)}`);
 
-        const orders = pendingRes.data.data;
-        if (!orders.length) return { msg: 'No open orders' };
+    //     const orders = pendingRes.data.data;
+    //     if (!orders.length) return { msg: 'No open orders' };
+    //     this.logger.log(`orders ${JSON.stringify(orders)}`);
 
-        // 2. Filter theo side
-        let ordersBySide = side ? orders.filter((order: any) => order.side === side) : orders;
-        const currentPrice = await this.getTicker(instId);
-        this.logger.log(`Current price for ${instId}: ${currentPrice}`);
-        if (!currentPrice || currentPrice <= 0) {
-            throw new Error(`Invalid current price fetched for ${instId}: ${currentPrice}`);
-        }
-        if (onlyForDown && side === 'sell') {
-            ordersBySide = ordersBySide.filter((order: any) => order.price < currentPrice);
-        }
+    //     // 2. Filter theo side
+    //     let ordersBySide = side ? orders.filter((order: any) => order.side === side) : orders;
+    //     this.logger.log(`ordersBySide ${JSON.stringify(ordersBySide)}`);
 
-        if (ordersBySide.length === 0) {
-            this.logger.log(`No ${side.toUpperCase()} orders to cancel`);
-            return { cancelled: [] };
-        }
-        // 2. Cancel in batch (20 each)
-        const batches = [];
-        for (let i = 0; i < ordersBySide.length; i += 20) {
-            const chunk = orders.slice(i, i + 20);
-            batches.push(chunk);
-        }
+    //     const currentPrice = await this.getTicker(instId);
+    //     this.logger.log(`Current price for ${instId}: ${currentPrice}`);
+    //     if (!currentPrice || currentPrice <= 0) {
+    //         throw new Error(`Invalid current price fetched for ${instId}: ${currentPrice}`);
+    //     }
+    //     if (side === 'sell') {
+    //         if (onlyForDown) {
+    //             ordersBySide = ordersBySide.filter((order: any) => order.ordPx < currentPrice);
+    //         } 
+    //         // else {
+    //         //     ordersBySide = ordersBySide.filter((order: any) => order.ordPx > currentPrice);
+    //         // }
+    //     }
 
-        const results = [];
-        for (const batch of batches) {
-            const cancelBody = {
-                instId: batch[0].instId, // OKX yêu cầu cùng instId trong 1 batch
-                ordIds: batch.map(o => o.ordId),
-            };
+    //     if (ordersBySide.length === 0) {
+    //         this.logger.log(`No ${side.toUpperCase()} orders to cancel`);
+    //         return { cancelled: [] };
+    //     }
+    //     // 2. Cancel in batch (20 each)
+    //     const batches = [];
+    //     for (let i = 0; i < ordersBySide.length; i += 20) {
+    //         const chunk = orders.slice(i, i + 20);
+    //         batches.push(chunk);
+    //     }
+    //     this.logger.log(`batches ${JSON.stringify(batches)}`);
 
-            const cancelPath = '/api/v5/trade/cancel-batch-orders';
-            const cancelTimestamp = new Date().toISOString();
-            const cancelSign = this.sign(cancelTimestamp, 'POST', cancelPath, JSON.stringify(cancelBody));
+    //     const results = [];
+    //     for await (const batch of batches) {
+    //         const cancelBody = {
+    //             instId: batch[0].instId, // OKX yêu cầu cùng instId trong 1 batch
+    //             ordIds: batch.map(o => o.ordId),
+    //         };
 
-            const res = await axios.post(
-                this.config.get<string>('okx.baseUrl') + cancelPath,
-                cancelBody,
-                {
-                    headers: {
-                        'OK-ACCESS-KEY': this.config.get<string>('okx.apiKey'),
-                        'OK-ACCESS-SIGN': cancelSign,
-                        'OK-ACCESS-TIMESTAMP': cancelTimestamp,
-                        'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphrase'),
-                        'Content-Type': 'application/json',
-                    },
-                }
-            );
+    //         const cancelPath = '/api/v5/trade/cancel-batch-orders';
+    //         const cancelTimestamp = new Date().toISOString();
+    //         const cancelSign = this.sign(cancelTimestamp, 'POST', cancelPath, JSON.stringify(cancelBody));
 
-            results.push(res.data);
-        }
+    //         this.logger.log(`cancelBody ${JSON.stringify(cancelBody)}`);
+            // const res = await axios.post(
+            //     this.config.get<string>('okx.baseUrl') + cancelPath,
+            //     cancelBody,
+            //     {
+            //         headers: {
+            //             'OK-ACCESS-KEY': this.config.get<string>('okx.apiKey'),
+            //             'OK-ACCESS-SIGN': cancelSign,
+            //             'OK-ACCESS-TIMESTAMP': cancelTimestamp,
+            //             'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphrase'),
+            //             'Content-Type': 'application/json',
+            //         },
+            //     }
+            // );
 
-        return results;
-    }
+    //         // results.push(res.data);
+    //     }
+
+    //     return results;
+    // }
 
     cancelAllTypeOfOpenOrders(instType: string = 'SPOT', side: 'buy' | 'sell' | null = null) {
         // const res1 = await this.cancelAllOpenOrders(instType, side);
@@ -211,13 +222,21 @@ export class OkxService {
 
         // 2. Filter theo side
         let ordersBySide = side ? pendingOrders.filter((order: any) => order.side === side) : pendingOrders;
+        // this.logger.log(`ordersBySide ${JSON.stringify(ordersBySide)}`);
         const currentPrice = await this.getTicker(instId);
+        this.logger.log(`currentPrice ${currentPrice}`);
         if (!currentPrice || currentPrice <= 0) {
             throw new Error(`Invalid current price fetched for ${instId}: ${currentPrice}`);
         }
-        if (onlyForDown && side === 'sell') {
-            ordersBySide = ordersBySide.filter((order: any) => order.triggerPx < currentPrice);
+        if (side === 'sell') {
+            if (onlyForDown) {
+                ordersBySide = ordersBySide.filter((order: any) => order.ordPx < currentPrice);
+            }
+            //  else {
+            //     ordersBySide = ordersBySide.filter((order: any) => order.ordPx > currentPrice);
+            // }
         }
+
         if (ordersBySide.length === 0) {
             this.logger.log(`No ${side.toUpperCase()} orders to cancel for ${instId}`);
             return { cancelled: [] };
@@ -235,7 +254,7 @@ export class OkxService {
         const chunks = this.chunk(ordersToCancel, 20);
         const results: any[] = [];
 
-        for (const chunk of chunks) {
+        for await (const chunk of chunks) {
             const bodyArray = chunk; // array of objects
             const bodyString = JSON.stringify(bodyArray);
 
@@ -303,7 +322,7 @@ export class OkxService {
         const chunks = this.chunk(ordersToCancel, 20);
         const results: any[] = [];
 
-        for (const chunk of chunks) {
+        for await (const chunk of chunks) {
             const bodyArray = chunk; // array of objects
             const bodyString = JSON.stringify(bodyArray);
 
@@ -357,12 +376,15 @@ export class OkxService {
 
     async placeMultipleBuyOrders(coin: string, testing: boolean = true) {
         this.logger.log(`Starting to place multiple orders for ${coin}, testing mode: ${testing}`);
+        const maxUsdt = this.config.get<number>('maxUsdt');
+        const riskPerTrade = this.config.get<number>('riskPerTrade');
+        const amountOfUsdtPerStep = this.config.get<number>('amountOfUsdtPerStep');
         const coinConfig = this.config.get<any>(`coin.${coin}`);
         this.logger.log(`Placing multiple orders for ${coin} with config: ${JSON.stringify(coinConfig)}`);
         if (!coinConfig) {
             throw new Error(`No configuration found for coin: ${JSON.stringify(coin)}`);
         }
-        const { maxUsdt, minBuyPrice, maxBuyPrice, stopLossPrice, amountOfUsdtPerStep, riskPerTrade, addForTriggerPrice, szToFixed, priceToFixed } = coinConfig;
+        const { minBuyPrice, maxBuyPrice, stopLossPrice, addForTriggerPrice, szToFixed, priceToFixed } = coinConfig;
         if (minBuyPrice >= maxBuyPrice) {
             throw new Error(`Invalid configuration: minBuyPrice (${minBuyPrice}) must be less than maxBuyPrice (${maxBuyPrice})`);
         }
@@ -378,6 +400,10 @@ export class OkxService {
         const costByUsdt = numberOfCoinToBuy * avarageBuyPrice;
         const numberOfSteps = Math.ceil(costByUsdt / amountOfUsdtPerStep);
         const priceDistanceBetweenEachStep = (maxBuyPrice - minBuyPrice) / numberOfSteps;
+
+        if (!priceDistanceBetweenEachStep || priceDistanceBetweenEachStep <= 0) {
+            this.logger.log(`priceDistanceBetweenEachStep : ${priceDistanceBetweenEachStep}`);
+        }
 
         const steps = Array.from({ length: numberOfSteps + 1 }, (_, i) => i);
 
@@ -418,14 +444,112 @@ export class OkxService {
         return data;
     }
 
+    async autobuy(coin: string, testing: boolean = true) {
+        const data = [];
+        this.logger.log(`Starting to place auto orders for ${coin}, testing mode: ${testing}`);
+        const maxUsdt = this.config.get<number>('maxUsdt');
+        const riskPerTrade = this.config.get<number>('riskPerTrade');
+        const amountOfUsdtPerStep = this.config.get<number>('amountOfUsdtPerStep');
+        this.logger.log(`maxUsdt ${maxUsdt}, riskPerTrade ${riskPerTrade}`)
+        const coinConfig = this.config.get<any>(`coin.${coin}`);
+        this.logger.log(`Placing auto buy orders for ${coin} with config: ${JSON.stringify(coinConfig)}`);
+        if (!coinConfig) {
+            throw new Error(`No configuration found for coin: ${JSON.stringify(coin)}`);
+        }
+        const { szToFixed, priceToFixed } = coinConfig;
+        if (amountOfUsdtPerStep <= 10) {
+            throw new Error(`Invalid configuration: amountOfUsdtPerStep (${amountOfUsdtPerStep}) must be greater than 10 USDT`);
+        }
+        
+        const instId = `${coin}-USDT`;
+        const currentPrice = await this.getTicker(instId);
+        this.logger.log(`Current price: ${currentPrice}`);
+        const minBuyPrice = currentPrice;
+        const maxBuyPrice = minBuyPrice * 1.1; // +10%
+        const stopLossPrice = minBuyPrice * 0.9; // -10%
+
+        const avarageBuyPrice = (minBuyPrice + maxBuyPrice) / 2; // 2.2655 USDT
+        const amountOfUsdtRisk = maxUsdt * riskPerTrade; // 30 USDT
+        this.logger.log(`minBuyPrice: ${minBuyPrice}, maxBuyPrice: ${maxBuyPrice}, stopLossPrice: ${stopLossPrice}, avarageBuyPrice ${avarageBuyPrice}, amountOfUsdtRisk ${amountOfUsdtRisk}`)
+
+        const totalNnumberOfCoinWillBeBought = (amountOfUsdtRisk / (avarageBuyPrice - stopLossPrice));
+        if (totalNnumberOfCoinWillBeBought <= 0) {
+            this.logger.log(`totalNnumberOfCoinWillBeBought <= 0: ${totalNnumberOfCoinWillBeBought <= 0}`);
+            return data;
+        }
+        
+        const coinBalanceData = await this.getAccountBalance(coin);
+        const numberOfBoughtCoin = Number(coinBalanceData?.data[0]?.details[0]?.availBal ?? 0);
+        const numberOfCoinWillBeBought = totalNnumberOfCoinWillBeBought - numberOfBoughtCoin;
+        const costByUsdt = numberOfCoinWillBeBought * avarageBuyPrice;
+        const numberOfSteps = Math.ceil(costByUsdt / amountOfUsdtPerStep);
+        this.logger.log(`avarageBuyPrice: ${avarageBuyPrice}, totalNnumberOfCoinWillBeBought: ${totalNnumberOfCoinWillBeBought}, numberOfBoughtCoin: ${numberOfBoughtCoin}, numberOfCoinWillBeBought: ${numberOfCoinWillBeBought}, costByUsdt: ${costByUsdt}, numberOfSteps: ${numberOfSteps}`)
+        if (numberOfCoinWillBeBought <= 0) {
+            this.logger.log(`numberOfCoinWillBeBought <= 0: ${numberOfCoinWillBeBought <= 0}`);
+            return data;
+        }
+        const priceDistanceBetweenEachStep = (maxBuyPrice - minBuyPrice) / numberOfSteps;
+        this.logger.log(`priceDistanceBetweenEachStep: ${priceDistanceBetweenEachStep}`);
+
+        if (!priceDistanceBetweenEachStep || priceDistanceBetweenEachStep <= 0) {
+            this.logger.log(`priceDistanceBetweenEachStep : ${priceDistanceBetweenEachStep}`);
+        }
+
+        const steps = Array.from({ length: numberOfSteps + 1 }, (_, i) => i);
+        this.logger.log('steps:', JSON.stringify(steps));
+        const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
+        this.logger.log(`avarageCost ${avarageCost}`);
+        let newTotalCost = avarageCost * numberOfBoughtCoin;
+        let newBoughtCoin = numberOfBoughtCoin;
+        let newWvarageCost = avarageCost;
+        try {
+            for await (let step of steps) {
+                const previousOrderPx = minBuyPrice + (step - 1) * priceDistanceBetweenEachStep;
+                const orderPx = previousOrderPx + priceDistanceBetweenEachStep;
+                // const triggerPx = orderPx - addForTriggerPrice * 10; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
+                const triggerPx = orderPx - orderPx * 0.002; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
+                const sz = amountOfUsdtPerStep / orderPx;
+                this.logger.log(`step: ${step}, previousOrderPx: ${previousOrderPx}, orderPx: ${orderPx}, currentPrice: ${currentPrice}, previousOrderPx < currentPrice: ${previousOrderPx < currentPrice}`);
+                if (previousOrderPx < currentPrice) {
+                    continue
+                }
+
+                // if (triggerPx >= newWvarageCost) {
+                //     this.logger.log(`Break triggerPx >= newWvarageCost ${newWvarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                //     break;
+                // }
+
+                this.logger.log(`Placing order: Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                const res = await this.placeOneOrder(coin, 'buy', sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPx.toFixed(priceToFixed), testing);
+
+                data.push({ data: res.data, step, body: res.body });
+                
+                newTotalCost += orderPx * sz;
+                newBoughtCoin += sz;
+                newWvarageCost = newTotalCost / newBoughtCoin;
+                this.logger.log(`newTotalCost ${newTotalCost}, newBoughtCoin ${newBoughtCoin}, newWvarageCost ${newWvarageCost}`);
+            }
+
+        } catch (error) {
+            this.logger.log('Error placing trigger order:', error.response?.data || error.message);
+            throw error;
+        }
+
+
+        return data;
+    }
+
     async placeMultipleBuyOrdersForUp(coin: string, testing: boolean = true) {
         this.logger.log(`Starting to place multiple orders for ${coin}, testing mode: ${testing}`);
+        const maxUsdt = this.config.get<number>('maxUsdt');
+        const riskPerTrade = this.config.get<number>('riskPerTrade');
+        const amountOfUsdtPerStep = this.config.get<number>('amountOfUsdtPerStep');
         const coinConfig = this.config.get<any>(`coin.${coin}`);
         this.logger.log(`Placing multiple orders for ${coin} with config: ${JSON.stringify(coinConfig)}`);
         if (!coinConfig) {
             throw new Error(`No configuration found for coin: ${JSON.stringify(coin)}`);
         }
-        const { maxUsdt, minBuyPrice, maxBuyPrice, stopLossPrice, amountOfUsdtPerStep, riskPerTrade, addForTriggerPrice, szToFixed, priceToFixed } = coinConfig;
+        const { minBuyPrice, maxBuyPrice, stopLossPrice, szToFixed, priceToFixed } = coinConfig;
         if (minBuyPrice >= maxBuyPrice) {
             throw new Error(`Invalid configuration: minBuyPrice (${minBuyPrice}) must be less than maxBuyPrice (${maxBuyPrice})`);
         }
@@ -435,6 +559,7 @@ export class OkxService {
         if (stopLossPrice >= minBuyPrice) {
             throw new Error(`Invalid configuration: stopLossPrice (${stopLossPrice}) must be less than minBuyPrice (${minBuyPrice})`);
         }
+        
         const avarageBuyPrice = (minBuyPrice + maxBuyPrice) / 2; // 2.2655 USDT
         const amountOfUsdtRisk = maxUsdt * riskPerTrade; // 30 USDT
 
@@ -451,16 +576,20 @@ export class OkxService {
         const numberOfCoinWillBeBought = totalNnumberOfCoinWillBeBought - numberOfBoughtCoin;
         const costByUsdt = numberOfCoinWillBeBought * avarageBuyPrice;
         const numberOfSteps = Math.ceil(costByUsdt / amountOfUsdtPerStep);
-        console.log(`avarageBuyPrice: ${avarageBuyPrice}, totalNnumberOfCoinWillBeBought: ${totalNnumberOfCoinWillBeBought}, numberOfBoughtCoin: ${numberOfBoughtCoin}, numberOfCoinWillBeBought: ${numberOfCoinWillBeBought}, costByUsdt: ${costByUsdt}, numberOfSteps: ${numberOfSteps}`)
+        this.logger.log(`avarageBuyPrice: ${avarageBuyPrice}, totalNnumberOfCoinWillBeBought: ${totalNnumberOfCoinWillBeBought}, numberOfBoughtCoin: ${numberOfBoughtCoin}, numberOfCoinWillBeBought: ${numberOfCoinWillBeBought}, costByUsdt: ${costByUsdt}, numberOfSteps: ${numberOfSteps}`)
         if (totalNnumberOfCoinWillBeBought <= 0) {
-            console.log(`totalNnumberOfCoinWillBeBought <= 0: ${totalNnumberOfCoinWillBeBought <= 0}`);
+            this.logger.log(`totalNnumberOfCoinWillBeBought <= 0: ${totalNnumberOfCoinWillBeBought <= 0}`);
             return data;
         }
         const priceDistanceBetweenEachStep = (maxBuyPrice - minBuyPrice) / numberOfSteps;
-        console.log(`priceDistanceBetweenEachStep: ${priceDistanceBetweenEachStep}`);
+        this.logger.log(`priceDistanceBetweenEachStep: ${priceDistanceBetweenEachStep}`);
+
+        if (!priceDistanceBetweenEachStep || priceDistanceBetweenEachStep <= 0) {
+            this.logger.log(`priceDistanceBetweenEachStep : ${priceDistanceBetweenEachStep}`);
+        }
 
         const steps = Array.from({ length: numberOfSteps + 1 }, (_, i) => i);
-        console.log('steps:', JSON.stringify(steps));
+        this.logger.log('steps:', JSON.stringify(steps));
         const instId = `${coin}-USDT`;
         const currentPrice = await this.getTicker(instId);
         this.logger.log(`Current price: ${currentPrice}`);
@@ -472,7 +601,7 @@ export class OkxService {
                 // const triggerPx = orderPx - addForTriggerPrice * 10; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
                 const triggerPx = orderPx - orderPx * 0.002; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
                 const sz = amountOfUsdtPerStep / orderPx;
-                console.log(`step: ${step}, previousOrderPx: ${previousOrderPx}, orderPx: ${orderPx}, currentPrice: ${currentPrice}, previousOrderPx < currentPrice: ${previousOrderPx < currentPrice}`);
+                this.logger.log(`step: ${step}, previousOrderPx: ${previousOrderPx}, orderPx: ${orderPx}, currentPrice: ${currentPrice}, previousOrderPx < currentPrice: ${previousOrderPx < currentPrice}`);
                 if (previousOrderPx < currentPrice) {
                     continue
                 }
@@ -501,7 +630,7 @@ export class OkxService {
         const results = [];
         for await (const coin of coins) {
             if (!testing) {
-                await this.cancelOpenOrdersForOneCoin(coin, 'SPOT');
+                // await this.cancelOpenOrdersForOneCoin(coin, 'SPOT');
                 await this.cancelOpenConditionalOrdersForOneCoin(coin, 'SPOT');
             }
             this.logger.log(`Placing multiple orders for ${coin}`);
@@ -511,7 +640,7 @@ export class OkxService {
         return results;
     }
 
-    async placeSurprisePriceBuyOrder(coin: string, testing: boolean = true) {
+    async placeSurprisePriceBuyOrder(coin: string, numberOfUSDT: number, testing: boolean = true) {
         const data = [];
         const coinConfig = this.config.get<any>(`coin.${coin}`);
         this.logger.log(`Placing surprise price order for ${coin} with config: ${JSON.stringify(coinConfig)}`);
@@ -527,19 +656,18 @@ export class OkxService {
         if (!currentPrice || currentPrice <= 0) {
             throw new Error(`Invalid current price fetched for ${coin}-USDT: ${currentPrice}`);
         }
-        // get balance
-        const usdtBalanceData = await this.getAccountBalance('USDT');
-        const numberOfUSDT = usdtBalanceData?.data[0]?.details[0].availBal;
+        // // get balance
+        // const usdtBalanceData = await this.getAccountBalance('USDT');
+        // const numberOfUSDT = usdtBalanceData?.data[0]?.details[0]?.availBal;
         this.logger.log(`numberOfUSDT: ${numberOfUSDT}`);
         if (!numberOfUSDT || numberOfUSDT <= 0) {
             return data;
         }
 
-
         const orderPrice = currentPrice * (1 - surprisePricePercentage);
         const triggerPx = orderPrice + orderPrice * 0.002;
-        const totalNnumberOfCoinWillBeBought = (numberOfUSDT/2.0) / orderPrice;
-        this.logger.log(`Placing surprise price order for ${coin} at percentage: ${surprisePricePercentage * 100}%, px: ${orderPrice}, testing mode: ${testing}`);
+        const totalNnumberOfCoinWillBeBought = (numberOfUSDT) / orderPrice;
+        this.logger.log(`Placing surprise price order for ${coin} at percentage: ${surprisePricePercentage * 100}%, px: ${orderPrice}, cost: ${totalNnumberOfCoinWillBeBought * orderPrice} testing mode: ${testing}`);
         const res = await this.placeOneOrder(coin, 'buy', totalNnumberOfCoinWillBeBought.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPrice.toFixed(priceToFixed), testing);
         data.push({ data: res.data, step: `surprise_${(surprisePricePercentage * 100).toFixed(1)}%`, body: res.body });
 
@@ -548,12 +676,13 @@ export class OkxService {
 
     async placeSurprisePriceSellOrder(coin: string, testing: boolean = true) {
         const data = [];
+        const amountOfUsdtPerStep = this.config.get<number>('amountOfUsdtPerStep');
         const coinConfig = this.config.get<any>(`coin.${coin}`);
         this.logger.log(`Placing surprise price order for ${coin} with config: ${JSON.stringify(coinConfig)}`);
         if (!coinConfig) {
             throw new Error(`No configuration found for coin: ${JSON.stringify(coin)}`);
         }
-        const { amountOfUsdtPerStep, priceToFixed, szToFixed } = coinConfig;
+        const { priceToFixed, szToFixed } = coinConfig;
 
         const surprisePricePercentage = [0.5, 0.4, 0.3, 0.2, 0.1] // % so với giá hiện tại
         const percentageOfNUmberOfBoughtCoinToSell = 0.1; // 10% số coin đã mua sẽ bán ở mỗi mức giá bất ngờ
@@ -565,13 +694,14 @@ export class OkxService {
         }
         // get balance
         const coinBalanceData = await this.getAccountBalance(coin);
-        const numberOfBoughtCoin = coinBalanceData?.data[0]?.details[0].availBal;
+        const numberOfBoughtCoin = coinBalanceData?.data[0]?.details[0]?.availBal;
         this.logger.log(`numberOfBoughtCoin: ${numberOfBoughtCoin}`);
         if (!numberOfBoughtCoin || numberOfBoughtCoin <= 0) {
             return data;
         }
         let totalNnumberOfCoinWillBeSell = 0;
-        for (const percentage of surprisePricePercentage) {
+        let totalCost = 0;
+        for await (const percentage of surprisePricePercentage) {
             if (totalNnumberOfCoinWillBeSell > numberOfBoughtCoin) {
                 this.logger.log(`totalNnumberOfCoinWillBeSell: ${totalNnumberOfCoinWillBeSell} > numberOfBoughtCoin: ${numberOfBoughtCoin}, break the loop`);
                 break;
@@ -585,21 +715,24 @@ export class OkxService {
                 sz = amountOfUsdtPerStep / orderPrice;
             }
             totalNnumberOfCoinWillBeSell += sz;
-            this.logger.log(`Placing surprise price order for ${coin} at percentage: ${percentage * 100}%, sz: ${sz}, px: ${orderPrice}, testing mode: ${testing}`);
+            this.logger.log(`Placing surprise price order for ${coin} at percentage: ${percentage * 100}%, sz: ${sz}, px: ${orderPrice}, cost: ${orderPrice * sz}, testing mode: ${testing}`);
             const res = await this.placeOneOrder(coin, 'sell', sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPrice.toFixed(priceToFixed), testing);
             data.push({ data: res.data, step: `surprise_${(percentage * 100).toFixed(1)}%`, body: res.body });
+            totalCost += orderPrice * sz;
         }
+        this.logger.log(`Total cosst ${totalCost}`);
         return data;
     }
 
-    async placeTakeProfitOrder(coin: string, onlyForDown: boolean, testing: boolean = true) {
+    async placeTakeProfitOrder(coin: string, onlyForDown: boolean, justOneOrder: boolean = false, testing: boolean = true) {
         const data = [];
+        const amountOfUsdtPerStep = this.config.get<number>('amountOfUsdtPerStep');
         const coinConfig = this.config.get<any>(`coin.${coin}`);
         this.logger.log(`Placing surprise price order for ${coin} with config: ${JSON.stringify(coinConfig)}`);
         if (!coinConfig) {
             throw new Error(`No configuration found for coin: ${JSON.stringify(coin)}`);
         }
-        const { amountOfUsdtPerStep, priceToFixed, szToFixed } = coinConfig;
+        const { priceToFixed, szToFixed } = coinConfig;
 
         const takeProfitPricePercentage = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05] // % so với giá hiện tại
         const percentageOfNUmberOfBoughtCoinToSell = 0.05; // 10% số coin đã mua sẽ bán ở mỗi mức giá take profit
@@ -611,16 +744,18 @@ export class OkxService {
         }
         // get balance
         const coinBalanceData = await this.getAccountBalance(coin);
-        const numberOfBoughtCoin = coinBalanceData?.data[0]?.details[0].availBal;
+        const numberOfBoughtCoin = coinBalanceData?.data[0]?.details[0]?.availBal;
         this.logger.log(`numberOfBoughtCoin: ${numberOfBoughtCoin}`);
         if (!numberOfBoughtCoin || numberOfBoughtCoin <= 0) {
             return data;
         }
-        const accAvgPx = coinBalanceData?.data[0]?.details[0].accAvgPx;
-        const avarageCost = coinBalanceData?.data[0]?.details[0].openAvgPx;
-        this.logger.log(`accAvgPx: ${accAvgPx}, avarageCost: ${avarageCost}`);
+        const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
+        this.logger.log(`avarageCost: ${avarageCost}`);
+        if (avarageCost <= 0) {
+            return data;
+        }
         let totalNnumberOfCoinWillBeSell = 0;
-        for (const percentage of takeProfitPricePercentage) {
+        for await (const percentage of takeProfitPricePercentage) {
             if (totalNnumberOfCoinWillBeSell > numberOfBoughtCoin) {
                 this.logger.log(`totalNnumberOfCoinWillBeSell: ${totalNnumberOfCoinWillBeSell} > numberOfBoughtCoin: ${numberOfBoughtCoin}, break the loop`);
                 break;
@@ -629,7 +764,7 @@ export class OkxService {
             const orderPrice = avarageCost * (1 + percentage);
             const triggerPx = orderPrice > currentPrice ? orderPrice - orderPrice * 0.002 : orderPrice + orderPrice * 0.002;
             if (onlyForDown && orderPrice >= currentPrice) {
-                this.logger.log(`at percentage: ${percentage * 100}%,onlyForDown is true and orderPrice: ${orderPrice} >= currentPrice: ${currentPrice} and triggerPx: ${triggerPx}, not order`);
+                this.logger.log(`at percentage: ${percentage * 100}%,onlyForDown is true and orderPrice: ${orderPrice} >= currentPrice: ${currentPrice} and triggerPx: ${orderPrice + orderPrice * 0.002}, not order`);
                 continue;
             }
             if (onlyForDown && triggerPx >= currentPrice) {
@@ -642,9 +777,13 @@ export class OkxService {
                 sz = amountOfUsdtPerStep / orderPrice;
             }
             totalNnumberOfCoinWillBeSell += sz;
-            this.logger.log(`Placing take profit price order for ${coin} at percentage: ${percentage * 100}%, sz: ${sz}, px: ${orderPrice} and triggerPx: ${triggerPx}, testing mode: ${testing}`);
+            this.logger.log(`Placing take profit price order for ${coin} at percentage: ${percentage * 100}%, sz: ${sz}, px: ${orderPrice} and triggerPx: ${triggerPx}, cost: ${orderPrice * sz}, testing mode: ${testing}`);
             const res = await this.placeOneOrder(coin, 'sell', sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPrice.toFixed(priceToFixed), testing);
             data.push({ data: res.data, step: `take_profit_${(percentage * 100).toFixed(1)}%`, body: res.body });
+
+            if (justOneOrder) {
+                break;
+            }
         }
         return data;
     }
@@ -664,7 +803,7 @@ export class OkxService {
         const data = [];
         // stop loss
         const coinBalanceData = await this.getAccountBalance(coin);
-        const numberOfBoughtCoin = coinBalanceData?.data[0]?.details[0].availBal;
+        const numberOfBoughtCoin = coinBalanceData?.data[0]?.details[0]?.availBal;
         this.logger.log(`numberOfBoughtCoin: ${numberOfBoughtCoin}`);
         if (!numberOfBoughtCoin || numberOfBoughtCoin <= 0) {
             return data;
@@ -676,12 +815,13 @@ export class OkxService {
 
     async placeMultipleSellOrdersForDown(coin: string, testing: boolean = true) {
         this.logger.log(`Starting to place multiple orders for ${coin}, testing mode: ${testing}`);
+        const amountOfUsdtPerStep = this.config.get<number>('amountOfUsdtPerStep');
         const coinConfig = this.config.get<any>(`coin.${coin}`);
         this.logger.log(`Placing multiple orders for ${coin} with config: ${JSON.stringify(coinConfig)}`);
         if (!coinConfig) {
             throw new Error(`No configuration found for coin: ${JSON.stringify(coin)}`);
         }
-        const { minBuyPrice, maxBuyPrice, stopLossPrice, amountOfUsdtPerStep, addForTriggerPrice, szToFixed, priceToFixed, minTakeProfitPrice, maxTakeProfitPrice } = coinConfig;
+        const { minBuyPrice, maxBuyPrice, priceToFixed, minTakeProfitPrice, maxTakeProfitPrice } = coinConfig;
 
         if (minBuyPrice >= maxBuyPrice) {
             throw new Error(`Invalid configuration: minBuyPrice (${minBuyPrice}) must be less than maxBuyPrice (${maxBuyPrice})`);
@@ -698,7 +838,7 @@ export class OkxService {
         const data = [];
         // stop loss
         const coinBalanceData = await this.getAccountBalance(coin);
-        const numberOfBoughtCoin = coinBalanceData?.data[0]?.details[0].availBal;
+        const numberOfBoughtCoin = coinBalanceData?.data[0]?.details[0]?.availBal;
         this.logger.log(`numberOfBoughtCoin: ${numberOfBoughtCoin}`);
         if (!numberOfBoughtCoin || numberOfBoughtCoin <= 0) {
             return data;
@@ -717,6 +857,10 @@ export class OkxService {
         const amountOfBoughtCoinByUsdt = numberOfBoughtCoin * currentPrice;
         const numberOfSteps = Math.ceil(amountOfBoughtCoinByUsdt / amountOfUsdtPerStep);
         const priceDistanceBetweenEachStep = (maxTakeProfitPrice - minTakeProfitPrice) / Math.max(numberOfSteps, 1.0);
+
+        if (!priceDistanceBetweenEachStep || priceDistanceBetweenEachStep <= 0) {
+            this.logger.log(`priceDistanceBetweenEachStep : ${priceDistanceBetweenEachStep}`);
+        }
 
         this.logger.log(`amountOfBoughtCoinByUsdt: ${amountOfBoughtCoinByUsdt}, numberOfSteps: ${numberOfSteps}, priceDistanceBetweenEachStep: ${priceDistanceBetweenEachStep}`)
 
