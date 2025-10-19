@@ -464,9 +464,9 @@ export class OkxService {
         const instId = `${coin}-USDT`;
         const currentPrice = await this.getTicker(instId);
         this.logger.log(`Current price: ${currentPrice}`);
-        const minBuyPrice = currentPrice;
-        const maxBuyPrice = minBuyPrice * 1.1; // +10%
-        const stopLossPrice = minBuyPrice * 0.9; // -10%
+        const minBuyPrice = currentPrice * 1.01; // +1%
+        const maxBuyPrice = currentPrice * 1.05; // +5%
+        const stopLossPrice = currentPrice * 0.9; // -10%
 
         const avarageBuyPrice = (minBuyPrice + maxBuyPrice) / 2; // 2.2655 USDT
         const amountOfUsdtRisk = maxUsdt * riskPerTrade; // 30 USDT

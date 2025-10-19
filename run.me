@@ -14,13 +14,25 @@ onlyForDown=false&\
 justOneOrder=false" \
   -H "Content-Type: application/json"
 
+# remove all sell
+curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
+testing=false&\
+removeExistingSellOrders=true&\
+addSellWhenDown=false&\
+addSellStopLoss=false&\
+addSellSurprisePrice=false&\
+addSellTakeProfit=false&\
+onlyForDown=false&\
+justOneOrder=false" \
+  -H "Content-Type: application/json"
+
 # sell at price for all for up
 curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
 testing=false&\
 removeExistingSellOrders=true&\
 addSellWhenDown=false&\
 addSellStopLoss=false&\
-addSellSurprisePrice=true&\
+addSellSurprisePrice=false&\
 addSellTakeProfit=true&\
 onlyForDown=false&\
 justOneOrder=false" \
@@ -47,12 +59,12 @@ addSellStopLoss=false&\
 addSellSurprisePrice=false&\
 addSellTakeProfit=true&\
 onlyForDown=true&\
-justOneOrder=false" \
+justOneOrder=true" \
   -H "Content-Type: application/json"
 
 
 # buy at price
-curl -X POST "http://localhost:3030/buy-at-price/BONK?\
+curl -X POST "http://localhost:3030/buy-at-price/BNB?\
 testing=false&\
 removeExistingBuyOrders=true&\
 addBuyWhenUp=false&\
@@ -62,12 +74,13 @@ autobuy=true" \
   -H "Content-Type: application/json"
 
 # buy at price for all
-  curl -X POST "http://localhost:3030/buy-at-price-all-coins?\
+curl -X POST "http://localhost:3030/buy-at-price-all-coins?\
 testing=false&\
 removeExistingBuyOrders=true&\
 addBuyWhenUp=false&\
 addBuySurprisePrice=false&\
-numberOfUSDT=200" \
+numberOfUSDT=200&\
+autobuy=true" \
   -H "Content-Type: application/json"
 
 # cancel order 
