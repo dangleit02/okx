@@ -216,7 +216,7 @@ export class OkxService {
 
         const pendingOrders = getRes.data?.data || [];
         if (pendingOrders.length === 0) {
-            this.logger.log(`✅ No pending algo orders to cancel for ${instId}.`);
+            this.logger.log(`No pending algo orders to cancel for ${instId}.`);
             return { message: 'No pending algo orders' };
         }
 
@@ -297,7 +297,7 @@ export class OkxService {
 
         const pendingOrders = getRes.data?.data || [];
         if (pendingOrders.length === 0) {
-            this.logger.log('✅ No pending algo orders to cancel.');
+            this.logger.log('No pending algo orders to cancel.');
             return { message: 'No pending algo orders' };
         }
 
@@ -450,6 +450,10 @@ export class OkxService {
         const maxUsdt = this.config.get<number>('maxUsdt');
         const riskPerTrade = this.config.get<number>('riskPerTrade');
         const amountOfUsdtPerStep = this.config.get<number>('amountOfUsdtPerStep');
+        const minBuyPriceRatio = this.config.get<number>('minBuyPriceRatio');
+        const maxBuyPriceRatio = this.config.get<number>('maxBuyPriceRatio');
+        const stopLossPriceRatio = this.config.get<number>('stopLossPriceRatio');
+    
         this.logger.log(`maxUsdt ${maxUsdt}, riskPerTrade ${riskPerTrade}`)
         const coinConfig = this.config.get<any>(`coin.${coin}`);
         this.logger.log(`Placing auto buy orders for ${coin} with config: ${JSON.stringify(coinConfig)}`);
@@ -464,15 +468,14 @@ export class OkxService {
         const instId = `${coin}-USDT`;
         const currentPrice = await this.getTicker(instId);
         this.logger.log(`Current price: ${currentPrice}`);
-        const minBuyPrice = currentPrice * 1.01; // +1%
-        const maxBuyPrice = currentPrice * 1.05; // +5%
-        const stopLossPrice = currentPrice * 0.9; // -10%
+        const minBuyPrice = currentPrice * minBuyPriceRatio;
+        const maxBuyPrice = currentPrice * maxBuyPriceRatio;
+        const stopLossPrice = currentPrice * stopLossPriceRatio;
 
-        const avarageBuyPrice = (minBuyPrice + maxBuyPrice) / 2; // 2.2655 USDT
         const amountOfUsdtRisk = maxUsdt * riskPerTrade; // 30 USDT
-        this.logger.log(`minBuyPrice: ${minBuyPrice}, maxBuyPrice: ${maxBuyPrice}, stopLossPrice: ${stopLossPrice}, avarageBuyPrice ${avarageBuyPrice}, amountOfUsdtRisk ${amountOfUsdtRisk}`)
+        this.logger.log(`minBuyPrice: ${minBuyPrice}, maxBuyPrice: ${maxBuyPrice}, stopLossPrice: ${stopLossPrice}, amountOfUsdtRisk ${amountOfUsdtRisk}`)
 
-        const totalNnumberOfCoinWillBeBought = (amountOfUsdtRisk / (avarageBuyPrice - stopLossPrice));
+        const totalNnumberOfCoinWillBeBought = (amountOfUsdtRisk / (maxBuyPrice - stopLossPrice));
         if (totalNnumberOfCoinWillBeBought <= 0) {
             this.logger.log(`totalNnumberOfCoinWillBeBought <= 0: ${totalNnumberOfCoinWillBeBought <= 0}`);
             return data;
@@ -481,9 +484,10 @@ export class OkxService {
         const coinBalanceData = await this.getAccountBalance(coin);
         const numberOfBoughtCoin = Number(coinBalanceData?.data[0]?.details[0]?.availBal ?? 0);
         const numberOfCoinWillBeBought = totalNnumberOfCoinWillBeBought - numberOfBoughtCoin;
-        const costByUsdt = numberOfCoinWillBeBought * avarageBuyPrice;
+        const totalCostByUsdt = totalNnumberOfCoinWillBeBought * maxBuyPrice;
+        const costByUsdt = numberOfCoinWillBeBought * maxBuyPrice;
         const numberOfSteps = Math.ceil(costByUsdt / amountOfUsdtPerStep);
-        this.logger.log(`avarageBuyPrice: ${avarageBuyPrice}, totalNnumberOfCoinWillBeBought: ${totalNnumberOfCoinWillBeBought}, numberOfBoughtCoin: ${numberOfBoughtCoin}, numberOfCoinWillBeBought: ${numberOfCoinWillBeBought}, costByUsdt: ${costByUsdt}, numberOfSteps: ${numberOfSteps}`)
+        this.logger.log(`totalNnumberOfCoinWillBeBought: ${totalNnumberOfCoinWillBeBought}, numberOfBoughtCoin: ${numberOfBoughtCoin}, numberOfCoinWillBeBought: ${numberOfCoinWillBeBought}, totalCostByUsdt ${totalCostByUsdt}, costByUsdt: ${costByUsdt}, numberOfSteps: ${numberOfSteps}`)
         if (numberOfCoinWillBeBought <= 0) {
             this.logger.log(`numberOfCoinWillBeBought <= 0: ${numberOfCoinWillBeBought <= 0}`);
             return data;
@@ -511,7 +515,7 @@ export class OkxService {
                 const sz = amountOfUsdtPerStep / orderPx;
                 this.logger.log(`step: ${step}, previousOrderPx: ${previousOrderPx}, orderPx: ${orderPx}, currentPrice: ${currentPrice}, previousOrderPx < currentPrice: ${previousOrderPx < currentPrice}`);
                 if (previousOrderPx < currentPrice) {
-                    continue
+                    continue;
                 }
 
                 // if (triggerPx >= newWvarageCost) {
