@@ -453,8 +453,10 @@ export class OkxService {
         const minBuyPriceRatio = this.config.get<number>('minBuyPriceRatio');
         const maxBuyPriceRatio = this.config.get<number>('maxBuyPriceRatio');
         const stopLossPriceRatio = this.config.get<number>('stopLossPriceRatio');
-    
+
         this.logger.log(`maxUsdt ${maxUsdt}, riskPerTrade ${riskPerTrade}`)
+
+        this.logger.log(`amountOfUsdtPerStep ${amountOfUsdtPerStep}, minBuyPriceRatio ${minBuyPriceRatio}, maxBuyPriceRatio ${maxBuyPriceRatio}, stopLossPriceRatio ${stopLossPriceRatio}`)
         const coinConfig = this.config.get<any>(`coin.${coin}`);
         this.logger.log(`Placing auto buy orders for ${coin} with config: ${JSON.stringify(coinConfig)}`);
         if (!coinConfig) {
@@ -468,9 +470,14 @@ export class OkxService {
         const instId = `${coin}-USDT`;
         const currentPrice = await this.getTicker(instId);
         this.logger.log(`Current price: ${currentPrice}`);
-        const minBuyPrice = currentPrice * minBuyPriceRatio;
-        const maxBuyPrice = currentPrice * maxBuyPriceRatio;
-        const stopLossPrice = currentPrice * stopLossPriceRatio;
+        const minBuyPrice = currentPrice * (1 + minBuyPriceRatio);
+        const maxBuyPrice = currentPrice * (1 + maxBuyPriceRatio);
+        const stopLossPrice = currentPrice * (1 - stopLossPriceRatio);
+
+        if (minBuyPrice >= maxBuyPrice || stopLossPrice >= minBuyPrice) {
+            this.logger.log(`Invalid calculated prices: minBuyPrice (${minBuyPrice}) must be less than maxBuyPrice (${maxBuyPrice}) and stopLossPrice (${stopLossPrice}) must be less than minBuyPrice (${minBuyPrice})`);
+            throw new Error(`Invalid calculated prices`);
+        }
 
         const amountOfUsdtRisk = maxUsdt * riskPerTrade; // 30 USDT
         this.logger.log(`minBuyPrice: ${minBuyPrice}, maxBuyPrice: ${maxBuyPrice}, stopLossPrice: ${stopLossPrice}, amountOfUsdtRisk ${amountOfUsdtRisk}`)
@@ -492,7 +499,7 @@ export class OkxService {
             this.logger.log(`numberOfCoinWillBeBought <= 0: ${numberOfCoinWillBeBought <= 0}`);
             return data;
         }
-        const priceDistanceBetweenEachStep = (maxBuyPrice - minBuyPrice) / numberOfSteps;
+        const priceDistanceBetweenEachStep = (maxBuyPrice - stopLossPrice) / numberOfSteps;
         this.logger.log(`priceDistanceBetweenEachStep: ${priceDistanceBetweenEachStep}`);
 
         if (!priceDistanceBetweenEachStep || priceDistanceBetweenEachStep <= 0) {
@@ -508,14 +515,12 @@ export class OkxService {
         let newWvarageCost = avarageCost;
         try {
             for await (let step of steps) {
-                const previousOrderPx = minBuyPrice + (step - 1) * priceDistanceBetweenEachStep;
-                const orderPx = previousOrderPx + priceDistanceBetweenEachStep;
-                // const triggerPx = orderPx - addForTriggerPrice * 10; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
+                const orderPx = maxBuyPrice - step * priceDistanceBetweenEachStep;
                 const triggerPx = orderPx - orderPx * 0.002; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
                 const sz = amountOfUsdtPerStep / orderPx;
-                this.logger.log(`step: ${step}, previousOrderPx: ${previousOrderPx}, orderPx: ${orderPx}, currentPrice: ${currentPrice}, previousOrderPx < currentPrice: ${previousOrderPx < currentPrice}`);
-                if (previousOrderPx < currentPrice) {
-                    continue;
+                this.logger.log(`step: ${step}, orderPx: ${orderPx}, currentPrice: ${currentPrice}, triggerPx: ${triggerPx}, triggerPx < currentPrice: ${triggerPx < currentPrice}`);
+                if (triggerPx < currentPrice) {
+                    break;
                 }
 
                 // if (triggerPx >= newWvarageCost) {

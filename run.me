@@ -39,8 +39,8 @@ justOneOrder=false" \
   -H "Content-Type: application/json"
 
 # sell At Price for down 
-curl -X POST "http://localhost:3030/sell-at-price/XRP?\
-testing=false&\
+curl -X POST "http://localhost:3030/sell-at-price/WIF?\
+testing=true&\
 removeExistingSellOrders=true&\
 addSellWhenDown=false&\
 addSellStopLoss=false&\
@@ -64,8 +64,8 @@ justOneOrder=true" \
 
 
 # buy at price
-curl -X POST "http://localhost:3030/buy-at-price/BNB?\
-testing=false&\
+curl -X POST "http://localhost:3030/buy-at-price/WIF?\
+testing=true&\
 removeExistingBuyOrders=true&\
 addBuyWhenUp=false&\
 addBuySurprisePrice=false&\
