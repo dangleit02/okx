@@ -1,6 +1,7 @@
 import { Injectable, LoggerService } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as moment from 'moment';
 
 @Injectable()
 export class AppLogger implements LoggerService {
@@ -15,8 +16,11 @@ export class AppLogger implements LoggerService {
   }
 
   private getDateString(): string {
-    const now = new Date();
-    return now.toISOString().split('T')[0]; // e.g. 2025-11-05
+    return moment().format('YYYY-MM-DD'); // e.g. 2025-11-05
+  }
+
+  private getTimestamp(): string {
+    return moment().format('YYYY/MM/DD HH:mm:ss');
   }
 
   private ensureLogFile() {
@@ -30,34 +34,33 @@ export class AppLogger implements LoggerService {
 
   private writeToFile(level: string, message: any, context?: string, trace?: string) {
     this.ensureLogFile(); // check if date changed
-    const timestamp = new Date().toISOString();
-    const logLine = `[${timestamp}] [${level}]${context ? ' [' + context + ']' : ''} - ${message}${trace ? '\n' + trace : ''}\n`;
+    const logLine = `[${this.getTimestamp()}] [${level}]${context ? ' [' + context + ']' : ''} - ${message}${trace ? '\n' + trace : ''}\n`;
     fs.appendFileSync(this.logFile, logLine);
   }
 
   log(message: any, context?: string) {
-    console.log(`[LOG]${context ? ' [' + context + ']' : ''} -`, message);
+    console.log(`[${this.getTimestamp()}] [LOG]${context ? ' [' + context + ']' : ''} -`, message);
     this.writeToFile('LOG', message, context);
   }
 
   error(message: any, trace?: string, context?: string) {
-    console.error(`[ERROR]${context ? ' [' + context + ']' : ''} -`, message);
+    console.error(`[${this.getTimestamp()}] [ERROR]${context ? ' [' + context + ']' : ''} -`, message);
     if (trace) console.error(trace);
     this.writeToFile('ERROR', message, context, trace);
   }
 
   warn(message: any, context?: string) {
-    console.warn(`[WARN]${context ? ' [' + context + ']' : ''} -`, message);
+    console.warn(`[${this.getTimestamp()}] [WARN]${context ? ' [' + context + ']' : ''} -`, message);
     this.writeToFile('WARN', message, context);
   }
 
   debug(message: any, context?: string) {
-    console.debug(`[DEBUG]${context ? ' [' + context + ']' : ''} -`, message);
+    console.debug(`[${this.getTimestamp()}] [DEBUG]${context ? ' [' + context + ']' : ''} -`, message);
     this.writeToFile('DEBUG', message, context);
   }
 
   verbose(message: any, context?: string) {
-    console.info(`[VERBOSE]${context ? ' [' + context + ']' : ''} -`, message);
+    console.info(`[${this.getTimestamp()}] [VERBOSE]${context ? ' [' + context + ']' : ''} -`, message);
     this.writeToFile('VERBOSE', message, context);
   }
 }

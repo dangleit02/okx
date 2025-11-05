@@ -39,9 +39,9 @@ export class TasksService {
                 await this.okxService.sellOneCoin(isTesting, removeExistingSellOrders, coin, results, addSellWhenDown, addSellSurprisePrice, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder);
             }
 
-            this.logger.log(`✅ Successfully auto sell for down ${moment().format('YY/MM/DD HH:mm:ss')}`)
+            this.logger.log(`✅ Successfully auto sell for down ${moment().format('YYYY/MM/DD HH:mm:ss')}`)
         } catch (error) {
-            this.logger.log(`⚠️ Error sell for down ${moment().format('YY/MM/DD HH:mm:ss')}, ${error.message}`)
+            this.logger.log(`⚠️ Error sell for down ${moment().format('YYYY/MM/DD HH:mm:ss')}, ${error.message}`)
             throw error;
         }
     }    

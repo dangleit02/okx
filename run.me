@@ -2,6 +2,19 @@
   curl -X GET 'http://localhost:3030/balance?ccy=DOGS' \
     -H "Content-Type: application/json"    
 
+# remove all sell
+curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
+testing=false&\
+removeExistingSellOrders=true&\
+addSellWhenDown=false&\
+addSellStopLoss=false&\
+addSellSurprisePrice=false&\
+addSellTakeProfit=false&\
+onlyForDown=false&\
+justOneOrder=false" \
+  -H "Content-Type: application/json"
+
+
 # sell At Price for up 
 curl -X POST "http://localhost:3030/sell-at-price/ENA?\
 testing=false&\
@@ -14,17 +27,6 @@ onlyForDown=false&\
 justOneOrder=false" \
   -H "Content-Type: application/json"
 
-# remove all sell
-curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
-testing=false&\
-removeExistingSellOrders=true&\
-addSellWhenDown=false&\
-addSellStopLoss=false&\
-addSellSurprisePrice=false&\
-addSellTakeProfit=false&\
-onlyForDown=false&\
-justOneOrder=false" \
-  -H "Content-Type: application/json"
 
 # sell at price for all for up
 curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
@@ -64,8 +66,8 @@ justOneOrder=true" \
 
 
 # buy at price
-curl -X POST "http://localhost:3030/buy-at-price/WIF?\
-testing=true&\
+curl -X POST "http://localhost:3030/buy-at-price/LINK?\
+testing=false&\
 removeExistingBuyOrders=true&\
 addBuyWhenUp=false&\
 addBuySurprisePrice=false&\
