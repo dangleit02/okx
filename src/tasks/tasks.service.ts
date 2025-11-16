@@ -28,7 +28,6 @@ export class TasksService {
             const results = [];
             const isTesting = false,
                 removeExistingSellOrders = 'true',
-                addSellWhenDown = 'false',
                 addSellSurprisePrice = 'false',
                 addSellStopLoss = 'false',
                 addSellTakeProfit = 'true',
@@ -36,7 +35,7 @@ export class TasksService {
                 justOneOrder = 'true';
             for await (const coin of coins) {
                 this.logger.log(`Processing coin: ${coin}`);
-                await this.okxService.sellOneCoin(isTesting, removeExistingSellOrders, coin, results, addSellWhenDown, addSellSurprisePrice, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder);
+                await this.okxService.sellOneCoin(isTesting, removeExistingSellOrders, coin, results, addSellSurprisePrice, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder);
             }
 
             this.logger.log(`✅ Successfully auto sell for down ${moment().format('YYYY/MM/DD HH:mm:ss')}`)

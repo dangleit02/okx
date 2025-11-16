@@ -44,7 +44,6 @@ justOneOrder=false" \
 curl -X POST "http://localhost:3030/sell-at-price/WIF?\
 testing=true&\
 removeExistingSellOrders=true&\
-addSellWhenDown=false&\
 addSellStopLoss=false&\
 addSellSurprisePrice=false&\
 addSellTakeProfit=true&\
@@ -56,7 +55,6 @@ justOneOrder=false" \
 curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
 testing=false&\
 removeExistingSellOrders=true&\
-addSellWhenDown=false&\
 addSellStopLoss=false&\
 addSellSurprisePrice=false&\
 addSellTakeProfit=true&\
@@ -69,7 +67,6 @@ justOneOrder=true" \
 curl -X POST "http://localhost:3030/buy-at-price/LINK?\
 testing=false&\
 removeExistingBuyOrders=true&\
-addBuyWhenUp=false&\
 addBuySurprisePrice=false&\
 numberOfUSDT=200&\
 autobuy=true" \
@@ -79,7 +76,6 @@ autobuy=true" \
 curl -X POST "http://localhost:3030/buy-at-price-all-coins?\
 testing=false&\
 removeExistingBuyOrders=true&\
-addBuyWhenUp=false&\
 addBuySurprisePrice=false&\
 numberOfUSDT=200&\
 autobuy=true" \
@@ -92,277 +88,4 @@ autobuy=true" \
   curl -X POST 'http://localhost:3030/cancel-all-orders?side=sell' \
     -H "Content-Type: application/json"    
 
-  curl -X POST 'http://localhost:3030/cancel-orders/AEVO?side=sell' \
-    -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/cancel-all-orders?side=buy' \
-    -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/cancel-orders/AEVO?side=buy' \
-    -H "Content-Type: application/json"
-
-# buy all for up
-
   
-  curl -X POST 'http://localhost:3030/order-all-for-up?testing=true' \
-    -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-all-for-up?testing=false' \
-    -H "Content-Type: application/json"
-
-# buy for up for one coin
-  
-  curl -X POST 'http://localhost:3030/order-for-up-one-coin/APT?testing=true' \
-    -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-for-up-one-coin/SHIB?testing=false' \
-    -H "Content-Type: application/json"
-
-
-# sell all for down
-
-  curl -X POST 'http://localhost:3030/order-all-for-down?testing=true' \
-    -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-all-for-down?testing=false' \
-    -H "Content-Type: application/json"
-
-# sell for down for one coin  
-  curl -X POST 'http://localhost:3030/order-for-down-one-coin/IMX?testing=true' \
-    -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-for-down-one-coin/IMX?testing=false' \
-    -H "Content-Type: application/json"
-
-# AXS
-  curl -X POST 'http://localhost:3030/order-multiple/AXS?testing=true' \
-  -H "Content-Type: application/json"
-
-
-  curl -X POST 'http://localhost:3030/order-multiple/AXS?testing=false' \
-  -H "Content-Type: application/json"
-
-
-# STRK
-  curl -X POST 'http://localhost:3030/order-multiple/STRK?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/STRK?testing=false' \
-  -H "Content-Type: application/json"
-
-# WLD
-  curl -X POST 'http://localhost:3030/order-multiple/WLD?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/WLD?testing=false' \
-  -H "Content-Type: application/json" 
-
-# DOT
-  curl -X POST 'http://localhost:3030/order-multiple/DOT?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/DOT?testing=false' \
-  -H "Content-Type: application/json" 
-
-# NEAR
-  curl -X POST 'http://localhost:3030/order-multiple/NEAR?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/NEAR?testing=false' \
-  -H "Content-Type: application/json" 
-
-# DOGS
-  curl -X POST 'http://localhost:3030/order-multiple/DOGS?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/DOGS?testing=false' \
-  -H "Content-Type: application/json" 
-
-# AEVO
-  curl -X POST 'http://localhost:3030/order-multiple/AEVO?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/AEVO?testing=false' \
-  -H "Content-Type: application/json" 
-
-# DYDX
-  curl -X POST 'http://localhost:3030/order-multiple/DYDX?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/DYDX?testing=false' \
-  -H "Content-Type: application/json" 
-
-# OP
-  curl -X POST 'http://localhost:3030/order-multiple/OP?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/OP?testing=false' \
-  -H "Content-Type: application/json" 
-
-# ENJ
-  curl -X POST 'http://localhost:3030/order-multiple/ENJ?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/ENJ?testing=false' \
-  -H "Content-Type: application/json" 
-
-# ID
-  curl -X POST 'http://localhost:3030/order-multiple/ID?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/ID?testing=false' \
-  -H "Content-Type: application/json" 
-
-# TNSR
-  curl -X POST 'http://localhost:3030/order-multiple/TNSR?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/TNSR?testing=false' \
-  -H "Content-Type: application/json" 
-
-# ETHW
-  curl -X POST 'http://localhost:3030/order-multiple/ETHW?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/ETHW?testing=false' \
-  -H "Content-Type: application/json" 
-
-# ORDI
-  curl -X POST 'http://localhost:3030/order-multiple/ORDI?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/ORDI?testing=false' \
-  -H "Content-Type: application/json" 
-
-# PEOPLE
-  curl -X POST 'http://localhost:3030/order-multiple/PEOPLE?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/PEOPLE?testing=false' \
-  -H "Content-Type: application/json" 
-
-# TIA
-  curl -X POST 'http://localhost:3030/order-multiple/TIA?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/TIA?testing=false' \
-  -H "Content-Type: application/json" 
-
-# IMX
-  curl -X POST 'http://localhost:3030/order-multiple/IMX?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/IMX?testing=false' \
-  -H "Content-Type: application/json" 
-
-# MLN
-  curl -X POST 'http://localhost:3030/order-multiple/MLN?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/MLN?testing=false' \
-  -H "Content-Type: application/json" 
-
-# MEME
-  curl -X POST 'http://localhost:3030/order-multiple/MEME?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/MEME?testing=false' \
-  -H "Content-Type: application/json" 
-
-# PYTH
-  curl -X POST 'http://localhost:3030/order-multiple/PYTH?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/PYTH?testing=false' \
-  -H "Content-Type: application/json" 
-
-# PEPE
-  curl -X POST 'http://localhost:3030/order-multiple/PEPE?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/PEPE?testing=false' \
-  -H "Content-Type: application/json" 
-
-# WIF
-  curl -X POST 'http://localhost:3030/order-multiple/WIF?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/WIF?testing=false' \
-  -H "Content-Type: application/json" 
-
-# FLOKI
-  curl -X POST 'http://localhost:3030/order-multiple/FLOKI?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/FLOKI?testing=false' \
-  -H "Content-Type: application/json" 
-
-# BONK
-  curl -X POST 'http://localhost:3030/order-multiple/BONK?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/BONK?testing=false' \
-  -H "Content-Type: application/json" 
-
-# DOGE
-  curl -X POST 'http://localhost:3030/order-multiple/DOGE?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/DOGE?testing=false' \
-  -H "Content-Type: application/json" 
-
-# BOME
-  curl -X POST 'http://localhost:3030/order-multiple/BOME?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/BOME?testing=false' \
-  -H "Content-Type: application/json" 
-
-# BIO
-  curl -X POST 'http://localhost:3030/order-multiple/BIO?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/BIO?testing=false' \
-  -H "Content-Type: application/json" 
-
-# POL
-  curl -X POST 'http://localhost:3030/order-multiple/POL?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/POL?testing=false' \
-  -H "Content-Type: application/json" 
-
-# MAGIC
-  curl -X POST 'http://localhost:3030/order-multiple/MAGIC?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/MAGIC?testing=false' \
-  -H "Content-Type: application/json" 
-
-# LDO
-  curl -X POST 'http://localhost:3030/order-multiple/LDO?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/LDO?testing=false' \
-  -H "Content-Type: application/json" 
-
-# ARB
-  curl -X POST 'http://localhost:3030/order-multiple/ARB?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/ARB?testing=false' \
-  -H "Content-Type: application/json" 
-
-# SHIB
-  curl -X POST 'http://localhost:3030/order-multiple/SHIB?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/SHIB?testing=false' \
-  -H "Content-Type: application/json" 
-
-# ADA
-  curl -X POST 'http://localhost:3030/order-multiple/ADA?testing=true' \
-  -H "Content-Type: application/json"
-
-  curl -X POST 'http://localhost:3030/order-multiple/ADA?testing=false' \
-  -H "Content-Type: application/json" 
