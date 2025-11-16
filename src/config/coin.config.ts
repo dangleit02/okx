@@ -3,8 +3,8 @@ export default () => ({
     riskPerTrade: 0.02,
     amountOfUsdtPerStep: 12,
     minBuyPriceRatio: 0.01, // +1%
-    maxBuyPriceRatio: 0.05, // +5%
-    stopLossPriceRatio: 0.3, // -30%    
+    maxBuyPriceRatio: 0.02, // +2%
+    stopLossPriceRatio: 0.1, // 10%    0.3, // 30%    
     coinsForBuy: [
         // TOP 100
         'BTC',
