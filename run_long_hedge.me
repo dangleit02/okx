@@ -16,7 +16,7 @@ autoTrade=true" \
 curl -X POST "http://localhost:3030/future-hedge/long-at-price/ETH?\
 testing=true&\
 removeExistingOrders=true&\
-enableTakeProfit=true&\
+enableTakeProfit=true" \
 -H "Content-Type: application/json"
 
 
@@ -24,7 +24,7 @@ enableTakeProfit=true&\
 curl -X POST "http://localhost:3030/future-hedge/long-at-price/STRK?\
 testing=true&\
 removeExistingOrders=true&\
-partialCloseOnRetrace=true&\
+partialCloseOnRetrace=true" \
 -H "Content-Type: application/json"
 
 # cancel all long trigger 

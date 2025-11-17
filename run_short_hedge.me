@@ -13,10 +13,10 @@ autoTrade=true" \
 
 
 # close partial short when up for one coin (to take profit, existed short position)
-curl -X POST "http://localhost:3030/future-hedge/short-at-price/ETH?\
+curl -X POST "http://localhost:3030/future-hedge/short-at-price/STRK?\
 testing=true&\
 removeExistingOrders=true&\
-enableTakeProfit=true&\
+enableTakeProfit=true" \
 -H "Content-Type: application/json"
 
 
@@ -24,7 +24,7 @@ enableTakeProfit=true&\
 curl -X POST "http://localhost:3030/future-hedge/short-at-price/STRK?\
 testing=true&\
 removeExistingOrders=true&\
-partialCloseOnRetrace=true&\
+partialCloseOnRetrace=true" \
 -H "Content-Type: application/json"
 
 # cancel all short trigger 

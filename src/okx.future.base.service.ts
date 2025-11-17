@@ -563,6 +563,7 @@ export abstract class OkxFutureBaseService {
         if (!currentPrice || currentPrice <= 0) throw new Error(`Invalid current price: ${currentPrice}`);
 
         const posData = await this.getOpenPosition(instId);
+        this.logger.log('Current position data:', JSON.stringify(posData, null, 2));
         const pos = posData?.data?.[0];
         const currentSize = Number(pos?.pos ?? 0);
         const avgPrice = Number(pos?.avgPx ?? 0);
@@ -656,9 +657,9 @@ export abstract class OkxFutureBaseService {
     }: TradeOneCoinParams) {
         const results: any[] = [];
 
-        // 1️⃣ cancel existing orders if requested
+        // 1️⃣ cancel existing take profit orders if requested
         if (!isTesting && removeExistingOrders) {
-            const cancelRes = await this.cancelAllTypeOfOpenOrdersForOneCoin(coin, direction, partialCloseOnRetrace);
+            const cancelRes = await this.cancelAllTypeOfOpenOrdersForOneCoin(coin, direction === 'long' ? 'short' : 'long', partialCloseOnRetrace);
             this.logger.log(`Cancel existing ${direction} orders:`, JSON.stringify(cancelRes, null, 2));
             results.push({ coin, action: 'cancel_existing_orders', direction, result: cancelRes });
         }
