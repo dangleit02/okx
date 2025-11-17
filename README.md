@@ -1,3 +1,28 @@
+OKX hiện có 3 loại thị trường chính:
+
+Market Type	instType trên API	Ví dụ instId	Đặc điểm
+Spot	SPOT	BTC-USDT	Mua bán tài sản thật
+Perpetual Swap (Futures)	SWAP	BTC-USDT-SWAP	Không có ngày đáo hạn — giống “futures vĩnh cửu”
+Delivery Futures	FUTURES	BTC-USDT-240329	Có ngày đáo hạn (ít dùng, OKX app thường ẩn)
+
+
+Trên OKX App:
+
+Khi bạn vào mục “Futures”, thực ra OKX đang hiển thị Perpetual Swap (instType = SWAP),
+tức là hợp đồng không có ngày đáo hạn, được duy trì qua cơ chế funding rate mỗi 8h.
+
+Loại “Futures có đáo hạn” (instType = FUTURES) giờ chỉ còn hiển thị trên trading.okx.com (web) phần Futures > Delivery.
+
+2. Hedge Mode → CÓ posSide
+
+OKX chỉ phân biệt hành động theo posSide.
+
+posSide	side	Ý nghĩa
+long	buy	Mở thêm long
+long	sell	Đóng bớt long
+short	sell	Mở thêm short
+short	buy	Đóng bớt short
+
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>

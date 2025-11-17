@@ -1,0 +1,34 @@
+# remove all trigger long orders (orders were tiggered for take profit or stop loss)
+curl -X POST "http://localhost:3030/future-hedge/long-at-price-all-coins?\
+testing=true&\
+removeExistingOrders=true&\
+-H "Content-Type: application/json"
+
+# auto trade long for one coin
+curl -X POST "http://localhost:3030/future-hedge/long-at-price/LINK?\
+testing=true&\
+removeExistingOrders=true&\
+autoTrade=true" \
+-H "Content-Type: application/json"
+
+
+# close partial long when up for one coin (to take profit, existed long position)
+curl -X POST "http://localhost:3030/future-hedge/long-at-price/ETH?\
+testing=true&\
+removeExistingOrders=true&\
+enableTakeProfit=true&\
+-H "Content-Type: application/json"
+
+
+# close partial long when down for one coin
+curl -X POST "http://localhost:3030/future-hedge/long-at-price/STRK?\
+testing=true&\
+removeExistingOrders=true&\
+partialCloseOnRetrace=true&\
+-H "Content-Type: application/json"
+
+# cancel all long trigger 
+curl -X POST 'http://localhost:3030/future-hedge/cancel-all-orders?direction='long' \
+-H "Content-Type: application/json"
+
+  

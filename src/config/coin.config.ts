@@ -2,8 +2,8 @@ export default () => ({
     maxUsdt: 2000,
     riskPerTrade: 0.02,
     amountOfUsdtPerStep: 12,
-    minBuyPriceRatio: 0.01, // +1%
-    maxBuyPriceRatio: 0.02, // +2%
+    minPriceRatio: 0.01, // +1%
+    maxPriceRatio: 0.02, // +2%
     stopLossPriceRatio: 0.1, // 10%    0.3, // 30%    
     coinsForBuy: [
         // TOP 100
@@ -82,6 +82,26 @@ export default () => ({
         // 'ENA',
         // 'OKB',
         'WIF',
+    ],
+    coinsForShort: [
+        // 'BTC',
+        'ETH',
+        // 'XRP',
+        // 'BNB',
+        // 'SOL',
+        // 'DOGE',
+        // 'ADA',  
+        // 'LINK',
+        // 'AVAX',
+        // 'XLM',
+        // 'SUI',
+        // // 'BCH',
+        // 'DOT',
+        // // 'UNI',
+        // 'AAVE',
+        // 'ENA',
+        // 'OKB',
+        // 'WIF',
     ],
     // coinsForTakeProfit: [
     //     'APT'    ,

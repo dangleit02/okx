@@ -34,9 +34,22 @@ export class AppLogger implements LoggerService {
 
   private writeToFile(level: string, message: any, context?: string, trace?: string) {
     this.ensureLogFile(); // check if date changed
-    const logLine = `[${this.getTimestamp()}] [${level}]${context ? ' [' + context + ']' : ''} - ${message}${trace ? '\n' + trace : ''}\n`;
+    let msgStr: string;
+
+    if (typeof message === 'object') {
+      try {
+        msgStr = JSON.stringify(message, null, 2); // format đẹp
+      } catch (err) {
+        msgStr = String(message);
+      }
+    } else {
+      msgStr = String(message);
+    }
+
+    const logLine = `[${this.getTimestamp()}] [${level}]${context ? ' [' + context + ']' : ''} - ${msgStr}${trace ? '\n' + trace : ''}\n`;
     fs.appendFileSync(this.logFile, logLine);
   }
+
 
   log(message: any, context?: string) {
     console.log(`[${this.getTimestamp()}] [LOG]${context ? ' [' + context + ']' : ''} -`, message);

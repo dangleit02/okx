@@ -6,7 +6,7 @@ import { AppLogger } from './common/logger.service';
 import * as _ from 'lodash';
 
 @Controller()
-export class AppController {
+export class SpotController {
   constructor(
     private readonly appService: AppService,
     private readonly okxService: OkxService,
@@ -31,13 +31,11 @@ export class AppController {
     @Param('coin') coin: string,
     @Query('testing') testing: string,
     @Query('removeExistingBuyOrders') removeExistingBuyOrders: string, // 'true' or 'false' remove existing buy orders before placing new ones
-    @Query('addBuySurprisePrice') addBuySurprisePrice: string, // 'true' or 'false' add surprise price order
-    @Query('numberOfUSDT') numberOfUSDT: number, // number of USDT to use for this coin
     @Query('autobuy') autobuy: string,
   ) {
     const results = [];
     const isTesting = testing !== 'false';
-    await this.okxService.buyOneCoin(isTesting, removeExistingBuyOrders, coin, results, addBuySurprisePrice, numberOfUSDT, autobuy);
+    await this.okxService.buyOneCoin(isTesting, removeExistingBuyOrders, coin, results, autobuy);
     return results;
   }
 
@@ -45,8 +43,6 @@ export class AppController {
   async buyAtPriceForAllCoins(
     @Query('testing') testing: string,
     @Query('removeExistingBuyOrders') removeExistingBuyOrders: string, // 'true' or 'false' remove existing buy orders before placing new ones
-    @Query('addBuySurprisePrice') addBuySurprisePrice: string, // 'true' or 'false' add surprise price order
-    @Query('numberOfUSDT') numberOfUSDT: number, // number of USDT to use for this coin
     @Query('autobuy') autobuy: string,
   ) {
     this.logger.log(`Starting to place all orders for all coins, testing mode: ${testing}`);
@@ -59,8 +55,8 @@ export class AppController {
     const isTesting = testing !== 'false';
     const results = [];
     for await (const coin of coins) {
-      this.logger.log(`Processing coin: ${coin}`);
-      await this.okxService.buyOneCoin(isTesting, removeExistingBuyOrders, coin, results, addBuySurprisePrice, numberOfUSDT, autobuy);
+      this.logger.log(`Processing coin: ${coin.toUpperCase()}`);
+      await this.okxService.buyOneCoin(isTesting, removeExistingBuyOrders, coin, results, autobuy);
     }
     return results;
   }
@@ -71,15 +67,12 @@ export class AppController {
     @Query('testing') testing: string,
     @Query('removeExistingSellOrders') removeExistingSellOrders: string, // 'true' or 'false' remove existing sell orders before placing new ones 
     @Query('addSellStopLoss') addSellStopLoss: string, // 'true' or 'false' add stop loss order
-    @Query('addSellSurprisePrice') addSellSurprisePrice: string, // 'true' or 'false' add surprise price order
     @Query('addSellTakeProfit') addSellTakeProfit: string, // 'true' or 'false' add take profit order
     @Query('onlyForDown') onlyForDown: string, // 'true' or 'false' only add sell orders for down strategy
     @Query('justOneOrder') justOneOrder: string, // 'true' or 'false' only add one order for each type
   ) {
-    const results = [];
     const isTesting = testing !== 'false';
-    await await this.okxService.sellOneCoin(isTesting, removeExistingSellOrders, coin, results, addSellSurprisePrice, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder);
-    return results;
+    return await await this.okxService.sellOneCoin({ coin, isTesting, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder });
   }
 
   @Post('sell-at-price-all-coins')
@@ -87,7 +80,6 @@ export class AppController {
     @Query('testing') testing: string,
     @Query('removeExistingSellOrders') removeExistingSellOrders: string, // 'true' or 'false' remove existing sell orders before placing new ones 
     @Query('addSellStopLoss') addSellStopLoss: string, // 'true' or 'false' add stop loss order
-    @Query('addSellSurprisePrice') addSellSurprisePrice: string, // 'true' or 'false' add surprise price order
     @Query('addSellTakeProfit') addSellTakeProfit: string, // 'true' or 'false' add take profit order
     @Query('onlyForDown') onlyForDown: string, // 'true' or 'false' only add sell orders for down strategy
     @Query('justOneOrder') justOneOrder: string, // 'true' or 'false' only add one order for each type
@@ -101,10 +93,11 @@ export class AppController {
     }
     coins = _.uniq(coins);
     this.logger.log(`Coins to process: ${JSON.stringify(coins)}`);
-    const results = [];
+    let results = [];
     for await (const coin of coins) {
-      this.logger.log(`Processing coin: ${coin}`);
-      await this.okxService.sellOneCoin(isTesting, removeExistingSellOrders, coin, results, addSellSurprisePrice, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder);
+      this.logger.log(`Processing coin: ${coin.toUpperCase()}`);
+      const result = await this.okxService.sellOneCoin({ isTesting, coin, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder });
+      results = results.concat(result);
     }
 
     return results;
@@ -114,7 +107,7 @@ export class AppController {
   async cancelAllOrders(
     @Query('side') side?: 'buy' | 'sell' | null,
   ) {
-    return await this.okxService.cancelAllTypeOfOpenOrders(side);
+    return await this.okxService.cancelAllOpenConditionSpotOrders(side);
   }
 
   @Post('cancel-orders/:coin')
@@ -122,7 +115,7 @@ export class AppController {
     @Param('coin') coin: string,
     @Query('side') side?: 'buy' | 'sell' | null,
   ) {
-    return await this.okxService.cancelAllTypeOfOpenOrdersForOneCoin(coin, side);
+    return await this.okxService.cancelOpenConditionSpotOrdersForOneCoin(coin, side);
   }
 
   // @Post('order-multiple/:coin')
@@ -174,7 +167,7 @@ export class AppController {
   //   @Query('testing') testing: string
   // ) {
   //   const isTesting = testing !== 'false';
-  //   const instId = `${coin}-USDT`;
+  //   const instId = `${coin.toUpperCase()}-USDT`;
   //   const triggerPxLow = parseFloat(low);
   //   const triggerPxHigh = parseFloat(high);
   //   this.tradingOneService.start(instId, sz, triggerPxLow, triggerPxHigh, isTesting);    
@@ -183,7 +176,7 @@ export class AppController {
 
   // @Post('stop-one/:coin')
   // stop(@Param('coin') coin: string) {
-  //   const instId = `${coin}-USDT`;
+  //   const instId = `${coin.toUpperCase()}-USDT`;
   //   this.tradingOneService.stop(instId);
   //   return { message: 'Stopped monitoring.' };
   // }
@@ -201,12 +194,12 @@ export class AppController {
   // ) {
   //   const isTesting = testing !== 'false';
   //   this.tradingMultipleService.start(coin, isTesting);    
-  //   return { message: `Monitoring ${coin} for rebound strategy...` };
+  //   return { message: `Monitoring ${coin.toUpperCase()} for rebound strategy...` };
   // }
 
   // @Post('stop-multiple/:coin')
   // stopMultiple(@Param('coin') coin: string) {
-  //   const instId = `${coin}-USDT`;
+  //   const instId = `${coin.toUpperCase()}-USDT`;
   //   this.tradingMultipleService.stop(instId);
   //   return { message: 'Stopped monitoring.' };
   // }

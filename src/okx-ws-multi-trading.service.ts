@@ -94,8 +94,8 @@ export class OkxWsMultiTradingService implements OnModuleInit, OnModuleDestroy {
         }
 
         const coinData = this.getCoinConfig(coin)
-        this.logger.log(`Starting strategy for ${coin} with data: ${JSON.stringify(coinData)}`);
-        const instId = `${coin}-USDT`;
+        this.logger.log(`Starting strategy for ${coin.toUpperCase()} with data: ${JSON.stringify(coinData)}`);
+        const instId = `${coin.toUpperCase()}-USDT`;
         this.strategies[instId] = {
             instId,
             coinData,
@@ -165,11 +165,11 @@ export class OkxWsMultiTradingService implements OnModuleInit, OnModuleDestroy {
     }
 
     getCoinConfig(coin: string): OrderStep[] {
-        const coinConfig = this.config.get<any>(`coin.${coin}`);
+        const coinConfig = this.config.get<any>(`coin.${coin.toUpperCase()}`);
         const maxUsdt = this.config.get<number>('maxUsdt');
         const riskPerTrade = this.config.get<number>('riskPerTrade');
         const amountOfUsdtPerStep = this.config.get<number>('amountOfUsdtPerStep');
-        this.logger.log(`Placing multiple orders for ${coin} with config: ${JSON.stringify(coinConfig)}`);
+        this.logger.log(`Placing multiple orders for ${coin.toUpperCase()} with config: ${JSON.stringify(coinConfig)}`);
         if (!coinConfig) {
             throw new Error(`No configuration found for coin: ${JSON.stringify(coin)}`);
         }

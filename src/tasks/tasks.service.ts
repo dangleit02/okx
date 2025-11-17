@@ -14,7 +14,7 @@ export class TasksService {
     ) {
     }
 
-    @Cron('0 * * * *')
+    // @Cron('0 * * * *')
     async autoSellForDown() {
         this.logger.log('Cron auto sell for down');
         try {
@@ -28,15 +28,16 @@ export class TasksService {
             const results = [];
             const isTesting = false,
                 removeExistingSellOrders = 'true',
-                addSellSurprisePrice = 'false',
                 addSellStopLoss = 'false',
                 addSellTakeProfit = 'true',
                 onlyForDown = 'true',
                 justOneOrder = 'true';
             for await (const coin of coins) {
-                this.logger.log(`Processing coin: ${coin}`);
-                await this.okxService.sellOneCoin(isTesting, removeExistingSellOrders, coin, results, addSellSurprisePrice, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder);
+                this.logger.log(`Processing coin: ${coin.toUpperCase()}`);
+                const result = await this.okxService.sellOneCoin({ coin, isTesting, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder });
+                results.push(...result);
             }
+            this.logger.log(`Auto sell results: ${JSON.stringify(results, null, 2)}`);
 
             this.logger.log(`✅ Successfully auto sell for down ${moment().format('YYYY/MM/DD HH:mm:ss')}`)
         } catch (error) {

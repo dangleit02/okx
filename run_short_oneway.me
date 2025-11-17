@@ -1,0 +1,34 @@
+# remove all trigger short orders (orders were tiggered for take profit or stop loss)
+curl -X POST "http://localhost:3030/future/short-at-price-all-coins?\
+testing=true&\
+removeExistingOrders=true&\
+-H "Content-Type: application/json"
+
+# auto trade short for one coin
+curl -X POST "http://localhost:3030/future/short-at-price/STRK?\
+testing=false&\
+removeExistingOrders=true&\
+autoTrade=true" \
+-H "Content-Type: application/json"
+
+
+# close partial short when up for one coin (to take profit, existed short position)
+curl -X POST "http://localhost:3030/future/short-at-price/ETH?\
+testing=true&\
+removeExistingOrders=true&\
+enableTakeProfit=true&\
+-H "Content-Type: application/json"
+
+
+# close partial short when down for one coin
+curl -X POST "http://localhost:3030/future/short-at-price/STRK?\
+testing=true&\
+removeExistingOrders=true&\
+partialCloseOnRetrace=true&\
+-H "Content-Type: application/json"
+
+# cancel all short trigger 
+curl -X POST 'http://localhost:3030/future/cancel-all-orders?direction='short' \
+-H "Content-Type: application/json"
+
+  

@@ -1,5 +1,5 @@
-import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { SpotController } from './spot.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import okxConfig from './config/okx.config';
@@ -9,6 +9,13 @@ import config from './config/config';
 import { AppLogger } from './common/logger.service';
 import { TasksModule } from './tasks/tasks.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { FutureController } from './future.controller';
+import { OkxFutureService } from './okx-future.service';
+import { FutureHedgeController } from './future-hedge.controller';
+import { FutureOneWayController } from './future-oneway.controller';
+import { OkxFutureHedgeService } from './okx.future.hedge.service';
+import { OkxFutureOneWayService } from './okx.future.oneway.service';
+import { RequestLoggerMiddleware } from './middlewares/request-logger.middleware';
 
 @Module({
   imports: [
@@ -19,7 +26,11 @@ import { ScheduleModule } from '@nestjs/schedule';
     ScheduleModule.forRoot(),
     TasksModule,
   ],
-  controllers: [AppController],
-  providers: [AppService, OkxService, AppLogger],
+  controllers: [SpotController, FutureController, FutureHedgeController, FutureOneWayController],
+  providers: [AppService, OkxService, OkxFutureService, AppLogger, OkxFutureHedgeService, OkxFutureOneWayService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestLoggerMiddleware).forRoutes('*');
+  }
+}

@@ -2,90 +2,73 @@
   curl -X GET 'http://localhost:3030/balance?ccy=DOGS' \
     -H "Content-Type: application/json"    
 
-# remove all sell
+# remove all trigger sell orders
 curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
 testing=false&\
 removeExistingSellOrders=true&\
-addSellWhenDown=false&\
-addSellStopLoss=false&\
-addSellSurprisePrice=false&\
-addSellTakeProfit=false&\
-onlyForDown=false&\
-justOneOrder=false" \
   -H "Content-Type: application/json"
 
 
-# sell At Price for up 
+# sell when up for one coin (to take profit)
 curl -X POST "http://localhost:3030/sell-at-price/ENA?\
 testing=false&\
 removeExistingSellOrders=true&\
-addSellWhenDown=false&\
-addSellStopLoss=false&\
-addSellSurprisePrice=true&\
 addSellTakeProfit=true&\
-onlyForDown=false&\
-justOneOrder=false" \
-  -H "Content-Type: application/json"
+-H "Content-Type: application/json"
 
 
-# sell at price for all for up
+# sell when up for all coinsForTakeProfit (to take profit)
 curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
 testing=false&\
 removeExistingSellOrders=true&\
-addSellWhenDown=false&\
-addSellStopLoss=false&\
-addSellSurprisePrice=false&\
 addSellTakeProfit=true&\
-onlyForDown=false&\
-justOneOrder=false" \
-  -H "Content-Type: application/json"
+-H "Content-Type: application/json"
 
-# sell At Price for down 
+# sell when down for one coin (to take profit but when down like stop loss)
 curl -X POST "http://localhost:3030/sell-at-price/WIF?\
 testing=true&\
 removeExistingSellOrders=true&\
-addSellStopLoss=false&\
-addSellSurprisePrice=false&\
-addSellTakeProfit=true&\
 onlyForDown=true&\
 justOneOrder=false" \
   -H "Content-Type: application/json"
 
-# sell at price for all for down
+# sell when down for all coinsForTakeProfit (to take profit but when down like stop loss)
 curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
 testing=false&\
 removeExistingSellOrders=true&\
-addSellStopLoss=false&\
-addSellSurprisePrice=false&\
-addSellTakeProfit=true&\
 onlyForDown=true&\
-justOneOrder=true" \
+justOneOrder=false" \
   -H "Content-Type: application/json"
 
 
-# buy at price
-curl -X POST "http://localhost:3030/buy-at-price/LINK?\
-testing=false&\
+# autobuy for one coin
+curl -X POST "http://localhost:3030/buy-at-price/ETH?\
+testing=true&\
 removeExistingBuyOrders=true&\
-addBuySurprisePrice=false&\
-numberOfUSDT=200&\
 autobuy=true" \
   -H "Content-Type: application/json"
 
-# buy at price for all
+# autobuy for all
 curl -X POST "http://localhost:3030/buy-at-price-all-coins?\
 testing=false&\
 removeExistingBuyOrders=true&\
-addBuySurprisePrice=false&\
-numberOfUSDT=200&\
 autobuy=true" \
   -H "Content-Type: application/json"
 
-# cancel order 
+# cancel order for one coin
   curl -X POST 'http://localhost:3030/cancel-orders/1INCH' \
     -H "Content-Type: application/json"
 
+# cancel all order for all
   curl -X POST 'http://localhost:3030/cancel-all-orders?side=sell' \
+    -H "Content-Type: application/json"    
+
+# cancel sell order for all
+  curl -X POST 'http://localhost:3030/cancel-all-orders?side=sell' \
+    -H "Content-Type: application/json"    
+
+# cancel buy order for all
+  curl -X POST 'http://localhost:3030/cancel-all-orders?side=buy' \
     -H "Content-Type: application/json"    
 
   
