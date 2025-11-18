@@ -54,7 +54,7 @@ export class TasksService {
     }
 
     // run every hour at minute 15
-    @Cron('36 * * * *')
+    @Cron('15 * * * *')
     async autoCloseShortPartialPositionForSwapOnRetrace() {
         this.logger.log(`Cron auto close short partial position for swap on retrace ${moment().format('YY/MM/DD HH:mm:ss')}`);
         try {
