@@ -1,6 +1,6 @@
 export default () => ({
     runSpotTask: false,
-    runSwapTaskForShort: true,
+    runSwapTaskForShort: false,
     runSwapTaskForLong: false,
     maxUsdt: 2000,
     riskPerTrade: 0.02,
@@ -856,6 +856,10 @@ export default () => ({
         PENGU: {
             szToFixed: 0, // Số chữ số thập phân cho khối lượng
             priceToFixed: 6, // Số chữ số thập phân cho giá 
+        },
+        ZEC: {
+            szToFixed: 0, // Số chữ số thập phân cho khối lượng
+            priceToFixed: 2, // Số chữ số thập phân cho giá 
         },
     },
 });

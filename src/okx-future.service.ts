@@ -46,7 +46,7 @@ export class OkxFutureService {
             const ticker = res.data.data?.[0];
             if (!ticker) return null;
 
-            return Number(ticker.last);
+            return parseFloat(ticker.last);
         } catch (err) {
             this.logger.error(`Error fetching ticker for ${instId}`, err.response?.data || err.message);
             return null;
@@ -236,8 +236,8 @@ export class OkxFutureService {
 
         const posData = await this.getOpenPosition(instId);
         const pos = posData?.data?.[0];
-        const currentSize = Number(pos?.pos ?? 0);
-        const avgPrice = Number(pos?.avgPx ?? 0);
+        const currentSize = parseFloat(pos?.pos ?? 0);
+        const avgPrice = parseFloat(pos?.avgPx ?? 0);
 
         log(`Open pos size ${currentSize}, avgPrice=${avgPrice}`);
 
@@ -318,8 +318,8 @@ export class OkxFutureService {
 
         const posData = await this.getOpenPosition(instId);
         const pos = posData?.data?.[0];
-        const currentSize = Number(pos?.pos ?? 0);
-        const avgPrice = Number(pos?.avgPx ?? 0);
+        const currentSize = parseFloat(pos?.pos ?? 0);
+        const avgPrice = parseFloat(pos?.avgPx ?? 0);
 
         if (!currentSize || currentSize <= 0 || avgPrice <= 0) return data;
 

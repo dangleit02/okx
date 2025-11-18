@@ -264,7 +264,7 @@ export class OkxService {
         }
         
         const coinBalanceData = await this.getAccountBalance(coin);
-        const numberOfBoughtCoin = Number(coinBalanceData?.data[0]?.details[0]?.availBal ?? 0);
+        const numberOfBoughtCoin = parseFloat(coinBalanceData?.data[0]?.details[0]?.availBal ?? 0);
         const numberOfCoinWillBeBought = totalNnumberOfCoinWillBeBought - numberOfBoughtCoin;
         const totalCostByUsdt = totalNnumberOfCoinWillBeBought * maxBuyPrice;
         const costByUsdt = numberOfCoinWillBeBought * (stopLossPrice + maxBuyPrice) / 2;
@@ -283,7 +283,7 @@ export class OkxService {
 
         const steps = Array.from({ length: numberOfSteps + 1 }, (_, i) => i);
         this.logger.log('steps:', JSON.stringify(steps));
-        const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
+        const avarageCost = parseFloat(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
         this.logger.log(`avarageCost ${avarageCost}`);
         let newTotalCost = avarageCost * numberOfBoughtCoin;
         let newBoughtCoin = numberOfBoughtCoin;
@@ -349,7 +349,7 @@ export class OkxService {
         if (!numberOfBoughtCoin || numberOfBoughtCoin <= 0) {
             return data;
         }
-        const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
+        const avarageCost = parseFloat(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
         this.logger.log(`avarageCost: ${avarageCost}`);
         if (avarageCost <= 0) {
             return data;

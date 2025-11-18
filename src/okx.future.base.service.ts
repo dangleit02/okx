@@ -63,11 +63,12 @@ export abstract class OkxFutureBaseService {
             const inst = res.data?.data?.[0] || null;
             if (inst) {
                 // normalize numeric fields
-                inst.lotSz = Number(inst.lotSz);
-                inst.minSz = Number(inst.minSz || inst.lotSz || 0);
-                inst.tickSz = Number(inst.tickSz || 0.0001);
+                inst.lotSz = parseFloat(inst.lotSz);
+                inst.minSz = parseFloat(inst.minSz || inst.lotSz || 0);
+                inst.tickSz = parseFloat(inst.tickSz || 0.0001);
                 // store
                 this.instrumentCache.set(key, inst);
+                this.logger.log(`Fetched instrument for ${instId}: ${JSON.stringify(inst)}`);
                 return inst;
             }
             return null;
@@ -90,25 +91,25 @@ export abstract class OkxFutureBaseService {
 
     // format size: floor to lot size multiple, ensure >= minSz
     protected formatSize(rawSz: number, inst: any) {
-        const lot = Number(inst.lotSz || inst.minSz || 1);
+        const lot = parseFloat(inst.lotSz || inst.minSz || 1);
         if (!lot || lot <= 0) throw new Error(`Invalid lot size for ${inst.instId}`);
         // floor to multiple of lot
         const multiplier = Math.floor(rawSz / lot);
         const sz = multiplier * lot;
-        const minSz = Number(inst.minSz || lot);
+        const minSz = parseFloat(inst.minSz || lot);
         if (sz < minSz) return 0;
         // avoid floating rounding issues: fix decimals according to lot
         const decimals = this.decimalPlaces(lot);
-        return Number(sz.toFixed(decimals));
+        return parseFloat(sz.toFixed(decimals));
     }
 
     // format price: round to nearest tick
     protected formatPrice(rawPx: number, inst: any) {
-        const tick = Number(inst.tickSz || 0.0001);
+        const tick = parseFloat(inst.tickSz || 0.0001);
         if (!tick || tick <= 0) throw new Error(`Invalid tick size for ${inst.instId}`);
         const rounded = Math.round(rawPx / tick) * tick;
         const decimals = this.decimalPlaces(tick);
-        return Number(rounded.toFixed(decimals));
+        return parseFloat(rounded.toFixed(decimals));
     }
 
     // ---------- market data ----------
@@ -118,7 +119,7 @@ export abstract class OkxFutureBaseService {
             const res = await axios.get(url);
             const ticker = res.data.data?.[0];
             if (!ticker) return null;
-            return Number(ticker.last);
+            return parseFloat(ticker.last);
         } catch (err: any) {
             this.logger.error(`Error fetching ticker for ${instId}`, err.response?.data || err.message);
             return null;
@@ -217,7 +218,7 @@ export abstract class OkxFutureBaseService {
                         finalFiltered.push(o); // if direction not provided, keep all
                         continue;
                     }
-                    const isRetrace = direction === 'long' ? (Number(o.ordPx) < currentPrice) : (Number(o.ordPx) > currentPrice);
+                    const isRetrace = direction === 'long' ? (parseFloat(o.ordPx) < currentPrice) : (parseFloat(o.ordPx) > currentPrice);
                     if (isRetrace) finalFiltered.push(o);
                 }
             }
@@ -261,24 +262,26 @@ export abstract class OkxFutureBaseService {
         }
 
         // parse and format sizes/prices
-        let rawSz = Number(sz);
+        let rawSz = parseFloat(sz);
         if (!isFinite(rawSz) || rawSz <= 0) throw new Error(`Invalid size: ${sz}`);
-
-        const formattedSz = this.formatSize(rawSz, inst);
-        if (!formattedSz || formattedSz <= 0) {
-            throw new Error(`Computed size after applying lot size is zero. rawSz=${rawSz}, lotSz=${inst.lotSz}, minSz=${inst.minSz}`);
+        let formattedSz = rawSz;
+        if (rawSz > 1) {
+            formattedSz = this.formatSize(rawSz, inst);
+            if (!formattedSz || formattedSz <= 0) {
+                throw new Error(`Computed size after applying lot size is zero. rawSz=${rawSz}, lotSz=${inst.lotSz}, minSz=${inst.minSz}`);
+            }
         }
 
         // order/trigger price formatting
         let formattedTriggerPx: number | undefined = undefined;
         let formattedOrderPx: number | undefined = undefined;
         if (triggerPx) {
-            const rawTrigger = Number(triggerPx);
+            const rawTrigger = parseFloat(triggerPx);
             if (!isFinite(rawTrigger)) throw new Error(`Invalid triggerPx: ${triggerPx}`);
             formattedTriggerPx = this.formatPrice(rawTrigger, inst);
         }
         if (orderPx && orderPx !== '-1') {
-            const rawOrder = Number(orderPx);
+            const rawOrder = parseFloat(orderPx);
             if (!isFinite(rawOrder)) throw new Error(`Invalid orderPx: ${orderPx}`);
             formattedOrderPx = this.formatPrice(rawOrder, inst);
         }
@@ -374,7 +377,7 @@ export abstract class OkxFutureBaseService {
         }
 
         // parse inputs
-        let rawSz = Number(sz);
+        let rawSz = parseFloat(sz);
         if (!isFinite(rawSz) || rawSz <= 0) throw new Error(`Invalid size: ${sz}`);
 
         const formattedSz = this.formatSize(rawSz, inst);
@@ -382,13 +385,13 @@ export abstract class OkxFutureBaseService {
             throw new Error(`Computed size after applying lot size is zero. rawSz=${rawSz}, lotSz=${inst.lotSz}, minSz=${inst.minSz}`);
         }
 
-        const rawTrigger = Number(triggerPx);
+        const rawTrigger = parseFloat(triggerPx);
         if (!isFinite(rawTrigger)) throw new Error(`Invalid triggerPx: ${triggerPx}`);
         const formattedTrigger = this.formatPrice(rawTrigger, inst);
 
         let formattedOrderPx: number | undefined = undefined;
         if (orderPx && orderPx !== '-1') {
-            const rawOrder = Number(orderPx);
+            const rawOrder = parseFloat(orderPx);
             if (!isFinite(rawOrder)) throw new Error(`Invalid orderPx: ${orderPx}`);
             formattedOrderPx = this.formatPrice(rawOrder, inst);
         }
@@ -483,10 +486,6 @@ export abstract class OkxFutureBaseService {
 
         log(`Start ${coin}, test=${isTesting}`);
 
-        const coinCfg = this.config.get<any>(`coin.${coin.toUpperCase()}`);
-        if (!coinCfg) throw new Error(`No config for coin ${coin}`);
-        const { szToFixed, priceToFixed } = coinCfg;
-
         if (amountOfUsdtPerStep <= 10) throw new Error(`amountOfUsdtPerStep must > 10`);
 
         const instId = `${coin.toUpperCase()}-USDT-SWAP`;
@@ -509,8 +508,8 @@ export abstract class OkxFutureBaseService {
 
         const posData = await this.getOpenPosition(instId);
         const pos = posData?.data?.[0];
-        const currentSize = Number(pos?.pos ?? 0);
-        const avgPrice = Number(pos?.avgPx ?? 0);
+        const currentSize = parseFloat(pos?.pos ?? 0);
+        const avgPrice = parseFloat(pos?.avgPx ?? 0);
 
         log(`Open pos size ${currentSize}, avgPrice=${avgPrice}`);
 
@@ -542,7 +541,7 @@ export abstract class OkxFutureBaseService {
             log(`Step ${step}: order ${orderPx}, trigger ${triggerPx}, sz ${sz}`);
 
             // openPosition now formats size/price internally
-            const res = await this.openPosition(coin, direction, sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPx.toFixed(priceToFixed), isTesting);
+            const res = await this.openPosition(coin, direction, sz.toString(), triggerPx.toString(), orderPx.toString(), isTesting);
 
             data.push({ step, data: res.data, body: res.body });
 
@@ -566,10 +565,7 @@ export abstract class OkxFutureBaseService {
     ) {
         const data: any[] = [];
         const amountOfUsdtPerStep = this.config.get<number>('amountOfUsdtPerStep');
-        const coinConfig = this.config.get<any>(`coin.${coin.toUpperCase()}`);
-        if (!coinConfig) throw new Error(`No configuration found for coin: ${coin.toUpperCase()}`);
-        const { priceToFixed, szToFixed } = coinConfig;
-
+        
         this.logger.log(`Placing take profit orders for ${coin.toUpperCase()}, direction=${direction}, testing=${testing}`);
 
         const takeProfitPercentages = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05];
@@ -581,8 +577,8 @@ export abstract class OkxFutureBaseService {
 
         const posData = await this.getOpenPosition(instId);
         const pos = posData?.data?.[0];
-        const currentSize = Number(pos?.pos ?? 0);
-        const avgPrice = Number(pos?.avgPx ?? 0);
+        const currentSize = parseFloat(pos?.pos ?? 0);
+        const avgPrice = parseFloat(pos?.avgPx ?? 0);
 
         if (!currentSize || currentSize <= 0 || avgPrice <= 0) return data;
 
@@ -630,10 +626,10 @@ export abstract class OkxFutureBaseService {
 
             totalSizeClosed += sz;
 
-            this.logger.log(`Step percentage=${(percentage * 100).toFixed(1)}%, raw sz=${sz}, orderPrice=${orderPrice.toFixed(priceToFixed)}, triggerPx=${triggerPx.toFixed(priceToFixed)}, testing=${testing}`);
+            this.logger.log(`Step percentage=${(percentage * 100).toFixed(1)}%, raw sz=${sz}, orderPrice=${orderPrice.toString()}, triggerPx=${triggerPx.toString()}, testing=${testing}`);
 
             // closePartialPosition will format the size & prices
-            const res = await this.closePartialPosition(coin, direction, sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPrice.toFixed(priceToFixed), testing);
+            const res = await this.closePartialPosition(coin, direction, sz.toString(), triggerPx.toString(), orderPrice.toString(), testing);
 
             data.push({ data: res.data, step: `take_profit_${(percentage * 100).toFixed(1)}%`, body: res.body });
 
