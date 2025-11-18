@@ -164,10 +164,20 @@ export abstract class OkxFutureBaseService {
     }
 
     // ---------- cancel helper that takes a list of orders and cancels them (supports filtering) ----------
-    async cancelOrdersFromList(
-        orders: any[],
-        direction?: 'long' | 'short',
-        enablePartialCloseOnRetrace: boolean = false
+    async cancelOrdersFromList(        
+        {
+            orders,
+            direction,
+            enableTakeProfit = false,
+            partialCloseOnRetrace = false,
+            autoTrade = false
+        }: {
+            orders: any[],
+            direction?: 'long' | 'short',
+            enableTakeProfit?: boolean,
+            partialCloseOnRetrace?: boolean,
+            autoTrade?: boolean
+        }
     ) {
         if (!orders || orders.length === 0) return { cancelled: [] };
 
@@ -175,12 +185,19 @@ export abstract class OkxFutureBaseService {
 
         // filter by side according to direction
         if (direction) {
-            const side = direction === 'long' ? 'buy' : 'sell';
-            filtered = filtered.filter(o => o.side === side);
+            let sideToKeep: string;
+            // remove open postion triggers
+            if (autoTrade) {
+                sideToKeep = direction === 'long' ? 'buy' : 'sell';
+            }
+            if (enableTakeProfit) {
+                sideToKeep = direction === 'long' ? 'sell' : 'buy';
+            }
+            filtered = filtered.filter(o => o.side === sideToKeep);
         }
 
         // if retrace-only filter: we need to keep only orders that are retrace for their own coin
-        if (enablePartialCloseOnRetrace && filtered.length > 0) {
+        if (partialCloseOnRetrace && filtered.length > 0) {
             const byCoin = new Map<string, any[]>();
             filtered.forEach(o => {
                 const coin = String(o.instId).split('-')[0];
@@ -563,7 +580,6 @@ export abstract class OkxFutureBaseService {
         if (!currentPrice || currentPrice <= 0) throw new Error(`Invalid current price: ${currentPrice}`);
 
         const posData = await this.getOpenPosition(instId);
-        this.logger.log('Current position data:', JSON.stringify(posData, null, 2));
         const pos = posData?.data?.[0];
         const currentSize = Number(pos?.pos ?? 0);
         const avgPrice = Number(pos?.avgPx ?? 0);
@@ -628,19 +644,27 @@ export abstract class OkxFutureBaseService {
     }
 
     // ---------- cancel helpers that call cancelOrdersFromList using pending orders for a coin ----------
-    async cancelAllTypeOfOpenOrdersForOneCoin(
+    async cancelAllTypeOfOpenOrdersForOneCoin( {
+        coin,
+        direction,
+        enableTakeProfit,
+        partialCloseOnRetrace,
+        autoTrade
+    }: {
         coin: string,
         direction: 'long' | 'short',
-        enablePartialCloseOnRetrace: boolean = false
-    ) {
+        enableTakeProfit: boolean,
+        partialCloseOnRetrace: boolean,
+        autoTrade: boolean
+    }) {
         const allOrders = await this.getPendingTriggerOrdersForCoin(coin, 'SWAP');
-        const cancelOneCoinRes = await this.cancelOrdersFromList(allOrders, direction, enablePartialCloseOnRetrace);
+        const cancelOneCoinRes = await this.cancelOrdersFromList({ orders: allOrders, direction, enableTakeProfit, partialCloseOnRetrace, autoTrade });
         return cancelOneCoinRes;
     }
 
     async cancelAllTypeOfOpenSwapOrders(direction: 'long' | 'short') {
         const allOrders = await this.getAllPendingTriggerOrders('SWAP');
-        const cancelAllRes = await this.cancelOrdersFromList(allOrders, direction);
+        const cancelAllRes = await this.cancelOrdersFromList({ orders: allOrders, direction });
         return cancelAllRes;
     }
 
@@ -659,7 +683,7 @@ export abstract class OkxFutureBaseService {
 
         // 1️⃣ cancel existing take profit orders if requested
         if (!isTesting && removeExistingOrders) {
-            const cancelRes = await this.cancelAllTypeOfOpenOrdersForOneCoin(coin, direction === 'long' ? 'short' : 'long', partialCloseOnRetrace);
+            const cancelRes = await this.cancelAllTypeOfOpenOrdersForOneCoin({ coin, direction, enableTakeProfit, partialCloseOnRetrace, autoTrade });
             this.logger.log(`Cancel existing ${direction} orders:`, JSON.stringify(cancelRes, null, 2));
             results.push({ coin, action: 'cancel_existing_orders', direction, result: cancelRes });
         }

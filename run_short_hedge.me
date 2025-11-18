@@ -12,18 +12,19 @@ autoTrade=true" \
 -H "Content-Type: application/json"
 
 
-# close partial short when up for one coin (to take profit, existed short position)
+# close partial short when down for one coin (to take profit, existed short position)
 curl -X POST "http://localhost:3030/future-hedge/short-at-price/STRK?\
-testing=true&\
+testing=false&\
 removeExistingOrders=true&\
 enableTakeProfit=true" \
 -H "Content-Type: application/json"
 
 
-# close partial short when down for one coin
+# close partial short when up for one coin
 curl -X POST "http://localhost:3030/future-hedge/short-at-price/STRK?\
-testing=true&\
+testing=false&\
 removeExistingOrders=true&\
+enableTakeProfit=true&\
 partialCloseOnRetrace=true" \
 -H "Content-Type: application/json"
 
