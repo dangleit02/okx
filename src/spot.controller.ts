@@ -87,7 +87,7 @@ export class SpotController {
     const isTesting = testing !== 'false';
 
     this.logger.log(`Starting to place all orders for all coins, testing mode: ${testing}`);
-    let coins = this.config.get<any>(`coinsForTakeProfit`);
+    let coins = this.config.get<any>(`coinsSpotForTakeProfit`);
     if (!coins) {
       throw new Error(`No configuration found for coins: ${JSON.stringify(coins)}`);
     }
@@ -168,8 +168,8 @@ export class SpotController {
   // ) {
   //   const isTesting = testing !== 'false';
   //   const instId = `${coin.toUpperCase()}-USDT`;
-  //   const triggerPxLow = parseFloat(low);
-  //   const triggerPxHigh = parseFloat(high);
+  //   const triggerPxLow = Number(low);
+  //   const triggerPxHigh = Number(high);
   //   this.tradingOneService.start(instId, sz, triggerPxLow, triggerPxHigh, isTesting);    
   //   return { message: `Monitoring ${instId} for rebound strategy...` };
   // }

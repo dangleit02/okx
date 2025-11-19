@@ -44,7 +44,7 @@ export class OkxService {
     private async getTicker(instId: string) {
         const url = `${this.config.get<string>('okx.baseUrl')}/api/v5/market/ticker?instId=${instId}`;
         const res = await axios.get(url);
-        return parseFloat(res.data.data[0]?.last);
+        return Number(res.data.data[0]?.last);
     }
 
     async cancelOpenConditionSpotOrdersForOneCoin(coin: string, side: 'buy' | 'sell' | null = null, onlyForDown: boolean = false) {
@@ -264,7 +264,7 @@ export class OkxService {
         }
         
         const coinBalanceData = await this.getAccountBalance(coin);
-        const numberOfBoughtCoin = parseFloat(coinBalanceData?.data[0]?.details[0]?.availBal ?? 0);
+        const numberOfBoughtCoin = Number(coinBalanceData?.data[0]?.details[0]?.availBal ?? 0);
         const numberOfCoinWillBeBought = totalNnumberOfCoinWillBeBought - numberOfBoughtCoin;
         const totalCostByUsdt = totalNnumberOfCoinWillBeBought * maxBuyPrice;
         const costByUsdt = numberOfCoinWillBeBought * (stopLossPrice + maxBuyPrice) / 2;
@@ -283,7 +283,7 @@ export class OkxService {
 
         const steps = Array.from({ length: numberOfSteps + 1 }, (_, i) => i);
         this.logger.log('steps:', JSON.stringify(steps));
-        const avarageCost = parseFloat(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
+        const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
         this.logger.log(`avarageCost ${avarageCost}`);
         let newTotalCost = avarageCost * numberOfBoughtCoin;
         let newBoughtCoin = numberOfBoughtCoin;
@@ -327,7 +327,7 @@ export class OkxService {
         const data = [];
         const amountOfUsdtPerStep = this.config.get<number>('amountOfUsdtPerStep');
         const coinConfig = this.config.get<any>(`coin.${coin.toUpperCase()}`);
-        this.logger.log(`Placing surprise price order for ${coin.toUpperCase()} with config: ${JSON.stringify(coinConfig)}`);
+        this.logger.log(`Placing take profit order for ${coin.toUpperCase()} with config: ${JSON.stringify(coinConfig)}`);
         if (!coinConfig) {
             throw new Error(`No configuration found for coin: ${JSON.stringify(coin)}`);
         }
@@ -349,7 +349,7 @@ export class OkxService {
         if (!numberOfBoughtCoin || numberOfBoughtCoin <= 0) {
             return data;
         }
-        const avarageCost = parseFloat(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
+        const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
         this.logger.log(`avarageCost: ${avarageCost}`);
         if (avarageCost <= 0) {
             return data;

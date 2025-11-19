@@ -63,9 +63,9 @@ export abstract class OkxFutureBaseService {
             const inst = res.data?.data?.[0] || null;
             if (inst) {
                 // normalize numeric fields
-                inst.lotSz = parseFloat(inst.lotSz);
-                inst.minSz = parseFloat(inst.minSz || inst.lotSz || 0);
-                inst.tickSz = parseFloat(inst.tickSz || 0.0001);
+                inst.lotSz = Number(inst.lotSz);
+                inst.minSz = Number(inst.minSz || inst.lotSz || 0);
+                inst.tickSz = Number(inst.tickSz || 0.0001);
                 // store
                 this.instrumentCache.set(key, inst);
                 this.logger.log(`Fetched instrument for ${instId}: ${JSON.stringify(inst)}`);
@@ -91,25 +91,25 @@ export abstract class OkxFutureBaseService {
 
     // format size: floor to lot size multiple, ensure >= minSz
     protected formatSize(rawSz: number, inst: any) {
-        const lot = parseFloat(inst.lotSz || inst.minSz || 1);
+        const lot = Number(inst.lotSz || inst.minSz || 1);
         if (!lot || lot <= 0) throw new Error(`Invalid lot size for ${inst.instId}`);
         // floor to multiple of lot
         const multiplier = Math.floor(rawSz / lot);
         const sz = multiplier * lot;
-        const minSz = parseFloat(inst.minSz || lot);
+        const minSz = Number(inst.minSz || lot);
         if (sz < minSz) return 0;
         // avoid floating rounding issues: fix decimals according to lot
         const decimals = this.decimalPlaces(lot);
-        return parseFloat(sz.toFixed(decimals));
+        return Number(sz.toFixed(decimals));
     }
 
     // format price: round to nearest tick
     protected formatPrice(rawPx: number, inst: any) {
-        const tick = parseFloat(inst.tickSz || 0.0001);
+        const tick = Number(inst.tickSz || 0.0001);
         if (!tick || tick <= 0) throw new Error(`Invalid tick size for ${inst.instId}`);
         const rounded = Math.round(rawPx / tick) * tick;
         const decimals = this.decimalPlaces(tick);
-        return parseFloat(rounded.toFixed(decimals));
+        return Number(rounded.toFixed(decimals));
     }
 
     // ---------- market data ----------
@@ -119,7 +119,7 @@ export abstract class OkxFutureBaseService {
             const res = await axios.get(url);
             const ticker = res.data.data?.[0];
             if (!ticker) return null;
-            return parseFloat(ticker.last);
+            return Number(ticker.last);
         } catch (err: any) {
             this.logger.error(`Error fetching ticker for ${instId}`, err.response?.data || err.message);
             return null;
@@ -218,7 +218,7 @@ export abstract class OkxFutureBaseService {
                         finalFiltered.push(o); // if direction not provided, keep all
                         continue;
                     }
-                    const isRetrace = direction === 'long' ? (parseFloat(o.ordPx) < currentPrice) : (parseFloat(o.ordPx) > currentPrice);
+                    const isRetrace = direction === 'long' ? (Number(o.ordPx) < currentPrice) : (Number(o.ordPx) > currentPrice);
                     if (isRetrace) finalFiltered.push(o);
                 }
             }
@@ -262,7 +262,7 @@ export abstract class OkxFutureBaseService {
         }
 
         // parse and format sizes/prices
-        let rawSz = parseFloat(sz);
+        let rawSz = Number(sz);
         if (!isFinite(rawSz) || rawSz <= 0) throw new Error(`Invalid size: ${sz}`);
         let formattedSz = rawSz;
         if (rawSz > 1) {
@@ -276,12 +276,12 @@ export abstract class OkxFutureBaseService {
         let formattedTriggerPx: number | undefined = undefined;
         let formattedOrderPx: number | undefined = undefined;
         if (triggerPx) {
-            const rawTrigger = parseFloat(triggerPx);
+            const rawTrigger = Number(triggerPx);
             if (!isFinite(rawTrigger)) throw new Error(`Invalid triggerPx: ${triggerPx}`);
             formattedTriggerPx = this.formatPrice(rawTrigger, inst);
         }
         if (orderPx && orderPx !== '-1') {
-            const rawOrder = parseFloat(orderPx);
+            const rawOrder = Number(orderPx);
             if (!isFinite(rawOrder)) throw new Error(`Invalid orderPx: ${orderPx}`);
             formattedOrderPx = this.formatPrice(rawOrder, inst);
         }
@@ -377,7 +377,7 @@ export abstract class OkxFutureBaseService {
         }
 
         // parse inputs
-        let rawSz = parseFloat(sz);
+        let rawSz = Number(sz);
         if (!isFinite(rawSz) || rawSz <= 0) throw new Error(`Invalid size: ${sz}`);
 
         const formattedSz = this.formatSize(rawSz, inst);
@@ -385,13 +385,13 @@ export abstract class OkxFutureBaseService {
             throw new Error(`Computed size after applying lot size is zero. rawSz=${rawSz}, lotSz=${inst.lotSz}, minSz=${inst.minSz}`);
         }
 
-        const rawTrigger = parseFloat(triggerPx);
+        const rawTrigger = Number(triggerPx);
         if (!isFinite(rawTrigger)) throw new Error(`Invalid triggerPx: ${triggerPx}`);
         const formattedTrigger = this.formatPrice(rawTrigger, inst);
 
         let formattedOrderPx: number | undefined = undefined;
         if (orderPx && orderPx !== '-1') {
-            const rawOrder = parseFloat(orderPx);
+            const rawOrder = Number(orderPx);
             if (!isFinite(rawOrder)) throw new Error(`Invalid orderPx: ${orderPx}`);
             formattedOrderPx = this.formatPrice(rawOrder, inst);
         }
@@ -508,8 +508,8 @@ export abstract class OkxFutureBaseService {
 
         const posData = await this.getOpenPosition(instId);
         const pos = posData?.data?.[0];
-        const currentSize = parseFloat(pos?.pos ?? 0);
-        const avgPrice = parseFloat(pos?.avgPx ?? 0);
+        const currentSize = Number(pos?.pos ?? 0);
+        const avgPrice = Number(pos?.avgPx ?? 0);
 
         log(`Open pos size ${currentSize}, avgPrice=${avgPrice}`);
 
@@ -577,8 +577,8 @@ export abstract class OkxFutureBaseService {
 
         const posData = await this.getOpenPosition(instId);
         const pos = posData?.data?.[0];
-        const currentSize = parseFloat(pos?.pos ?? 0);
-        const avgPrice = parseFloat(pos?.avgPx ?? 0);
+        const currentSize = Number(pos?.pos ?? 0);
+        const avgPrice = Number(pos?.avgPx ?? 0);
 
         if (!currentSize || currentSize <= 0 || avgPrice <= 0) return data;
 

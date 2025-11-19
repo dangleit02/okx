@@ -26,9 +26,9 @@ export class TasksService {
                 return;
             }
             this.logger.log(`Starting to place all orders for all coins ${moment().format('YY/MM/DD HH:mm:ss')}`);
-            let coins = this.config.get<any>(`coinsForTakeProfit`);
+            let coins = this.config.get<any>(`coinsSpotForTakeProfit`);
             if (!coins) {
-                throw new Error(`No configuration found for coinsForTakeProfit: ${JSON.stringify(coins)}`);
+                throw new Error(`No configuration found for coinsSpotForTakeProfit: ${JSON.stringify(coins)}`);
             }
             coins = _.uniq(coins);
             this.logger.log(`Coins to process: ${JSON.stringify(coins)}`);

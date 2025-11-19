@@ -145,7 +145,7 @@ export class OkxWsMultiTradingService implements OnModuleInit, OnModuleDestroy {
                 const instId = msg.arg.instId;
                 const strategy = this.strategies[instId];
                 if (!strategy) return;
-                const price = parseFloat(msg.data[0].last);
+                const price = Number(msg.data[0].last);
                 const timestamp = new Date().toISOString();
                 this.logger.log(`[${timestamp}] Price ${instId}: ${price}`);                
                 this.setItemsHavingTriggerPriceAbove(strategy, price);
@@ -215,7 +215,7 @@ export class OkxWsMultiTradingService implements OnModuleInit, OnModuleDestroy {
 
     private setItemsHavingTriggerPriceAbove(strategy: Strategy, currentPrice) {
         strategy.coinData.forEach(item => {
-            if (item.active && !item.waitingForRebound && currentPrice <= parseFloat(item.triggerPxWhenDown)) {
+            if (item.active && !item.waitingForRebound && currentPrice <= Number(item.triggerPxWhenDown)) {
                 item.waitingForRebound = true;
             }
         });
@@ -224,7 +224,7 @@ export class OkxWsMultiTradingService implements OnModuleInit, OnModuleDestroy {
 
     private async setItemsHavingTriggerPriceBelow(strategy: Strategy, currentPrice) {
         for await (const item of strategy.coinData) {
-            if (item.active && item.waitingForRebound && currentPrice >= parseFloat(item.triggerPxWhenUp)) {
+            if (item.active && item.waitingForRebound && currentPrice >= Number(item.triggerPxWhenUp)) {
                 this.logger.log(`Price ${currentPrice} >= triggerPxWhenUp ${item.triggerPxWhenUp}, placing buy order for step ${item.step} at price item.orderPrice`);
                 const res = await this.placeLimitBuy(strategy.instId, item.sz, item.orderPx, strategy.testing);
                 this.logger.log(`Buy order response: ${JSON.stringify(res)}`);

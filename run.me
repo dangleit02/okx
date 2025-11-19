@@ -9,19 +9,33 @@ removeExistingSellOrders=true&\
   -H "Content-Type: application/json"
 
 
+# autobuy for one coin
+curl -X POST "http://localhost:3030/buy-at-price/ADA?\
+testing=false&\
+removeExistingBuyOrders=true&\
+autobuy=true" \
+  -H "Content-Type: application/json"
+
+# autobuy for all
+curl -X POST "http://localhost:3030/buy-at-price-all-coins?\
+testing=true&\
+removeExistingBuyOrders=true&\
+autobuy=true" \
+  -H "Content-Type: application/json"
+
 # sell when up for one coin (to take profit)
 curl -X POST "http://localhost:3030/sell-at-price/ENA?\
 testing=false&\
 removeExistingSellOrders=true&\
-addSellTakeProfit=true&\
+addSellTakeProfit=true \
 -H "Content-Type: application/json"
 
 
-# sell when up for all coinsForTakeProfit (to take profit)
+# sell when up for all coinsSpotForTakeProfit (to take profit)
 curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
 testing=false&\
 removeExistingSellOrders=true&\
-addSellTakeProfit=true&\
+addSellTakeProfit=true" \
 -H "Content-Type: application/json"
 
 # sell when down for one coin (to take profit but when down like stop loss)
@@ -32,7 +46,7 @@ onlyForDown=true&\
 justOneOrder=false" \
   -H "Content-Type: application/json"
 
-# sell when down for all coinsForTakeProfit (to take profit but when down like stop loss)
+# sell when down for all coinsSpotForTakeProfit (to take profit but when down like stop loss)
 curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
 testing=false&\
 removeExistingSellOrders=true&\
@@ -40,20 +54,6 @@ onlyForDown=true&\
 justOneOrder=false" \
   -H "Content-Type: application/json"
 
-
-# autobuy for one coin
-curl -X POST "http://localhost:3030/buy-at-price/ETH?\
-testing=true&\
-removeExistingBuyOrders=true&\
-autobuy=true" \
-  -H "Content-Type: application/json"
-
-# autobuy for all
-curl -X POST "http://localhost:3030/buy-at-price-all-coins?\
-testing=false&\
-removeExistingBuyOrders=true&\
-autobuy=true" \
-  -H "Content-Type: application/json"
 
 # cancel order for one coin
   curl -X POST 'http://localhost:3030/cancel-orders/1INCH' \

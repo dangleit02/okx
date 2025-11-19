@@ -140,7 +140,7 @@ export class OkxWsOneTradingService implements OnModuleInit, OnModuleDestroy {
                 const strategy = this.strategies[instId];
                 if (!strategy || !strategy.active) return;
 
-                const price = parseFloat(msg.data[0].last);
+                const price = Number(msg.data[0].last);
                 this.logger.log(`Price ${instId}: ${price}`);
 
                 if (!strategy.waitingForRebound && price <= strategy.low) {
