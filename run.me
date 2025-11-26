@@ -10,7 +10,7 @@ removeExistingSellOrders=true&\
 
 
 # autobuy for one coin
-curl -X POST "http://localhost:3030/buy-at-price/ADA?\
+curl -X POST "http://localhost:3030/buy-at-price/OP?\
 testing=false&\
 removeExistingBuyOrders=true&\
 autobuy=true" \
@@ -18,16 +18,16 @@ autobuy=true" \
 
 # autobuy for all
 curl -X POST "http://localhost:3030/buy-at-price-all-coins?\
-testing=true&\
+testing=false&\
 removeExistingBuyOrders=true&\
 autobuy=true" \
   -H "Content-Type: application/json"
 
 # sell when up for one coin (to take profit)
-curl -X POST "http://localhost:3030/sell-at-price/ENA?\
-testing=false&\
+curl -X POST "http://localhost:3030/sell-at-price/BOME?\
+testing=true&\
 removeExistingSellOrders=true&\
-addSellTakeProfit=true \
+addSellTakeProfit=true" \
 -H "Content-Type: application/json"
 
 
@@ -39,24 +39,46 @@ addSellTakeProfit=true" \
 -H "Content-Type: application/json"
 
 # sell when down for one coin (to take profit but when down like stop loss)
-curl -X POST "http://localhost:3030/sell-at-price/WIF?\
-testing=true&\
+curl -X POST "http://localhost:3030/sell-at-price/AVAX?\
+testing=false&\
 removeExistingSellOrders=true&\
+addSellTakeProfit=true&\
 onlyForDown=true&\
-justOneOrder=false" \
+justOneOrder=true" \
   -H "Content-Type: application/json"
 
 # sell when down for all coinsSpotForTakeProfit (to take profit but when down like stop loss)
 curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
 testing=false&\
 removeExistingSellOrders=true&\
+addSellTakeProfit=true&\
+onlyForDown=true&\
+justOneOrder=true" \
+  -H "Content-Type: application/json"
+
+# stop loss
+curl -X POST "http://localhost:3030/sell-at-price/LINK?\
+testing=false&\
+removeExistingSellOrders=true&\
+addSellStopLoss=true&\
+addSellTakeProfit=true&\
+onlyForDown=true&\
+justOneOrder=false" \
+  -H "Content-Type: application/json"
+
+curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
+testing=false&\
+removeExistingSellOrders=true&\
+addSellStopLoss=true&\
+addSellTakeProfit=true&\
 onlyForDown=true&\
 justOneOrder=false" \
   -H "Content-Type: application/json"
 
 
+
 # cancel order for one coin
-  curl -X POST 'http://localhost:3030/cancel-orders/1INCH' \
+  curl -X POST 'http://localhost:3030/cancel-orders/BTC' \
     -H "Content-Type: application/json"
 
 # cancel all order for all

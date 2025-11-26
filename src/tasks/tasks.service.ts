@@ -25,6 +25,7 @@ export class TasksService {
                 this.logger.log('Auto sell spot for down task is disabled in configuration.');
                 return;
             }
+            const runSpotTaskHavingStopLoss = this.config.get<boolean>('runSpotTaskHavingStopLoss');
             this.logger.log(`Starting to place all orders for all coins ${moment().format('YY/MM/DD HH:mm:ss')}`);
             let coins = this.config.get<any>(`coinsSpotForTakeProfit`);
             if (!coins) {
@@ -35,7 +36,7 @@ export class TasksService {
             const results = [];
             const isTesting = false,
                 removeExistingSellOrders = 'true',
-                addSellStopLoss = 'false',
+                addSellStopLoss = runSpotTaskHavingStopLoss ? 'true' : 'false',
                 addSellTakeProfit = 'true',
                 onlyForDown = 'true',
                 justOneOrder = 'true';

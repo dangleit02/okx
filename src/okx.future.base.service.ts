@@ -264,13 +264,19 @@ export abstract class OkxFutureBaseService {
         // parse and format sizes/prices
         let rawSz = Number(sz);
         if (!isFinite(rawSz) || rawSz <= 0) throw new Error(`Invalid size: ${sz}`);
+        // const formattedSz = parseFloat(rawSz.toFixed(8));
+        // if (!formattedSz || formattedSz <= 0) {
+        //     throw new Error(`Computed size after applying lot size is zero. rawSz=${rawSz}, lotSz=${inst.lotSz}, minSz=${inst.minSz}`);
+        // }
         let formattedSz = rawSz;
         if (rawSz > 1) {
-            formattedSz = this.formatSize(rawSz, inst);
-            if (!formattedSz || formattedSz <= 0) {
-                throw new Error(`Computed size after applying lot size is zero. rawSz=${rawSz}, lotSz=${inst.lotSz}, minSz=${inst.minSz}`);
-            }
+            formattedSz = this.formatSize(rawSz, inst);            
+        } else {
+            formattedSz = parseFloat(rawSz.toFixed(8));
         }
+        if (!formattedSz || formattedSz <= 0) {
+            throw new Error(`Computed size after applying lot size is zero. rawSz=${rawSz}, lotSz=${inst.lotSz}, minSz=${inst.minSz}`);
+        }        
 
         // order/trigger price formatting
         let formattedTriggerPx: number | undefined = undefined;
