@@ -16,8 +16,43 @@ export class TasksService {
     ) {
     }
 
+    // run each 15 minutes
+    // @Cron('*/15 * * * *')
+    // run every hour at minute 30
+    @Cron('30 * * * *')
+    async autoBuySpotForDown() {
+        this.logger.log(`Cron auto buy for down ${moment().format('YY/MM/DD HH:mm:ss')}`);
+        try {
+            if (!this.config.get<boolean>('runSpotTask')) {
+                this.logger.log('Auto buy spot for down task is disabled in configuration.');
+                return;
+            }
+            this.logger.log(`Starting to place all orders for all coins ${moment().format('YY/MM/DD HH:mm:ss')}`);
+            let coins = this.config.get<any>(`coinsForBuy`);
+            if (!coins) {
+                throw new Error(`No configuration found for coinsForBuy: ${JSON.stringify(coins)}`);
+            }
+            coins = _.uniq(coins);
+            this.logger.log(`Coins to process: ${JSON.stringify(coins)}`);
+            const results = [];
+            const isTesting = false,
+                removeExistingBuyOrders = 'true',
+                autobuy = 'true';                
+            for await (const coin of coins) {
+                this.logger.log(`Processing coin: ${coin.toUpperCase()}`);
+                await this.okxService.buyOneCoin(isTesting, removeExistingBuyOrders, coin, results, autobuy);
+            }
+            this.logger.log(`Auto buy results: ${JSON.stringify(results, null, 2)}`);
+
+            this.logger.log(`✅ Successfully auto buy for down ${moment().format('YYYY/MM/DD HH:mm:ss')}`)
+        } catch (error) {
+            this.logger.log(`⚠️ Error buy for down ${moment().format('YYYY/MM/DD HH:mm:ss')}, ${error.message}`)
+            throw error;
+        }
+    }
+
     // run every hour at minute 0
-    @Cron('0 * * * *')
+    // @Cron('0 * * * *')
     async autoSellSpotForDown() {
         this.logger.log(`Cron auto sell for down ${moment().format('YY/MM/DD HH:mm:ss')}`);
         try {

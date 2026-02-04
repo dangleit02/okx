@@ -68,20 +68,38 @@ export class OkxService {
             }
         );
 
-        const pendingOrders = getRes.data?.data || [];
-        if (pendingOrders.length === 0) {
-            this.logger.log(`No pending algo orders to cancel for ${instId}.`);
-            return { message: 'No pending algo orders' };
-        }
-
-        // 2. Filter theo side
-        let ordersBySide = side ? pendingOrders.filter((order: any) => order.side === side) : pendingOrders;
-        // this.logger.log(`ordersBySide ${JSON.stringify(ordersBySide)}`);
         const currentPrice = await this.getTicker(instId);
         this.logger.log(`currentPrice ${currentPrice}`);
         if (!currentPrice || currentPrice <= 0) {
             throw new Error(`Invalid current price fetched for ${instId}: ${currentPrice}`);
         }
+        
+        const pendingOrders = getRes.data?.data || [];
+        if (pendingOrders.length === 0) {
+            this.logger.log(`No pending algo orders to cancel for ${instId}.`);
+            return { message: 'No pending algo orders' };
+        }
+        this.logger.log(`pendingOrders ${JSON.stringify(pendingOrders, null, 2)}`);
+        // 2. Filter theo side
+        let ordersBySide = side ? pendingOrders.filter((order: any) => order.side === side) : pendingOrders;
+        
+        // 3. filter by price
+        ordersBySide = ordersBySide.filter((order: any) => {
+            if (order.side === 'buy') {
+                // if price higher than last price, skip
+                if (currentPrice > order.last) {
+                    return false;
+                }
+            }
+            if (order.side === 'sell') {
+                // if price lower than last price, skip
+                if (currentPrice < order.last) {
+                    return false;
+                }
+            }
+            return true;
+        });
+        this.logger.log(`ordersBySide ${JSON.stringify(ordersBySide, null, 2)}`);
         if (side === 'sell') {
             if (onlyForDown) {
                 ordersBySide = ordersBySide.filter((order: any) => order.ordPx < currentPrice);
@@ -293,7 +311,7 @@ export class OkxService {
                 const orderPx = maxBuyPrice - step * priceDistanceBetweenEachStep;
                 const triggerPx = orderPx - orderPx * 0.002; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
                 const sz = amountOfUsdtPerStep / orderPx;
-                this.logger.log(`step: ${step}, orderPx: ${orderPx}, minUpPrice: ${minBuyPrice}, triggerPx: ${triggerPx}, triggerPx < currentPrice: ${triggerPx < minBuyPrice}`);
+                this.logger.log(`step: ${step}, orderPx: ${orderPx}, minBuyPrice: ${minBuyPrice}, triggerPx: ${triggerPx}, triggerPx < currentPrice: ${triggerPx < minBuyPrice}`);
                 if (triggerPx < minBuyPrice) {
                     break;
                 }
@@ -337,7 +355,7 @@ export class OkxService {
         }
         const { priceToFixed, szToFixed } = coinConfig;
 
-        const takeProfitPricePercentage = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05, 0.01] // % so với giá hiện tại
+        const takeProfitPricePercentage = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1] // % so với giá hiện tại
 
         const percentageOfNUmberOfBoughtCoinToSell = 0.05; // 5% số coin đã mua sẽ bán ở mỗi mức giá take profit
         this.logger.log(`Placing take profit price order for ${coin.toUpperCase()}, testing mode: ${testing}`);
@@ -358,12 +376,14 @@ export class OkxService {
         if (avarageCost <= 0) {
             return data;
         }
-        let totalNnumberOfCoinWillBeSell = 0;
-        if (onlyForDown) {
-            takeProfitPricePercentage.push(currentPrice * (1 - stopLossRatio) / avarageCost - 1)            
+        if (avarageCost >= currentPrice) {
+            this.logger.log(`avarageCost: ${avarageCost} >= currentPrice: ${currentPrice}, not place take profit order`);
+            return data;
         }
+        let totalNnumberOfCoinWillBeSell = 0;
         this.logger.log(`takeProfitPricePercentage: ${JSON.stringify(takeProfitPricePercentage)}`);
         for await (const percentage of takeProfitPricePercentage) {
+            this.logger.log(`Processing take profit at percentage: ${percentage * 100}%`);
             if (totalNnumberOfCoinWillBeSell > numberOfBoughtCoin) {
                 this.logger.log(`totalNnumberOfCoinWillBeSell: ${totalNnumberOfCoinWillBeSell} > numberOfBoughtCoin: ${numberOfBoughtCoin}, break the loop`);
                 break;
@@ -385,7 +405,7 @@ export class OkxService {
                 sz = amountOfUsdtPerStep / orderPrice;
             }
             totalNnumberOfCoinWillBeSell += sz;
-            this.logger.log(`Placing take profit price order for ${coin.toUpperCase()} at percentage: ${percentage * 100}%, sz: ${sz}, px: ${orderPrice} and triggerPx: ${triggerPx}, cost: ${orderPrice * sz}, testing mode: ${testing}`);
+            this.logger.log(`Placed take profit price order for ${coin.toUpperCase()} at percentage: ${percentage * 100}%, sz: ${sz}, px: ${orderPrice} and triggerPx: ${triggerPx}, cost: ${orderPrice * sz}, testing mode: ${testing}`);
             const res = await this.placeOneOrder(coin, 'sell', sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPrice.toFixed(priceToFixed), testing);
             data.push({ data: res.data, step: `take_profit_${(percentage * 100).toFixed(1)}%`, body: res.body });
 

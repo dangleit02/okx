@@ -9,27 +9,29 @@ export default () => ({
     stopLossRatio: 0.01, // 1%
     minPriceRatio: 0.01, // +1%
     maxPriceRatio: 0.02, // +2%
-    stopLossPriceRatio: 0.1, // 10%    0.3, // 30%    
+    stopLossPriceRatio: 0.1,//0.06, // 6%//0.1, // 10%    0.3, // 30%    
+    futureLeverage: 3,
     coinsForBuy: [
+        'ETH'
         // TOP 100
-        'BTC',
-        'ETH',
-        'XRP',
-        // 'BNB',
-        'SOL',
-        'DOGE',
-        'ADA',  
-        'LINK',
-        'AVAX',
-        // 'XLM',
-        'SUI',
-        // 'BCH',
-        'DOT',
-        'FLOKI',
-        'BOME',
-        'MEME',
-        'PEOPLE',
-        'OP',
+        // 'BTC',
+        // 'ETH',
+        // 'XRP',
+        // // 'BNB',
+        // 'SOL',
+        // 'DOGE',
+        // 'ADA',  
+        // 'LINK',
+        // 'AVAX',
+        // // 'XLM',
+        // 'SUI',
+        // // 'BCH',
+        // 'DOT',
+        // 'FLOKI',
+        // 'BOME',
+        // 'MEME',
+        // 'PEOPLE',
+        // 'OP',
         // 'UNI',
         // 'AAVE',
         // 'OKB',
@@ -73,6 +75,8 @@ export default () => ({
         // 'ENA',
     ],
     coinsSpotForTakeProfit: [
+        'ETH'
+        // TOP 100
         // 'BTC',
         // 'ETH',
         // 'XRP',
@@ -81,7 +85,7 @@ export default () => ({
         // 'DOGE',
         // 'ADA',  
         // 'LINK',
-        'AVAX',
+        // 'AVAX',
         // 'XLM',
         // 'SUI',
         // // 'BCH',
@@ -98,7 +102,7 @@ export default () => ({
         // 'WIF',        
     ],
     coinsForShort: [
-        'STRK',
+        'ETH',
     ],
     coinsForLong: [
     ],

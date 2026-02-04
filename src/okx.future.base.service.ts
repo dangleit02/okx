@@ -69,6 +69,7 @@ export abstract class OkxFutureBaseService {
                 // store
                 this.instrumentCache.set(key, inst);
                 this.logger.log(`Fetched instrument for ${instId}: ${JSON.stringify(inst)}`);
+                this.logger.log(`lotSz=${inst.lotSz}, minSz=${inst.minSz}, tickSz=${inst.tickSz}`);
                 return inst;
             }
             return null;
@@ -97,7 +98,10 @@ export abstract class OkxFutureBaseService {
         const multiplier = Math.floor(rawSz / lot);
         const sz = multiplier * lot;
         const minSz = Number(inst.minSz || lot);
-        if (sz < minSz) return 0;
+        if (sz < minSz) {
+            this.logger.warn(`Computed size ${sz} is less than minSz ${minSz} for ${inst.instId}, multiplier: ${multiplier}, returning 0`);
+            return 0;
+        }
         // avoid floating rounding issues: fix decimals according to lot
         const decimals = this.decimalPlaces(lot);
         return Number(sz.toFixed(decimals));
@@ -165,7 +169,7 @@ export abstract class OkxFutureBaseService {
     }
 
     // ---------- cancel helper that takes a list of orders and cancels them (supports filtering) ----------
-    async cancelOrdersFromList(        
+    async cancelOrdersFromList(
         {
             orders,
             direction,
@@ -268,15 +272,16 @@ export abstract class OkxFutureBaseService {
         // if (!formattedSz || formattedSz <= 0) {
         //     throw new Error(`Computed size after applying lot size is zero. rawSz=${rawSz}, lotSz=${inst.lotSz}, minSz=${inst.minSz}`);
         // }
-        let formattedSz = rawSz;
-        if (rawSz > 1) {
-            formattedSz = this.formatSize(rawSz, inst);            
-        } else {
-            formattedSz = parseFloat(rawSz.toFixed(8));
-        }
+        // let formattedSz = rawSz;
+        // if (rawSz > 1) {
+        //     formattedSz = this.formatSize(rawSz, inst);
+        // } else {
+        //     formattedSz = parseFloat(rawSz.toFixed(8));
+        // }
+        const formattedSz = this.formatSize(rawSz, inst);
         if (!formattedSz || formattedSz <= 0) {
             throw new Error(`Computed size after applying lot size is zero. rawSz=${rawSz}, lotSz=${inst.lotSz}, minSz=${inst.minSz}`);
-        }        
+        }
 
         // order/trigger price formatting
         let formattedTriggerPx: number | undefined = undefined;
@@ -324,14 +329,17 @@ export abstract class OkxFutureBaseService {
         }
 
         const timestamp = new Date().toISOString();
-
+        const futureLeverage = this.config.get<number>('futureLeverage') || 1;
+        this.logger.log(`FutureLeverage: ${futureLeverage} (long and short)`);
+                    
         // set leverage if desired (example sets to 1 for both posSides only when not testing)
         if (!testing) {
             try {
                 // some coins require posSide param for setLeverage when in hedge mode
                 if (this.includePosSide()) {
-                    await this.setLeverage(instId, 1, 'long');
-                    await this.setLeverage(instId, 1, 'short');
+                    this.logger.log(`Setting leverage for ${instId} to ${futureLeverage} (long and short)`);
+                    await this.setLeverage(instId, futureLeverage, 'long');
+                    await this.setLeverage(instId, futureLeverage, 'short');
                 } else {
                     // for one-way mode OKX may not accept posSide param; call without posSide if needed
                     await this.setLeverage(instId, 1).catch(() => { /* ignore */ });
@@ -571,7 +579,7 @@ export abstract class OkxFutureBaseService {
     ) {
         const data: any[] = [];
         const amountOfUsdtPerStep = this.config.get<number>('amountOfUsdtPerStep');
-        
+
         this.logger.log(`Placing take profit orders for ${coin.toUpperCase()}, direction=${direction}, testing=${testing}`);
 
         const takeProfitPercentages = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05];
@@ -646,7 +654,7 @@ export abstract class OkxFutureBaseService {
     }
 
     // ---------- cancel helpers that call cancelOrdersFromList using pending orders for a coin ----------
-    async cancelAllTypeOfOpenOrdersForOneCoin( {
+    async cancelAllTypeOfOpenOrdersForOneCoin({
         coin,
         direction,
         enableTakeProfit,
