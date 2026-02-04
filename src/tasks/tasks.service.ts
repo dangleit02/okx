@@ -52,7 +52,7 @@ export class TasksService {
     }
 
     // run every hour at minute 0
-    // @Cron('0 * * * *')
+    @Cron('0 * * * *')
     async autoSellSpotForDown() {
         this.logger.log(`Cron auto sell for down ${moment().format('YY/MM/DD HH:mm:ss')}`);
         try {

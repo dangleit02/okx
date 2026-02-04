@@ -10,10 +10,10 @@ removeExistingSellOrders=true&\
 
 
 # autobuy for one coin
-curl -X POST "http://localhost:3030/buy-at-price/OP?\
+curl -X POST "http://localhost:3030/buy-at-price/ETH?\
 testing=false&\
 removeExistingBuyOrders=true&\
-autobuy=true" \
+autobuy=false" \
   -H "Content-Type: application/json"
 
 # autobuy for all
@@ -24,7 +24,7 @@ autobuy=true" \
   -H "Content-Type: application/json"
 
 # sell when up for one coin (to take profit)
-curl -X POST "http://localhost:3030/sell-at-price/BOME?\
+curl -X POST "http://localhost:3030/sell-at-price/ETH?\
 testing=true&\
 removeExistingSellOrders=true&\
 addSellTakeProfit=true" \
