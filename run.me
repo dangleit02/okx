@@ -5,7 +5,7 @@
 # remove all trigger sell orders
 curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
 testing=false&\
-removeExistingSellOrders=true&\
+removeExistingSellOrders=true" \
   -H "Content-Type: application/json"
 
 
@@ -13,7 +13,14 @@ removeExistingSellOrders=true&\
 curl -X POST "http://localhost:3030/buy-at-price/ETH?\
 testing=false&\
 removeExistingBuyOrders=true&\
-autobuy=false" \
+autobuy=true" \
+  -H "Content-Type: application/json"
+
+# autosell for one coin
+curl -X POST "http://localhost:3030/sell-at-price/ETH?\
+testing=true&\
+removeExistingSellOrders=true&\
+addSellTakeProfit=true" \
   -H "Content-Type: application/json"
 
 # autobuy for all

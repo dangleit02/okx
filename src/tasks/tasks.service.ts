@@ -17,13 +17,13 @@ export class TasksService {
     }
 
     // run each 15 minutes
-    // @Cron('*/15 * * * *')
+    // @Cron('*/1 * * * *')
     // run every hour at minute 30
     @Cron('30 * * * *')
     async autoBuySpotForDown() {
         this.logger.log(`Cron auto buy for down ${moment().format('YY/MM/DD HH:mm:ss')}`);
         try {
-            if (!this.config.get<boolean>('runSpotTask')) {
+            if (!this.config.get<boolean>('runSpotTaskForBuy')) {
                 this.logger.log('Auto buy spot for down task is disabled in configuration.');
                 return;
             }
@@ -56,7 +56,7 @@ export class TasksService {
     async autoSellSpotForDown() {
         this.logger.log(`Cron auto sell for down ${moment().format('YY/MM/DD HH:mm:ss')}`);
         try {
-            if (!this.config.get<boolean>('runSpotTask')) {
+            if (!this.config.get<boolean>('runSpotTaskForSell')) {
                 this.logger.log('Auto sell spot for down task is disabled in configuration.');
                 return;
             }
@@ -73,10 +73,11 @@ export class TasksService {
                 removeExistingSellOrders = 'true',
                 addSellStopLoss = runSpotTaskHavingStopLoss ? 'true' : 'false',
                 addSellTakeProfit = 'true',
-                onlyForDown = 'true',
-                justOneOrder = 'true';
+                onlyForDown = 'false',
+                justOneOrder = 'false';
             for await (const coin of coins) {
                 this.logger.log(`Processing coin: ${coin.toUpperCase()}`);
+                // const result = await this.okxService.sellOneCoin({ coin, isTesting, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder });
                 const result = await this.okxService.sellOneCoin({ coin, isTesting, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder });
                 results.push(...result);
             }
@@ -90,7 +91,7 @@ export class TasksService {
     }
 
     // run every hour at minute 15
-    @Cron('15 * * * *')
+    // @Cron('15 * * * *')
     async autoCloseShortPartialPositionForSwapOnRetrace() {
         this.logger.log(`Cron auto close short partial position for swap on retrace ${moment().format('YY/MM/DD HH:mm:ss')}`);
         try {
@@ -126,7 +127,7 @@ export class TasksService {
     }
 
     // run every hour at minute 30
-    @Cron('30 * * * *')
+    // @Cron('45 * * * *')
     async autoCloseLongPartialPositionForSwapOnRetrace() {
         this.logger.log(`Cron auto close long partial position for swap on retrace ${moment().format('YY/MM/DD HH:mm:ss')}`);
         try {

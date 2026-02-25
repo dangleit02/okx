@@ -494,9 +494,9 @@ export abstract class OkxFutureBaseService {
         const maxUsdt = this.config.get<number>('maxUsdt');
         const riskPerTrade = this.config.get<number>('riskPerTrade');
         const amountOfUsdtPerStep = this.config.get<number>('amountOfUsdtPerStep');
-        const priceRatioMin = this.config.get<number>('minPriceRatio');
-        const priceRatioMax = this.config.get<number>('maxPriceRatio');
-        const stopLossRatio = this.config.get<number>('stopLossPriceRatio');
+        const priceRatioMin = this.config.get<number>('minBuyPriceRatio');
+        const priceRatioMax = this.config.get<number>('maxBuyPriceRatio');
+        const stopLossRatio = this.config.get<number>('stopLossBuyPriceRatio');
 
         log(`Start ${coin}, test=${isTesting}`);
 

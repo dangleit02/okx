@@ -1,15 +1,19 @@
 export default () => ({
-    runSpotTask: true,
+    runSpotTaskForBuy: false,
+    runSpotTaskForSell: false,
     runSpotTaskHavingStopLoss: false,
     runSwapTaskForShort: false,
     runSwapTaskForLong: false,
-    maxUsdt: 2000,
+    maxUsdt: 4000,
     riskPerTrade: 0.02,
     amountOfUsdtPerStep: 12,
     stopLossRatio: 0.01, // 1%
-    minPriceRatio: 0.01, // +1%
-    maxPriceRatio: 0.02, // +2%
-    stopLossPriceRatio: 0.1,//0.06, // 6%//0.1, // 10%    0.3, // 30%    
+    minBuyPriceRatio: 0.01, // +1%
+    maxBuyPriceRatio: 0.02, // +2%
+    stopLossBuyPriceRatio: 0.1,//0.06, // 6%//0.1, // 10%    0.3, // 30%    
+    minSellPriceRatio: 0.01, // +1%
+    maxSellPriceRatio: 0.02, // +2%
+    stopLossSellPriceRatio: 0.1,//0.06, // 6%//0.1, // 10%    0.3, // 30%    
     futureLeverage: 3,
     coinsForBuy: [
         'ETH'
