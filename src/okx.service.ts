@@ -324,10 +324,10 @@ export class OkxService {
                     break;
                 }
 
-                // if (triggerPx >= newWvarageCost) {
-                //     this.logger.log(`Break triggerPx >= newWvarageCost ${newWvarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
-                //     break;
-                // }
+                if (triggerPx >= newAvarageCost) {
+                    this.logger.log(`Break triggerPx >= newWvarageCost ${newAvarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                    break;
+                }
 
                 this.logger.log(`Placing order: Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
                 const res = await this.placeOneOrder(coin, 'buy', sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPx.toFixed(priceToFixed), testing);
@@ -424,6 +424,11 @@ export class OkxService {
                 if (sz <= 0) break;
                 if (orderPx < minTakeProfitPrice) {
                     this.logger.log(`Break orderPx < minTakeProfitPrice ${minTakeProfitPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                    break;
+                }
+
+                if (triggerPx <= avarageCost) {
+                    this.logger.log(`Break triggerPx <= newWvarageCost ${avarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
                     break;
                 }
 
