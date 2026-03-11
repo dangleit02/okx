@@ -3,8 +3,7 @@ import * as WebSocket from 'ws';
 import axios from 'axios';
 import * as crypto from 'crypto';
 import { ConfigService } from '@nestjs/config';
-import { AppLogger } from './common/logger.service';
-import { stringify } from 'querystring';
+import { AppLogger } from 'src/logger/logger.service';
 
 interface Strategy {
     instId: string;

@@ -1,10 +1,10 @@
 import { Controller, Param, Post, Query } from '@nestjs/common';
 import { OkxFutureService } from './okx-future.service';
 import { ConfigService } from '@nestjs/config';
-import { AppLogger } from './common/logger.service';
+import { AppLogger } from 'src/logger/logger.service';
 import * as _ from 'lodash';
-import { TradeOneCoinParams } from './interfaces/interface';
-import { parseBool } from './common/util';
+import { TradeOneCoinParams } from 'src/interfaces/interface';
+import { parseBool } from 'src/common/util';
 
 @Controller('future')
 export class FutureController {

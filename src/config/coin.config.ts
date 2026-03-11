@@ -1,10 +1,10 @@
 export default () => ({
     runSpotTaskForBuy: false,
-    runSpotTaskForSell: false,
+    runSpotTaskForSell: true,
     runSpotTaskHavingStopLoss: false,
     runSwapTaskForShort: false,
     runSwapTaskForLong: false,
-    maxUsdt: 4000,
+    maxUsdt: 5000,
     riskPerTrade: 0.02,
     amountOfUsdtPerStep: 12,
     stopLossRatio: 0.01, // 1%

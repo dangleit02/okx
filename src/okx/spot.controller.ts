@@ -1,23 +1,16 @@
 import { Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { AppService } from './app.service';
 import { OkxService } from './okx.service';
 import { ConfigService } from '@nestjs/config';
-import { AppLogger } from './common/logger.service';
+import { AppLogger } from '../logger/logger.service';
 import * as _ from 'lodash';
 
 @Controller()
 export class SpotController {
   constructor(
-    private readonly appService: AppService,
     private readonly okxService: OkxService,
     private config: ConfigService,
     private readonly logger: AppLogger,
   ) { }
-
-  @Get()
-  getHello(): string {
-    return this.appService.getHello();
-  }
 
   @Get('balance')
   async getBalance(@Query('ccy') ccy?: string) {

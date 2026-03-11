@@ -2,11 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import axios from 'axios';
-import { AppLogger } from './common/logger.service';
+import { AppLogger } from 'src/logger/logger.service';
 import * as _ from 'lodash';
+import { EmailService } from 'src/email/email.service';
 @Injectable()
 export class OkxService {
-    constructor(private config: ConfigService, private readonly logger: AppLogger) { }
+    constructor(
+        private config: ConfigService,
+        private readonly logger: AppLogger,
+        private readonly emailService: EmailService,
+    ) { }
 
     private signRequest(secret: string, message: string) {
         return crypto.createHmac('sha256', secret).update(message).digest('base64');
@@ -266,7 +271,7 @@ export class OkxService {
         const minBuyPrice = currentPrice * (1 + minBuyPriceRatio);
         const maxBuyPrice = currentPrice * (1 + maxBuyPriceRatio);
         const stopLossPrice = currentPrice * (1 - stopLossBuyPriceRatio);
-
+        
         if (minBuyPrice >= maxBuyPrice || stopLossPrice >= minBuyPrice) {
             this.logger.log(`Invalid calculated prices: minBuyPrice (${minBuyPrice}) must be less than maxBuyPrice (${maxBuyPrice}) and stopLossPrice (${stopLossPrice}) must be less than minBuyPrice (${minBuyPrice})`);
             throw new Error(`Invalid calculated prices`);
@@ -303,6 +308,7 @@ export class OkxService {
         this.logger.log('steps:', JSON.stringify(steps));
         const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
         this.logger.log(`avarageCost ${avarageCost}`);
+        data.push({ currentPrice, minBuyPrice, maxBuyPrice, stopLossPrice, avarageCost });
 
         const minTakeProfitPrice = avarageCost * (1 + 0.05); // tối thiểu phải có lãi 5%
         this.logger.log(`minTakeProfitPrice ${minTakeProfitPrice}`);
@@ -324,10 +330,10 @@ export class OkxService {
                     break;
                 }
 
-                // if (triggerPx >= newWvarageCost) {
-                //     this.logger.log(`Break triggerPx >= newWvarageCost ${newWvarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
-                //     break;
-                // }
+                if (triggerPx >= newAvarageCost) {
+                    this.logger.log(`Break triggerPx >= newWvarageCost ${newAvarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                    break;
+                }
 
                 this.logger.log(`Placing order: Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
                 const res = await this.placeOneOrder(coin, 'buy', sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPx.toFixed(priceToFixed), testing);
@@ -345,7 +351,7 @@ export class OkxService {
             throw error;
         }
 
-
+        this.emailService.sendEmail(process.env.EMAIL_TO, "Buy orders", data);
         return data;
     }
 
@@ -409,7 +415,8 @@ export class OkxService {
 
         let remainingCoin = coinToSell;
         const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
-        const minTakeProfitPrice = avarageCost * (1 + 0.05); // tối thiểu phải có lãi 5%
+        const minTakeProfitPrice = avarageCost * (1 + 0.03); // tối thiểu phải có lãi 5%
+        data.push({ currentPrice, minSellPrice, maxSellPrice, stopLossPrice, avarageCost, minTakeProfitPrice });
         this.logger.log(`minTakeProfitPrice ${minTakeProfitPrice}`);
         try {
             for await (let step of steps) {
@@ -450,7 +457,7 @@ export class OkxService {
             );
             throw error;
         }
-
+        this.emailService.sendEmail(process.env.EMAIL_TO, "Sell orders", data);
         return data;
     }
 
