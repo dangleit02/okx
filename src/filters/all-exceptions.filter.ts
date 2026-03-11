@@ -6,11 +6,15 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { AppLogger } from 'src/common/logger.service';
+import { EmailService } from 'src/email/email.service';
+import { AppLogger } from 'src/logger/logger.service';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
-  constructor(private readonly logger: AppLogger) {}
+  constructor(
+    private readonly logger: AppLogger,
+    private readonly emailService: EmailService,
+  ) {}
 
   catch(exception: any, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
@@ -31,8 +35,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       undefined;
 
     // log chi tiết
-    this.logger.error(
-      {
+    const content = {
         method: request.method,
         url: request.url,
         params: request.params,
@@ -42,10 +45,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
         message,
         stack: exception.stack,
         extra: extraErrorData, // Axios/HTTP response body
-      },
+      };
+    this.logger.error(
+      content,
       undefined,
       'Exception',
     );
+
+    this.emailService.sendEmail(process.env.EMAIL_TO, "Exception", content);
 
     // trả response chuẩn cho client
     response.status(status).json({

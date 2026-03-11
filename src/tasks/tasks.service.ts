@@ -1,11 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { ConfigService } from "@nestjs/config";
-import { OkxService } from "src/okx.service";
-import { AppLogger } from "src/common/logger.service";
+import { OkxService } from "src/okx/okx.service";
+import { AppLogger } from "src/logger/logger.service";
 import * as _ from 'lodash';
 import * as moment from 'moment';
-import { OkxFutureHedgeService } from "src/okx.future.hedge.service";
+import { OkxFutureHedgeService } from "src/okx/okx.future.hedge.service";
 @Injectable()
 export class TasksService {
     constructor(
