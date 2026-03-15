@@ -308,7 +308,7 @@ export class OkxService {
         this.logger.log('steps:', JSON.stringify(steps));
         const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
         this.logger.log(`avarageCost ${avarageCost}`);
-        data.push({ currentPrice, minBuyPrice, maxBuyPrice, stopLossPrice, avarageCost });
+        data.push({ info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, minBuyPrice ${minBuyPrice}, maxBuyPrice ${maxBuyPrice}, stopLossPrice ${stopLossPrice}` });
 
         const minTakeProfitPrice = avarageCost * (1 + 0.05); // tối thiểu phải có lãi 5%
         this.logger.log(`minTakeProfitPrice ${minTakeProfitPrice}`);
@@ -416,7 +416,7 @@ export class OkxService {
         let remainingCoin = coinToSell;
         const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
         const minTakeProfitPrice = avarageCost * (1 + 0.03); // tối thiểu phải có lãi 5%
-        data.push({ currentPrice, minSellPrice, maxSellPrice, stopLossPrice, avarageCost, minTakeProfitPrice });
+        data.push({ info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}` });
         this.logger.log(`minTakeProfitPrice ${minTakeProfitPrice}`);
         try {
             for await (let step of steps) {
