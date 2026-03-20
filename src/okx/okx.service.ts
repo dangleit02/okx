@@ -331,10 +331,10 @@ export class OkxService {
                     break;
                 }
 
-                if (!!minTakeProfitPrice && orderPx >= minTakeProfitPrice) {
-                    this.logger.log(`Break orderPx >= minTakeProfitPrice ${minTakeProfitPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
-                    break;
-                }
+                // if (!!minTakeProfitPrice && orderPx >= minTakeProfitPrice) {
+                //     this.logger.log(`Break orderPx >= minTakeProfitPrice ${minTakeProfitPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                //     break;
+                // }
 
                 if (!buyWithoutCheckAvarageCost && !!newAvarageCost && triggerPx >= newAvarageCost) {
                     this.logger.log(`Break triggerPx >= newWvarageCost ${newAvarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
