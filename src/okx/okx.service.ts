@@ -59,6 +59,13 @@ export class OkxService {
         const instId = `${coin.toUpperCase()}-USDT`; // coin cụ thể
         const ordType = 'trigger';  // bắt buộc
         const instType = 'SPOT';
+
+        const currentPrice = await this.getTicker(instId);
+        this.logger.log(`currentPrice ${currentPrice}`);
+        if (!currentPrice || currentPrice <= 0) {
+            throw new Error(`Invalid current price fetched for ${instId}: ${currentPrice}`);
+        }
+        
         const getPath = `/api/v5/trade/orders-algo-pending?instType=${instType}&ordType=${ordType}&instId=${instId}`;
         const getSign = this.sign(timestamp, 'GET', getPath);
         const getRes = await axios.get(
@@ -73,13 +80,8 @@ export class OkxService {
             }
         );
 
-        const currentPrice = await this.getTicker(instId);
-        this.logger.log(`currentPrice ${currentPrice}`);
-        if (!currentPrice || currentPrice <= 0) {
-            throw new Error(`Invalid current price fetched for ${instId}: ${currentPrice}`);
-        }
-
         const pendingOrders = getRes.data?.data || [];
+        this.emailService.sendEmail(process.env.EMAIL_TO, `Number of existed ${side} orders of ${coin}`, pendingOrders.length);            
         if (pendingOrders.length === 0) {
             this.logger.log(`No pending algo orders to cancel for ${instId}.`);
             return { message: 'No pending algo orders' };
@@ -116,6 +118,7 @@ export class OkxService {
 
         if (ordersBySide.length === 0) {
             this.logger.log(`No ${side.toUpperCase()} orders to cancel for ${instId}`);
+            this.emailService.sendEmail(process.env.EMAIL_TO, `Number of ${side} orders of ${coin} to cancel`, 0);
             return { cancelled: [] };
         }
 
@@ -124,6 +127,8 @@ export class OkxService {
             algoId: o.algoId,
             instId: o.instId,
         }));
+
+        this.emailService.sendEmail(process.env.EMAIL_TO, `Number of ${side} orders of ${coin} to cancel`, ordersToCancel.length);
 
         this.logger.log(`Found ${ordersToCancel.length} pending algo orders. Cancelling...`);
 
@@ -251,6 +256,7 @@ export class OkxService {
         const minBuyPriceRatio = this.config.get<number>('minBuyPriceRatio');
         const maxBuyPriceRatio = this.config.get<number>('maxBuyPriceRatio');
         const stopLossBuyPriceRatio = this.config.get<number>('stopLossBuyPriceRatio');
+        const buyWithoutCheckAvarageCost = this.config.get<boolean>('buyWithoutCheckAvarageCost');
 
         this.logger.log(`maxUsdt ${maxUsdt}, riskPerTrade ${riskPerTrade}`)
 
@@ -308,8 +314,8 @@ export class OkxService {
         this.logger.log('steps:', JSON.stringify(steps));
         const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
         this.logger.log(`avarageCost ${avarageCost}`);
-        data.push({ info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, minBuyPrice ${minBuyPrice}, maxBuyPrice ${maxBuyPrice}, stopLossPrice ${stopLossPrice}` });
-
+        this.emailService.sendEmail(process.env.EMAIL_TO, `Buy ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, minBuyPrice ${minBuyPrice}, maxBuyPrice ${maxBuyPrice}, stopLossPrice ${stopLossPrice}` });
+        
         const minTakeProfitPrice = avarageCost * (1 + 0.05); // tối thiểu phải có lãi 5%
         this.logger.log(`minTakeProfitPrice ${minTakeProfitPrice}`);
         let newTotalCost = avarageCost * numberOfBoughtCoin;
@@ -325,12 +331,12 @@ export class OkxService {
                     break;
                 }
 
-                if (orderPx >= minTakeProfitPrice) {
+                if (!!minTakeProfitPrice && orderPx >= minTakeProfitPrice) {
                     this.logger.log(`Break orderPx >= minTakeProfitPrice ${minTakeProfitPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
                     break;
                 }
 
-                if (triggerPx >= newAvarageCost) {
+                if (!buyWithoutCheckAvarageCost && !!newAvarageCost && triggerPx >= newAvarageCost) {
                     this.logger.log(`Break triggerPx >= newWvarageCost ${newAvarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
                     break;
                 }
@@ -350,8 +356,8 @@ export class OkxService {
             this.logger.log('Error placing trigger order:', error.response?.data || error.message);
             throw error;
         }
-
-        this.emailService.sendEmail(process.env.EMAIL_TO, "Buy orders", data);
+        this.emailService.sendEmail(process.env.EMAIL_TO, `Number of new buy orders for ${coin}`, data.length);
+        this.emailService.sendEmail(process.env.EMAIL_TO, `New buy ${coin} orders`, data.map((item => item.body?.triggerPx)));
         return data;
     }
 
@@ -416,7 +422,7 @@ export class OkxService {
         let remainingCoin = coinToSell;
         const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
         const minTakeProfitPrice = avarageCost * (1 + 0.03); // tối thiểu phải có lãi 5%
-        data.push({ info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}` });
+        this.emailService.sendEmail(process.env.EMAIL_TO, `Sell ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}` });
         this.logger.log(`minTakeProfitPrice ${minTakeProfitPrice}`);
         try {
             for await (let step of steps) {
@@ -457,7 +463,8 @@ export class OkxService {
             );
             throw error;
         }
-        this.emailService.sendEmail(process.env.EMAIL_TO, "Sell orders", data);
+        this.emailService.sendEmail(process.env.EMAIL_TO, `Number of new sell orders for ${coin}`, data.length);
+        this.emailService.sendEmail(process.env.EMAIL_TO, `New sell ${coin} orders`, data);
         return data;
     }
 

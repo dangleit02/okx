@@ -23,7 +23,6 @@ export class EmailService {
         to,
         subject,
         html: `
-          <h3>Receipt JSON</h3>
           <pre>${JSON.stringify(data, null, 2)}</pre>
         `
       });
