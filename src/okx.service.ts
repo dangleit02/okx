@@ -409,7 +409,7 @@ export class OkxService {
 
         let remainingCoin = coinToSell;
         const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
-        const minTakeProfitPrice = avarageCost * (1 + 0.05); // tối thiểu phải có lãi 5%
+        const minTakeProfitPrice = avarageCost * (1 + 0.03); // tối thiểu phải có lãi 5%
         this.logger.log(`minTakeProfitPrice ${minTakeProfitPrice}`);
         try {
             for await (let step of steps) {

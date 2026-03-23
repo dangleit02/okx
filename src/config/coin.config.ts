@@ -1,6 +1,6 @@
 export default () => ({
     runSpotTaskForBuy: false,
-    runSpotTaskForSell: false,
+    runSpotTaskForSell: true,
     runSpotTaskHavingStopLoss: false,
     runSwapTaskForShort: false,
     runSwapTaskForLong: false,

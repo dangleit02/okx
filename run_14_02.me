@@ -5,7 +5,7 @@
 # remove all trigger sell orders
 curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
 testing=false&\
-removeExistingSellOrders=true" \
+removeExistingSellOrders=true&\
   -H "Content-Type: application/json"
 
 
@@ -13,15 +13,15 @@ removeExistingSellOrders=true" \
 curl -X POST "http://localhost:3030/buy-at-price/ETH?\
 testing=false&\
 removeExistingBuyOrders=true&\
-autobuy=true" \
+autobuy=false" \
   -H "Content-Type: application/json"
 
 # autosell for one coin
 curl -X POST "http://localhost:3030/sell-at-price/ETH?\
-testing=true&\
+testing=false&\
 removeExistingSellOrders=true&\
-addSellTakeProfit=true" \
-  -H "Content-Type: application/json"
+addSellTakeProfit=true"
+
 
 # autobuy for all
 curl -X POST "http://localhost:3030/buy-at-price-all-coins?\
@@ -32,7 +32,7 @@ autobuy=true" \
 
 # sell when up for one coin (to take profit)
 curl -X POST "http://localhost:3030/sell-at-price/ETH?\
-testing=true&\
+testing=false&\
 removeExistingSellOrders=true&\
 addSellTakeProfit=true" \
 -H "Content-Type: application/json"
@@ -46,7 +46,7 @@ addSellTakeProfit=true" \
 -H "Content-Type: application/json"
 
 # sell when down for one coin (to take profit but when down like stop loss)
-curl -X POST "http://localhost:3030/sell-at-price/AVAX?\
+curl -X POST "http://localhost:3030/sell-at-price/ETH?\
 testing=false&\
 removeExistingSellOrders=true&\
 addSellTakeProfit=true&\
