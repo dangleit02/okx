@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { SpotController } from './spot.controller';
+import { SpotController } from './okx/spot.controller';
 import { AppService } from './app.service';
 
 describe('AppController', () => {

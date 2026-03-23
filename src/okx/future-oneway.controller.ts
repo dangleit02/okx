@@ -1,15 +1,15 @@
 import { Controller, Param, Post, Query } from '@nestjs/common';
-import { OkxFutureHedgeService } from './okx.future.hedge.service';
+import { OkxFutureOneWayService } from './okx.future.oneway.service';
 import { ConfigService } from '@nestjs/config';
-import { AppLogger } from './common/logger.service';
+import { AppLogger } from 'src/logger/logger.service';
 import * as _ from 'lodash';
-import { TradeOneCoinParams } from './interfaces/interface';
-import { parseBool } from './common/util';
+import { TradeOneCoinParams } from 'src/interfaces/interface';
+import { parseBool } from 'src/common/util';
 
-@Controller('future-hedge')
-export class FutureHedgeController {
+@Controller('future-oneway')
+export class FutureOneWayController {
   constructor(
-    private readonly okx: OkxFutureHedgeService,
+    private readonly okx: OkxFutureOneWayService,
     private config: ConfigService,
     private readonly logger: AppLogger,
   ) {}
@@ -47,7 +47,7 @@ export class FutureHedgeController {
   }
 
   private async processAllCoins(params: TradeOneCoinParams) {
-    this.logger.log(`Starting batch orders in Hedge mode, testing: ${params.isTesting}`);
+    this.logger.log(`Starting batch orders in OneWay mode, testing: ${params.isTesting}`);
 
     let coins = _.uniq(this.config.get<any>('coinsForBuy') || []);
     if (!coins.length) throw new Error('No coins configured');

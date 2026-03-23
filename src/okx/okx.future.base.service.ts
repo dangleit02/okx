@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import axios from 'axios';
-import { AppLogger } from './common/logger.service';
-import { TradeOneCoinParams } from './interfaces/interface';
+import { AppLogger } from 'src/logger/logger.service';
+import { TradeOneCoinParams } from 'src/interfaces/interface';
 
 /**
  * Base service: contains shared logic. Child classes must implement:

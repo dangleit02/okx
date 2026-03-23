@@ -16,6 +16,12 @@ removeExistingBuyOrders=true&\
 autobuy=false" \
   -H "Content-Type: application/json"
 
+curl -X POST "http://localhost:3030/buy-at-price/ETH?\
+testing=true&\
+removeExistingBuyOrders=true&\
+autobuy=true" \
+  -H "Content-Type: application/json"
+
 # autosell for one coin
 curl -X POST "http://localhost:3030/sell-at-price/ETH?\
 testing=false&\

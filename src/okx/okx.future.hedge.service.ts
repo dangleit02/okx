@@ -1,20 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { OkxFutureBaseService } from './okx.future.base.service';
 import { ConfigService } from '@nestjs/config';
-import { AppLogger } from './common/logger.service';
+import { AppLogger } from 'src/logger/logger.service';
 
 @Injectable()
-export class OkxFutureOneWayService extends OkxFutureBaseService {
+export class OkxFutureHedgeService extends OkxFutureBaseService {
   constructor(protected config: ConfigService, protected readonly logger: AppLogger) {
     super(config, logger);
   }
 
   protected includePosSide(): boolean {
-    // One-way mode: don't include posSide in requests
-    return false;
+    return true;
   }
 
-  protected getPosSide(direction: 'long' | 'short'): undefined {
-    return undefined;
+  protected getPosSide(direction: 'long' | 'short'): 'long' | 'short' {
+    // In hedge mode, posSide is required and equals direction
+    return direction;
   }
 }
