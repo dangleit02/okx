@@ -81,7 +81,6 @@ export class OkxService {
         );
 
         const pendingOrders = getRes.data?.data || [];
-        this.emailService.sendEmail(process.env.EMAIL_TO, `Number of existed ${side} orders of ${coin}`, pendingOrders.length);            
         if (pendingOrders.length === 0) {
             this.logger.log(`No pending algo orders to cancel for ${instId}.`);
             return { message: 'No pending algo orders' };
@@ -89,7 +88,7 @@ export class OkxService {
         this.logger.log(`pendingOrders ${JSON.stringify(pendingOrders, null, 2)}`);
         // 2. Filter theo side
         let ordersBySide = side ? pendingOrders.filter((order: any) => order.side === side) : pendingOrders;
-
+        this.emailService.sendEmail(process.env.EMAIL_TO, `Number of existed ${side} orders of ${coin}`, ordersBySide.length);    
         // 3. filter by price
         ordersBySide = ordersBySide.filter((order: any) => {
             if (order.side === 'buy') {
@@ -358,6 +357,7 @@ export class OkxService {
         }
         this.emailService.sendEmail(process.env.EMAIL_TO, `Number of new buy orders for ${coin}`, data.length);
         this.emailService.sendEmail(process.env.EMAIL_TO, `New buy ${coin} orders`, data.map((item => item.body?.triggerPx)));
+        this.logger.log(`Current price: ${currentPrice}`);
         return data;
     }
 
@@ -421,9 +421,9 @@ export class OkxService {
 
         let remainingCoin = coinToSell;
         const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
-        const minTakeProfitPrice = avarageCost * (1 + 0.03); // tối thiểu phải có lãi 5%
+        const minTakeProfitPrice = avarageCost * (1 + 0.05); // tối thiểu phải có lãi 5%
         this.emailService.sendEmail(process.env.EMAIL_TO, `Sell ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}` });
-        this.logger.log(`minTakeProfitPrice ${minTakeProfitPrice}`);
+        this.logger.log(`avarageCost: ${avarageCost} minTakeProfitPrice ${minTakeProfitPrice}: ${avarageCost > 0 ? (minTakeProfitPrice / avarageCost - 1) * 100 : 0 }%`);
         try {
             for await (let step of steps) {
                 const orderPx = minSellPrice + step * priceDistanceBetweenEachStep;
@@ -470,6 +470,7 @@ export class OkxService {
         }
         this.emailService.sendEmail(process.env.EMAIL_TO, `Number of new sell orders for ${coin}`, data.length);
         this.emailService.sendEmail(process.env.EMAIL_TO, `New sell ${coin} orders`, data);
+        this.logger.log(`Current price: ${currentPrice}`);
         return data;
     }
 
