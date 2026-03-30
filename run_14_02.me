@@ -13,7 +13,7 @@ removeExistingSellOrders=true&\
 curl -X POST "http://localhost:3030/buy-at-price/ETH?\
 testing=false&\
 removeExistingBuyOrders=true&\
-autobuy=false" \
+autobuy=true" \
   -H "Content-Type: application/json"
 
 curl -X POST "http://localhost:3030/buy-at-price/ETH?\
@@ -25,6 +25,11 @@ autobuy=true" \
 # autosell for one coin
 curl -X POST "http://localhost:3030/sell-at-price/ETH?\
 testing=false&\
+removeExistingSellOrders=true&\
+addSellTakeProfit=true"
+
+curl -X POST "http://localhost:3030/sell-at-price/ETH?\
+testing=true&\
 removeExistingSellOrders=true&\
 addSellTakeProfit=true"
 

@@ -435,7 +435,10 @@ export class OkxService {
                     remainingCoin
                 );
 
-                if (triggerPx > maxSellPrice) break;
+                if (triggerPx > maxSellPrice){
+                  this.logger.log(`Break triggerPx > maxSellPrice ${maxSellPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                  break;  
+                } 
                 if (sz <= 0) break;
                 if (orderPx < minTakeProfitPrice) {
                     this.logger.log(`Break orderPx < minTakeProfitPrice ${minTakeProfitPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
