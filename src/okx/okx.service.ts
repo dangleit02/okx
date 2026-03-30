@@ -355,8 +355,10 @@ export class OkxService {
             this.logger.log('Error placing trigger order:', error.response?.data || error.message);
             throw error;
         }
-        this.emailService.sendEmail(process.env.EMAIL_TO, `Number of new buy orders for ${coin}`, data.length);
-        this.emailService.sendEmail(process.env.EMAIL_TO, `New buy ${coin} orders`, data.map((item => item.body?.triggerPx)));
+        if (data.length > 0) {
+            this.emailService.sendEmail(process.env.EMAIL_TO, `Number of new buy orders for ${coin}`, data.length);
+            this.emailService.sendEmail(process.env.EMAIL_TO, `New buy ${coin} orders`, data.map((item => item.body?.triggerPx)));
+        }
         this.logger.log(`Current price: ${currentPrice}`);
         return data;
     }
@@ -421,7 +423,7 @@ export class OkxService {
 
         let remainingCoin = coinToSell;
         const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
-        const minTakeProfitPrice = avarageCost * (1 + 0.05); // tối thiểu phải có lãi 5%
+        const minTakeProfitPrice = avarageCost * (1 + 0.03); // tối thiểu phải có lãi 5%
         this.emailService.sendEmail(process.env.EMAIL_TO, `Sell ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}` });
         this.logger.log(`avarageCost: ${avarageCost} minTakeProfitPrice ${minTakeProfitPrice}: ${avarageCost > 0 ? (minTakeProfitPrice / avarageCost - 1) * 100 : 0 }%`);
         try {
@@ -468,8 +470,10 @@ export class OkxService {
             );
             throw error;
         }
-        this.emailService.sendEmail(process.env.EMAIL_TO, `Number of new sell orders for ${coin}`, data.length);
-        this.emailService.sendEmail(process.env.EMAIL_TO, `New sell ${coin} orders`, data);
+        if (data.length > 0) {
+            this.emailService.sendEmail(process.env.EMAIL_TO, `Number of new sell orders for ${coin}`, data.length);
+            this.emailService.sendEmail(process.env.EMAIL_TO, `New sell ${coin} orders`, data);
+        }
         this.logger.log(`Current price: ${currentPrice}`);
         return data;
     }
