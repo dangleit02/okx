@@ -377,6 +377,7 @@ export class OkxService {
         const minSellPriceRatio = this.config.get<number>('minSellPriceRatio');
         const maxSellPriceRatio = this.config.get<number>('maxSellPriceRatio');
         const stopLossSellPriceRatio = this.config.get<number>('stopLossSellPriceRatio');
+        const minTakeProfitRatio = this.config.get<number>('minTakeProfitRatio');
 
         const coinConfig = this.config.get<any>(`coin.${coin.toUpperCase()}`);
         if (!coinConfig) throw new Error(`No config for ${coin}`);
@@ -423,7 +424,7 @@ export class OkxService {
 
         let remainingCoin = coinToSell;
         const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
-        const minTakeProfitPrice = avarageCost * (1 + 0.03); // tối thiểu phải có lãi 5%
+        const minTakeProfitPrice = avarageCost * (1 + minTakeProfitRatio);
         this.emailService.sendEmail(process.env.EMAIL_TO, `Sell ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}` });
         this.logger.log(`avarageCost: ${avarageCost} minTakeProfitPrice ${minTakeProfitPrice}: ${avarageCost > 0 ? (minTakeProfitPrice / avarageCost - 1) * 100 : 0 }%`);
         try {
