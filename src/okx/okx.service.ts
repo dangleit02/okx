@@ -337,7 +337,7 @@ export class OkxService {
 
                 if (!buyWithoutCheckAvarageCost && !!newAvarageCost && triggerPx >= newAvarageCost) {
                     this.logger.log(`Break triggerPx >= newWvarageCost ${newAvarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
-                    break;
+                    continue;
                 }
 
                 this.logger.log(`Placing order: Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
@@ -442,12 +442,12 @@ export class OkxService {
                 if (sz <= 0) break;
                 if (orderPx < minTakeProfitPrice) {
                     this.logger.log(`Break orderPx < minTakeProfitPrice ${minTakeProfitPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
-                    break;
+                    continue;
                 }
 
                 if (triggerPx <= avarageCost) {
                     this.logger.log(`Break triggerPx <= newWvarageCost ${avarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
-                    break;
+                    continue;
                 }
 
                 this.logger.log(
