@@ -357,7 +357,7 @@ export class OkxService {
         }
         if (data.length > 0) {
             this.emailService.sendEmail(process.env.EMAIL_TO, `Number of new buy orders for ${coin}`, data.length);
-            this.emailService.sendEmail(process.env.EMAIL_TO, `New buy ${coin} orders`, data.map((item => item.body?.triggerPx)));
+            this.emailService.sendEmail(process.env.EMAIL_TO, `New buy ${coin} orders`, data.map((item) => item.body?.triggerPx));
         }
         this.logger.log(`Current price: ${currentPrice}`);
         return data;
@@ -476,7 +476,7 @@ export class OkxService {
         }
         if (data.length > 0) {
             this.emailService.sendEmail(process.env.EMAIL_TO, `Number of new sell orders for ${coin}`, data.length);
-            this.emailService.sendEmail(process.env.EMAIL_TO, `New sell ${coin} orders`, data);
+            this.emailService.sendEmail(process.env.EMAIL_TO, `New sell ${coin} orders`, data.map((item) => item.body?.triggerPx));
         }
         this.logger.log(`Current price: ${currentPrice}`);
         return data;
