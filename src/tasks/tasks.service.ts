@@ -70,7 +70,7 @@ export class TasksService {
             this.logger.log(`Coins to process: ${JSON.stringify(coins)}`);
             const results = [];
             const isTesting = false,
-                removeExistingSellOrders = 'true',
+                removeExistingSellOrders = 'false',
                 addSellStopLoss = runSpotTaskHavingStopLoss ? 'true' : 'false',
                 addSellTakeProfit = 'true',
                 onlyForDown = 'false',

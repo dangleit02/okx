@@ -25,12 +25,12 @@ autobuy=true" \
 # autosell for one coin
 curl -X POST "http://localhost:3030/sell-at-price/ETH?\
 testing=false&\
-removeExistingSellOrders=true&\
+removeExistingSellOrders=false&\
 addSellTakeProfit=true"
 
 curl -X POST "http://localhost:3030/sell-at-price/ETH?\
 testing=true&\
-removeExistingSellOrders=true&\
+removeExistingSellOrders=false&\
 addSellTakeProfit=true"
 
 
