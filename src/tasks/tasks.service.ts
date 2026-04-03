@@ -36,7 +36,7 @@ export class TasksService {
             this.logger.log(`Coins to process: ${JSON.stringify(coins)}`);
             const results = [];
             const isTesting = false,
-                removeExistingBuyOrders = 'true',
+                removeExistingBuyOrders = 'false',
                 autobuy = 'true';                
             for await (const coin of coins) {
                 this.logger.log(`Processing coin: ${coin.toUpperCase()}`);
