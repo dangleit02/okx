@@ -312,7 +312,7 @@ export class OkxService {
         this.logger.log('steps:', JSON.stringify(steps));
         const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
         this.logger.log(`avarageCost ${avarageCost}`);
-        this.emailService.sendEmail(process.env.EMAIL_TO, `Buy ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(avarageCost - currentPrice)/currentPrice*100}%, minBuyPrice ${minBuyPrice}, maxBuyPrice ${maxBuyPrice}, stopLossPrice ${stopLossPrice}` });
+        this.emailService.sendEmail(process.env.EMAIL_TO, `Buy ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(currentPrice - avarageCost)/avarageCost*100}%, minBuyPrice ${minBuyPrice}, maxBuyPrice ${maxBuyPrice}, stopLossPrice ${stopLossPrice}` });
         
         const minTakeProfitPrice = avarageCost * (1 + 0.05); // tối thiểu phải có lãi 5%
         this.logger.log(`minTakeProfitPrice ${minTakeProfitPrice}`);
@@ -431,7 +431,7 @@ export class OkxService {
         let remainingCoin = coinToSell;
         const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
         const minTakeProfitPrice = avarageCost * (1 + minTakeProfitRatio); // tối thiểu phải có lãi 5%
-        this.emailService.sendEmail(process.env.EMAIL_TO, `Sell ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(avarageCost - currentPrice)/currentPrice*100}%, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}` });
+        this.emailService.sendEmail(process.env.EMAIL_TO, `Sell ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(currentPrice - avarageCost)/avarageCost*100}%, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}` });
         this.logger.log(`avarageCost: ${avarageCost} minTakeProfitPrice ${minTakeProfitPrice}: ${avarageCost > 0 ? (minTakeProfitPrice / avarageCost - 1) * 100 : 0 }%`);
         try {
             for await (let step of steps) {
