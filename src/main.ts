@@ -4,7 +4,7 @@ import { AppLogger } from './logger/logger.service';
 import { AllExceptionsFilter } from './filters/all-exceptions.filter';
 import { EmailService } from './email/email.service';
 import * as crypto from 'crypto';
-(global as any).crypto = crypto;
+// (global as any).crypto = crypto;
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {

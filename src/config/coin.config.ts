@@ -2,7 +2,8 @@ export default () => ({
     runSpotTaskForBuy: true,
     buyWithoutCheckAvarageCost: false,
     runSpotTaskForSell: false,
-    minTakeProfitRatio: 0.01, // 3%
+    sellWithoutCheckAvarageCost: true,
+    minTakeProfitRatio: -0.05, // 3%
     runSpotTaskHavingStopLoss: false,
     runSwapTaskForShort: false,
     runSwapTaskForLong: false,
@@ -18,7 +19,9 @@ export default () => ({
     stopLossSellPriceRatio: 0.1,//0.06, // 6%//0.1, // 10%    0.3, // 30%    
     futureLeverage: 3,
     coinsForBuy: [
-        'ETH'
+        'ETH',
+        'ADA',
+        'PEPE',
         // TOP 100
         // 'BTC',
         // 'ETH',

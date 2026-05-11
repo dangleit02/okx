@@ -312,7 +312,7 @@ export class OkxService {
         this.logger.log('steps:', JSON.stringify(steps));
         const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
         this.logger.log(`avarageCost ${avarageCost}`);
-        this.emailService.sendEmail(process.env.EMAIL_TO, `Buy ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, minBuyPrice ${minBuyPrice}, maxBuyPrice ${maxBuyPrice}, stopLossPrice ${stopLossPrice}` });
+        this.emailService.sendEmail(process.env.EMAIL_TO, `Buy ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(avarageCost - currentPrice)/currentPrice*100}%, minBuyPrice ${minBuyPrice}, maxBuyPrice ${maxBuyPrice}, stopLossPrice ${stopLossPrice}` });
         
         const minTakeProfitPrice = avarageCost * (1 + 0.05); // tối thiểu phải có lãi 5%
         this.logger.log(`minTakeProfitPrice ${minTakeProfitPrice}`);
@@ -324,8 +324,13 @@ export class OkxService {
                 const orderPx = maxBuyPrice - step * priceDistanceBetweenEachStep;
                 const triggerPx = orderPx - orderPx * 0.002; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
                 const sz = amountOfUsdtPerStep / orderPx;
-                this.logger.log(`step: ${step}, orderPx: ${orderPx}, minBuyPrice: ${minBuyPrice}, triggerPx: ${triggerPx}, triggerPx < minBuyPrice: ${triggerPx < minBuyPrice}`);
+                
+                if (sz <= 0) {
+                    this.logger.log(`sz ${sz} <= 0, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                    break;
+                }
                 if (triggerPx < minBuyPrice) {
+                    this.logger.log(`triggerPx ${triggerPx} < minBuyPrice ${minBuyPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
                     break;
                 }
 
@@ -335,8 +340,8 @@ export class OkxService {
                 // }
 
                 if (!buyWithoutCheckAvarageCost && !!newAvarageCost && triggerPx >= newAvarageCost) {
-                    this.logger.log(`Break triggerPx >= newWvarageCost ${newAvarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
-                    break;
+                    this.logger.log(`triggerPx ${triggerPx} >= newWvarageCost ${newAvarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                    continue;
                 }
 
                 this.logger.log(`Placing order: Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
@@ -376,6 +381,8 @@ export class OkxService {
         const minSellPriceRatio = this.config.get<number>('minSellPriceRatio');
         const maxSellPriceRatio = this.config.get<number>('maxSellPriceRatio');
         const stopLossSellPriceRatio = this.config.get<number>('stopLossSellPriceRatio');
+        const minTakeProfitRatio = this.config.get<number>('minTakeProfitRatio');
+        const sellWithoutCheckAvarageCost = this.config.get<boolean>('sellWithoutCheckAvarageCost');
 
         const coinConfig = this.config.get<any>(`coin.${coin.toUpperCase()}`);
         if (!coinConfig) throw new Error(`No config for ${coin}`);
@@ -390,6 +397,7 @@ export class OkxService {
         const minSellPrice = currentPrice * (1 - maxSellPriceRatio);
         const maxSellPrice = currentPrice * (1 - minSellPriceRatio);
         const stopLossPrice = currentPrice * (1 + stopLossSellPriceRatio);
+        this.logger.log(`minSellPrice: ${minSellPrice}, maxSellPrice: ${maxSellPrice}, stopLossPrice: ${stopLossPrice}`);
 
         if (minSellPrice >= maxSellPrice || stopLossPrice <= maxSellPrice) {
             throw new Error(`Invalid SELL price configuration`);
@@ -415,15 +423,15 @@ export class OkxService {
         const priceDistanceBetweenEachStep =
             (stopLossPrice - minSellPrice) / numberOfSteps;
 
-        this.logger.log(`SELL steps: ${numberOfSteps}`);
+        this.logger.log(`SELL costByUsdt: ${costByUsdt}, steps: ${numberOfSteps}`);
         this.logger.log(`priceDistanceEachStep: ${priceDistanceBetweenEachStep}`);
 
         const steps = Array.from({ length: numberOfSteps + 1 }, (_, i) => i);
 
         let remainingCoin = coinToSell;
         const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
-        const minTakeProfitPrice = avarageCost * (1 + 0.03); // tối thiểu phải có lãi 5%
-        this.emailService.sendEmail(process.env.EMAIL_TO, `Sell ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}` });
+        const minTakeProfitPrice = avarageCost * (1 + minTakeProfitRatio); // tối thiểu phải có lãi 5%
+        this.emailService.sendEmail(process.env.EMAIL_TO, `Sell ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(avarageCost - currentPrice)/currentPrice*100}%, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}` });
         this.logger.log(`avarageCost: ${avarageCost} minTakeProfitPrice ${minTakeProfitPrice}: ${avarageCost > 0 ? (minTakeProfitPrice / avarageCost - 1) * 100 : 0 }%`);
         try {
             for await (let step of steps) {
@@ -434,16 +442,22 @@ export class OkxService {
                     remainingCoin
                 );
 
-                if (triggerPx > maxSellPrice) break;
-                if (sz <= 0) break;
-                if (orderPx < minTakeProfitPrice) {
-                    this.logger.log(`Break orderPx < minTakeProfitPrice ${minTakeProfitPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                if (sz <= 0) {
+                    this.logger.log(`sz ${sz} <= 0, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
                     break;
                 }
-
-                if (triggerPx <= avarageCost) {
-                    this.logger.log(`Break triggerPx <= newWvarageCost ${avarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                if (triggerPx > maxSellPrice) {
+                    this.logger.log(`triggerPx ${triggerPx} > maxSellPrice ${maxSellPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
                     break;
+                }
+                if (orderPx < minTakeProfitPrice) {
+                    this.logger.log(`orderPx ${orderPx} < minTakeProfitPrice ${minTakeProfitPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                    continue;
+                }
+
+                if (!sellWithoutCheckAvarageCost && !!avarageCost && triggerPx < avarageCost) {
+                    this.logger.log(`triggerPx ${triggerPx} < avarageCost ${avarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                    continue;
                 }
 
                 this.logger.log(
@@ -471,7 +485,7 @@ export class OkxService {
         }
         if (data.length > 0) {
             this.emailService.sendEmail(process.env.EMAIL_TO, `Number of new sell orders for ${coin}`, data.length);
-            this.emailService.sendEmail(process.env.EMAIL_TO, `New sell ${coin} orders`, data);
+            this.emailService.sendEmail(process.env.EMAIL_TO, `New sell ${coin} orders`, data.map((item => item.body?.triggerPx)));
         }
         this.logger.log(`Current price: ${currentPrice}`);
         return data;
