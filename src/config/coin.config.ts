@@ -510,6 +510,8 @@ export default () => ({
             addForTriggerPrice: 0.000000001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 3, // Số chữ số thập phân cho khối lượng
             priceToFixed: 9, // Số chữ số thập phân cho giá
+            minBuyPriceRatio: 3,
+            maxBuyPriceRatio: 4,
         },
         WIF: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -660,6 +662,8 @@ export default () => ({
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 4, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
+            minBuyPriceRatio: 2,
+            maxBuyPriceRatio: 3,
         },
         XLM: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -792,6 +796,8 @@ export default () => ({
             addForTriggerPrice: 0.000001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 2, // Số chữ số thập phân cho giá
+            minBuyPriceRatio: 1,
+            maxBuyPriceRatio: 2,
         },
         XRP: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)

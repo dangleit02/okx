@@ -251,8 +251,8 @@ export class OkxService {
         const maxUsdt = this.config.get<number>('maxUsdt');
         const riskPerTrade = this.config.get<number>('riskPerTrade');
         const amountOfUsdtPerStep = this.config.get<number>('amountOfUsdtPerStep');
-        const minBuyPriceRatio = this.config.get<number>('minBuyPriceRatio');
-        const maxBuyPriceRatio = this.config.get<number>('maxBuyPriceRatio');
+        let minBuyPriceRatio = this.config.get<number>('minBuyPriceRatio');
+        let maxBuyPriceRatio = this.config.get<number>('maxBuyPriceRatio');
         const stopLossBuyPriceRatio = this.config.get<number>('stopLossBuyPriceRatio');
         const buyWithoutCheckAvarageCost = this.config.get<boolean>('buyWithoutCheckAvarageCost');
 
@@ -260,6 +260,8 @@ export class OkxService {
 
         this.logger.log(`amountOfUsdtPerStep ${amountOfUsdtPerStep}, minBuyPriceRatio ${minBuyPriceRatio}, maxBuyPriceRatio ${maxBuyPriceRatio}, stopLossBuyPriceRatio ${stopLossBuyPriceRatio}`)
         const coinConfig = this.config.get<any>(`coin.${coin.toUpperCase()}`);
+        minBuyPriceRatio = coinConfig?.minBuyPriceRatio ?? minBuyPriceRatio;
+        maxBuyPriceRatio = coinConfig?.maxBuyPriceRatio ?? maxBuyPriceRatio;
         this.logger.log(`Placing auto buy orders for ${coin.toUpperCase()} with config: ${JSON.stringify(coinConfig)}`);
         if (!coinConfig) {
             throw new Error(`No configuration found for coin: ${JSON.stringify(coin)}`);
