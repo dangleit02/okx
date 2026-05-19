@@ -512,6 +512,8 @@ export default () => ({
             priceToFixed: 9, // Số chữ số thập phân cho giá
             minBuyPriceRatio: 0.03,
             maxBuyPriceRatio: 0.04,
+            minSellPriceRatio: 0.03,
+            maxSellPriceRatio: 0.04,
         },
         WIF: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -664,6 +666,8 @@ export default () => ({
             priceToFixed: 4, // Số chữ số thập phân cho giá
             minBuyPriceRatio: 0.02,
             maxBuyPriceRatio: 0.03,
+            minSellPriceRatio: 0.02,
+            maxSellPriceRatio: 0.03,
         },
         XLM: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -798,6 +802,8 @@ export default () => ({
             priceToFixed: 2, // Số chữ số thập phân cho giá
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
+            minSellPriceRatio: 0.01,
+            maxSellPriceRatio: 0.02,
         },
         XRP: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)

@@ -380,14 +380,17 @@ export class OkxService {
         const riskPerTrade = this.config.get<number>('riskPerTrade');
         const amountOfUsdtPerStep = this.config.get<number>('amountOfUsdtPerStep');
 
-        const minSellPriceRatio = this.config.get<number>('minSellPriceRatio');
-        const maxSellPriceRatio = this.config.get<number>('maxSellPriceRatio');
+        let minSellPriceRatio = this.config.get<number>('minSellPriceRatio');
+        let maxSellPriceRatio = this.config.get<number>('maxSellPriceRatio');
         const stopLossSellPriceRatio = this.config.get<number>('stopLossSellPriceRatio');
         const minTakeProfitRatio = this.config.get<number>('minTakeProfitRatio');
         const sellWithoutCheckAvarageCost = this.config.get<boolean>('sellWithoutCheckAvarageCost');
 
         const coinConfig = this.config.get<any>(`coin.${coin.toUpperCase()}`);
         if (!coinConfig) throw new Error(`No config for ${coin}`);
+
+        minSellPriceRatio = coinConfig?.minSellPriceRatio ?? minSellPriceRatio;
+        maxSellPriceRatio = coinConfig?.maxSellPriceRatio ?? maxSellPriceRatio;
 
         const { szToFixed, priceToFixed } = coinConfig;
 
