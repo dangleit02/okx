@@ -316,8 +316,6 @@ export class OkxService {
         this.logger.log(`avarageCost ${avarageCost}`);
         this.emailService.sendEmail(process.env.EMAIL_TO, `Buy ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(currentPrice - avarageCost)/avarageCost*100}%, minBuyPrice ${minBuyPrice}, maxBuyPrice ${maxBuyPrice}, stopLossPrice ${stopLossPrice}` });
         
-        const minTakeProfitPrice = avarageCost * (1 + 0.05); // tối thiểu phải có lãi 5%
-        this.logger.log(`minTakeProfitPrice ${minTakeProfitPrice}`);
         let newTotalCost = avarageCost * numberOfBoughtCoin;
         let newBoughtCoin = numberOfBoughtCoin;
         let newAvarageCost = avarageCost;
@@ -335,11 +333,6 @@ export class OkxService {
                     this.logger.log(`triggerPx ${triggerPx} < minBuyPrice ${minBuyPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
                     break;
                 }
-
-                // if (!!minTakeProfitPrice && orderPx >= minTakeProfitPrice) {
-                //     this.logger.log(`Break orderPx >= minTakeProfitPrice ${minTakeProfitPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
-                //     break;
-                // }
 
                 if (!buyWithoutCheckAvarageCost && !!newAvarageCost && triggerPx >= newAvarageCost) {
                     this.logger.log(`triggerPx ${triggerPx} >= newWvarageCost ${newAvarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
@@ -402,7 +395,7 @@ export class OkxService {
         const minSellPrice = currentPrice * (1 - maxSellPriceRatio);
         const maxSellPrice = currentPrice * (1 - minSellPriceRatio);
         const stopLossPrice = currentPrice * (1 + stopLossSellPriceRatio);
-        this.logger.log(`minSellPrice: ${minSellPrice}, maxSellPrice: ${maxSellPrice}, stopLossPrice: ${stopLossPrice}`);
+        this.logger.log(`minSellPrice: ${minSellPrice}, maxSellPrice: ${maxSellPrice}, stopLossPrice: ${stopLossPrice}, minTakeProfitRatio: ${minTakeProfitRatio}`);
 
         if (minSellPrice >= maxSellPrice || stopLossPrice <= maxSellPrice) {
             throw new Error(`Invalid SELL price configuration`);
