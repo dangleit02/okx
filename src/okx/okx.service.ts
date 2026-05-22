@@ -484,8 +484,7 @@ export class OkxService {
             throw error;
         }
         if (!testing && data.length > 0) {
-            this.emailService.sendEmail(process.env.EMAIL_TO, `sell ${coin}`, data.map((item => item.body?.triggerPx)));
-            this.emailService.sendEmail(process.env.EMAIL_TO, `sell ${coin}`, data.map((item => `${(item.body?.triggerPx - avarageCost)/avarageCost*100}%`)));
+            this.emailService.sendEmail(process.env.EMAIL_TO, `sell ${coin}`, data.map((item => `${item.body?.triggerPx}:${(item.body?.triggerPx - avarageCost)/avarageCost*100}%`)));
         }
         this.logger.log(`Current price: ${currentPrice}`);
         return data;
