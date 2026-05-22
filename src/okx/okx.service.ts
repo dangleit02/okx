@@ -314,8 +314,9 @@ export class OkxService {
         this.logger.log('steps:', JSON.stringify(steps));
         const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
         this.logger.log(`avarageCost ${avarageCost}`);
-        this.emailService.sendEmail(process.env.EMAIL_TO, `Buy ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(currentPrice - avarageCost)/avarageCost*100}%, minBuyPrice ${minBuyPrice}, maxBuyPrice ${maxBuyPrice}, stopLossPrice ${stopLossPrice}` });
-        
+        if (!testing) {
+            this.emailService.sendEmail(process.env.EMAIL_TO, `Buy ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(currentPrice - avarageCost)/avarageCost*100}%, minBuyPrice ${minBuyPrice}, maxBuyPrice ${maxBuyPrice}, stopLossPrice ${stopLossPrice}` });
+        }
         let newTotalCost = avarageCost * numberOfBoughtCoin;
         let newBoughtCoin = numberOfBoughtCoin;
         let newAvarageCost = avarageCost;
@@ -354,9 +355,8 @@ export class OkxService {
             this.logger.log('Error placing trigger order:', error.response?.data || error.message);
             throw error;
         }
-        if (data.length > 0) {
-            this.emailService.sendEmail(process.env.EMAIL_TO, `Number of new buy orders for ${coin}`, data.length);
-            this.emailService.sendEmail(process.env.EMAIL_TO, `New buy ${coin} orders`, data.map((item => item.body?.triggerPx)));
+        if (!testing && data.length > 0) {
+            this.emailService.sendEmail(process.env.EMAIL_TO, `New buy ${coin} orders`, data.map((item => {return {step: item.step, triggerPx: item.body?.triggerPx, profit: `${(item.body?.triggerPr - avarageCost)/avarageCost*100}%`}})));
         }
         this.logger.log(`Current price: ${currentPrice}`);
         return data;
@@ -429,7 +429,9 @@ export class OkxService {
         let remainingCoin = coinToSell;
         const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
         const minTakeProfitPrice = avarageCost * (1 + minTakeProfitRatio); // tối thiểu phải có lãi 5%
-        this.emailService.sendEmail(process.env.EMAIL_TO, `Sell ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(currentPrice - avarageCost)/avarageCost*100}%, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}` });
+        if (!testing) {
+            this.emailService.sendEmail(process.env.EMAIL_TO, `Sell ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(currentPrice - avarageCost)/avarageCost*100}%, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}` });
+        }
         this.logger.log(`avarageCost: ${avarageCost} minTakeProfitPrice ${minTakeProfitPrice}: ${avarageCost > 0 ? (minTakeProfitPrice / avarageCost - 1) * 100 : 0 }%`);
         try {
             for await (let step of steps) {
@@ -459,7 +461,7 @@ export class OkxService {
                 }
 
                 this.logger.log(
-                    `SELL step ${step} | orderPx ${orderPx.toFixed(priceToFixed)} | triggerPx ${triggerPx.toFixed(priceToFixed)} | sz ${sz.toFixed(szToFixed)}`
+                    `SELL step ${step} | orderPx ${orderPx.toFixed(priceToFixed)} | triggerPx ${triggerPx.toFixed(priceToFixed)} | sz ${sz.toFixed(szToFixed)} | profit: ${(orderPx - avarageCost)/avarageCost*100}%`
                 );
 
                 const res = await this.placeOneOrder(
@@ -481,9 +483,9 @@ export class OkxService {
             );
             throw error;
         }
-        if (data.length > 0) {
-            this.emailService.sendEmail(process.env.EMAIL_TO, `Number of new sell orders for ${coin}`, data.length);
-            this.emailService.sendEmail(process.env.EMAIL_TO, `New sell ${coin} orders`, data.map((item => item.body?.triggerPx)));
+        if (!testing && data.length > 0) {
+            this.emailService.sendEmail(process.env.EMAIL_TO, `sell ${coin}`, data.map((item => item.body?.triggerPx)));
+            this.emailService.sendEmail(process.env.EMAIL_TO, `sell ${coin}`, data.map((item => `${(item.body?.triggerPx - avarageCost)/avarageCost*100}%`)));
         }
         this.logger.log(`Current price: ${currentPrice}`);
         return data;
