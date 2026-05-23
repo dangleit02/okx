@@ -1,5 +1,5 @@
 export default () => ({
-    runSpotTaskForBuy: false,
+    runSpotTaskForBuy: true,
     buyWithoutCheckAvarageCost: false,
     runSpotTaskForSell: true,
     sellWithoutCheckAvarageCost: true,
@@ -19,6 +19,7 @@ export default () => ({
     stopLossSellPriceRatio: 0.1,//0.06, // 6%//0.1, // 10%    0.3, // 30%    
     futureLeverage: 3,
     coinsForBuy: [
+        'ETH',
         'ADA',
         'PEPE',
         // TOP 100
@@ -801,10 +802,10 @@ export default () => ({
             addForTriggerPrice: 0.000001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 2, // Số chữ số thập phân cho giá
-            minBuyPriceRatio: 0.01,
-            maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.01,
-            maxSellPriceRatio: 0.02,
+            minBuyPriceRatio: 0.02,
+            maxBuyPriceRatio: 0.03,
+            minSellPriceRatio: 0.02,
+            maxSellPriceRatio: 0.03,
         },
         XRP: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)

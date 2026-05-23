@@ -356,7 +356,7 @@ export class OkxService {
             throw error;
         }
         if (!testing && data.length > 0) {
-            this.emailService.sendEmail(process.env.EMAIL_TO, `New buy ${coin} orders`, data.map((item => {return {step: item.step, triggerPx: item.body?.triggerPx, profit: `${(item.body?.triggerPr - avarageCost)/avarageCost*100}%`}})));
+            this.emailService.sendEmail(process.env.EMAIL_TO, `buy ${coin}`, data.map((item => {return `item.body?.triggerPx:${(item.body?.triggerPr - avarageCost)/avarageCost*100}%`})));
         }
         this.logger.log(`Current price: ${currentPrice}`);
         return data;
