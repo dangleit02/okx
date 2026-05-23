@@ -272,93 +272,102 @@ export class OkxService {
         }
 
         const instId = `${coin.toUpperCase()}-USDT`;
-        const currentPrice = await this.getTicker(instId);
-        this.logger.log(`Current price: ${currentPrice}`);
-        const minBuyPrice = currentPrice * (1 + minBuyPriceRatio);
-        const maxBuyPrice = currentPrice * (1 + maxBuyPriceRatio);
-        const stopLossPrice = currentPrice * (1 - stopLossBuyPriceRatio);
-        
-        if (minBuyPrice >= maxBuyPrice || stopLossPrice >= minBuyPrice) {
-            this.logger.log(`Invalid calculated prices: minBuyPrice (${minBuyPrice}) must be less than maxBuyPrice (${maxBuyPrice}) and stopLossPrice (${stopLossPrice}) must be less than minBuyPrice (${minBuyPrice})`);
-            throw new Error(`Invalid calculated prices`);
-        }
-
-        const amountOfUsdtRisk = maxUsdt * riskPerTrade; // 30 USDT
-        this.logger.log(`minBuyPrice: ${minBuyPrice}, maxBuyPrice: ${maxBuyPrice}, stopLossPrice: ${stopLossPrice}, amountOfUsdtRisk ${amountOfUsdtRisk}`)
-
-        const totalNnumberOfCoinWillBeBought = (amountOfUsdtRisk / (maxBuyPrice - stopLossPrice));
-        if (totalNnumberOfCoinWillBeBought <= 0) {
-            this.logger.log(`totalNnumberOfCoinWillBeBought <= 0: ${totalNnumberOfCoinWillBeBought <= 0}`);
-            return data;
-        }
-
-        const coinBalanceData = await this.getAccountBalance(coin);
-        const numberOfBoughtCoin = Number(coinBalanceData?.data[0]?.details[0]?.availBal ?? 0);
-        const numberOfCoinWillBeBought = totalNnumberOfCoinWillBeBought - numberOfBoughtCoin;
-        const totalCostByUsdt = totalNnumberOfCoinWillBeBought * maxBuyPrice;
-        const costByUsdt = numberOfCoinWillBeBought * (stopLossPrice + maxBuyPrice) / 2;
-        const numberOfSteps = Math.ceil(costByUsdt / amountOfUsdtPerStep);
-        this.logger.log(`totalNnumberOfCoinWillBeBought: ${totalNnumberOfCoinWillBeBought}, numberOfBoughtCoin: ${numberOfBoughtCoin}, numberOfCoinWillBeBought: ${numberOfCoinWillBeBought}, totalCostByUsdt ${totalCostByUsdt}, costByUsdt: ${costByUsdt}, numberOfSteps: ${numberOfSteps}`)
-        if (numberOfCoinWillBeBought <= 0) {
-            this.logger.log(`numberOfCoinWillBeBought <= 0: ${numberOfCoinWillBeBought <= 0}`);
-            return data;
-        }
-        const priceDistanceBetweenEachStep = (maxBuyPrice - stopLossPrice) / numberOfSteps;
-        this.logger.log(`priceDistanceBetweenEachStep: ${priceDistanceBetweenEachStep}`);
-
-        if (!priceDistanceBetweenEachStep || priceDistanceBetweenEachStep <= 0) {
-            this.logger.log(`priceDistanceBetweenEachStep : ${priceDistanceBetweenEachStep}`);
-        }
-
-        const steps = Array.from({ length: numberOfSteps + 1 }, (_, i) => i);
-        this.logger.log('steps:', JSON.stringify(steps));
-        const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
-        this.logger.log(`avarageCost ${avarageCost}`);
-        if (!testing) {
-            this.emailService.sendEmail(process.env.EMAIL_TO, `Buy ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(currentPrice - avarageCost)/avarageCost*100}%, minBuyPrice ${minBuyPrice}, maxBuyPrice ${maxBuyPrice}, stopLossPrice ${stopLossPrice}` });
-        }
-        let newTotalCost = avarageCost * numberOfBoughtCoin;
-        let newBoughtCoin = numberOfBoughtCoin;
-        let newAvarageCost = avarageCost;
-        try {
-            for await (let step of steps) {
-                const orderPx = maxBuyPrice - step * priceDistanceBetweenEachStep;
-                const triggerPx = orderPx - orderPx * 0.002; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
-                const sz = amountOfUsdtPerStep / orderPx;
-                
-                if (sz <= 0) {
-                    this.logger.log(`sz ${sz} <= 0, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
-                    break;
-                }
-                if (triggerPx < minBuyPrice) {
-                    this.logger.log(`triggerPx ${triggerPx} < minBuyPrice ${minBuyPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
-                    break;
-                }
-
-                if (!buyWithoutCheckAvarageCost && !!newAvarageCost && triggerPx >= newAvarageCost) {
-                    this.logger.log(`triggerPx ${triggerPx} >= newWvarageCost ${newAvarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
-                    continue;
-                }
-
-                this.logger.log(`Placing order: Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
-                const res = await this.placeOneOrder(coin, 'buy', sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPx.toFixed(priceToFixed), testing);
-
-                data.push({ data: res.data, step, body: res.body });
-
-                newTotalCost += orderPx * sz;
-                newBoughtCoin += sz;
-                newAvarageCost = newTotalCost / newBoughtCoin;
-                this.logger.log(`newTotalCost ${newTotalCost}, newBoughtCoin ${newBoughtCoin}, newWvarageCost ${newAvarageCost}`);
+        let currentPrice = await this.getTicker(instId);
+        while (true) {
+            this.logger.log(`BUY ${coin} Current price: ${currentPrice}`);
+            const minBuyPrice = currentPrice * (1 + minBuyPriceRatio);
+            const maxBuyPrice = currentPrice * (1 + maxBuyPriceRatio);
+            const stopLossPrice = currentPrice * (1 - stopLossBuyPriceRatio);
+            
+            if (minBuyPrice >= maxBuyPrice || stopLossPrice >= minBuyPrice) {
+                this.logger.log(`BUY ${coin} Invalid calculated prices: minBuyPrice (${minBuyPrice}) must be less than maxBuyPrice (${maxBuyPrice}) and stopLossPrice (${stopLossPrice}) must be less than minBuyPrice (${minBuyPrice})`);
+                throw new Error(`Invalid calculated prices`);
             }
 
-        } catch (error) {
-            this.logger.log('Error placing trigger order:', error.response?.data || error.message);
-            throw error;
+            const amountOfUsdtRisk = maxUsdt * riskPerTrade; // 30 USDT
+            this.logger.log(`BUY ${coin} minBuyPrice: ${minBuyPrice}, maxBuyPrice: ${maxBuyPrice}, stopLossPrice: ${stopLossPrice}, amountOfUsdtRisk ${amountOfUsdtRisk}`)
+
+            const totalNnumberOfCoinWillBeBought = (amountOfUsdtRisk / (maxBuyPrice - stopLossPrice));
+            if (totalNnumberOfCoinWillBeBought <= 0) {
+                this.logger.log(`BUY ${coin} totalNnumberOfCoinWillBeBought <= 0: ${totalNnumberOfCoinWillBeBought <= 0}`);
+                return data;
+            }
+
+            const coinBalanceData = await this.getAccountBalance(coin);
+            const numberOfBoughtCoin = Number(coinBalanceData?.data[0]?.details[0]?.availBal ?? 0);
+            const numberOfCoinWillBeBought = totalNnumberOfCoinWillBeBought - numberOfBoughtCoin;
+            const totalCostByUsdt = totalNnumberOfCoinWillBeBought * maxBuyPrice;
+            const costByUsdt = numberOfCoinWillBeBought * (stopLossPrice + maxBuyPrice) / 2;
+            const numberOfSteps = Math.ceil(costByUsdt / amountOfUsdtPerStep);
+            this.logger.log(`BUY ${coin} totalNnumberOfCoinWillBeBought: ${totalNnumberOfCoinWillBeBought}, numberOfBoughtCoin: ${numberOfBoughtCoin}, numberOfCoinWillBeBought: ${numberOfCoinWillBeBought}, totalCostByUsdt ${totalCostByUsdt}, costByUsdt: ${costByUsdt}, numberOfSteps: ${numberOfSteps}`)
+            if (numberOfCoinWillBeBought <= 0) {
+                this.logger.log(`BUY ${coin} numberOfCoinWillBeBought <= 0: ${numberOfCoinWillBeBought <= 0}`);
+                return data;
+            }
+            const priceDistanceBetweenEachStep = (maxBuyPrice - stopLossPrice) / numberOfSteps;
+            this.logger.log(`BUY ${coin} priceDistanceBetweenEachStep: ${priceDistanceBetweenEachStep}`);
+
+            if (!priceDistanceBetweenEachStep || priceDistanceBetweenEachStep <= 0) {
+                this.logger.log(`BUY ${coin} priceDistanceBetweenEachStep : ${priceDistanceBetweenEachStep}`);
+            }
+
+            const steps = Array.from({ length: numberOfSteps + 1 }, (_, i) => i);
+            this.logger.log('BUY ${coin} steps:', JSON.stringify(steps));
+            const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
+            this.logger.log(`BUY ${coin} avarageCost ${avarageCost}`);
+            if (!testing) {
+                this.emailService.sendEmail(process.env.EMAIL_TO, `Buy ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(currentPrice - avarageCost)/avarageCost*100}%, minBuyPrice ${minBuyPrice}, maxBuyPrice ${maxBuyPrice}, stopLossPrice ${stopLossPrice}` });
+            }
+            let newTotalCost = avarageCost * numberOfBoughtCoin;
+            let newBoughtCoin = numberOfBoughtCoin;
+            let newAvarageCost = avarageCost;
+            try {
+                for await (let step of steps) {
+                    const orderPx = maxBuyPrice - step * priceDistanceBetweenEachStep;
+                    const triggerPx = orderPx - orderPx * 0.002; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
+                    const sz = amountOfUsdtPerStep / orderPx;
+                    
+                    if (sz <= 0) {
+                        this.logger.log(`BUY ${coin} sz ${sz} <= 0, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                        break;
+                    }
+                    if (triggerPx < minBuyPrice) {
+                        this.logger.log(`BUY ${coin} triggerPx ${triggerPx} < minBuyPrice ${minBuyPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                        break;
+                    }
+
+                    if (!buyWithoutCheckAvarageCost && !!newAvarageCost && triggerPx >= newAvarageCost) {
+                        this.logger.log(`BUY ${coin} triggerPx ${triggerPx} >= newWvarageCost ${newAvarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                        continue;
+                    }
+
+                    this.logger.log(`BUY ${coin} Placing order: Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                    const res = await this.placeOneOrder(coin, 'buy', sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPx.toFixed(priceToFixed), testing);
+
+                    data.push({ data: res.data, step, body: res.body });
+
+                    newTotalCost += orderPx * sz;
+                    newBoughtCoin += sz;
+                    newAvarageCost = newTotalCost / newBoughtCoin;
+                    this.logger.log(`BUY ${coin} newTotalCost ${newTotalCost}, newBoughtCoin ${newBoughtCoin}, newWvarageCost ${newAvarageCost}`);
+                }
+
+            } catch (error) {
+                this.logger.log('BUY ${coin} Error placing trigger order:', error.response?.data || error.message);
+                throw error;
+            }
+            if (!testing && data.length > 0) {
+                this.emailService.sendEmail(process.env.EMAIL_TO, `buy ${coin}`, data.map((item => {return `item.body?.triggerPx:${(item.body?.triggerPr - avarageCost)/avarageCost*100}%`})));
+            }
+            await this.sleep(5000 * 60);
+            const price = await this.getTicker(instId);
+            this.logger.log(`BUY ${coin} Current price: ${price}`);            
+            // break if price increase, otherwise continue order buy to get lower price
+            if (currentPrice <= price) {
+                break;
+            }
+            currentPrice = price;
         }
-        if (!testing && data.length > 0) {
-            this.emailService.sendEmail(process.env.EMAIL_TO, `buy ${coin}`, data.map((item => {return `item.body?.triggerPx:${(item.body?.triggerPr - avarageCost)/avarageCost*100}%`})));
-        }
-        this.logger.log(`Current price: ${currentPrice}`);
         return data;
     }
 
@@ -388,105 +397,114 @@ export class OkxService {
         const { szToFixed, priceToFixed } = coinConfig;
 
         const instId = `${coin.toUpperCase()}-USDT`;
-        const currentPrice = await this.getTicker(instId);
-        this.logger.log(`Current price: ${currentPrice}`);
+        let currentPrice = await this.getTicker(instId);
+        while(true) {
+            this.logger.log(`SELL ${coin}  Current price: ${currentPrice}`);
 
-        // SELL prices (below current)
-        const minSellPrice = currentPrice * (1 - maxSellPriceRatio);
-        const maxSellPrice = currentPrice * (1 - minSellPriceRatio);
-        const stopLossPrice = currentPrice * (1 + stopLossSellPriceRatio);
-        this.logger.log(`minSellPrice: ${minSellPrice}, maxSellPrice: ${maxSellPrice}, stopLossPrice: ${stopLossPrice}, minTakeProfitRatio: ${minTakeProfitRatio}`);
+            // SELL prices (below current)
+            const minSellPrice = currentPrice * (1 - maxSellPriceRatio);
+            const maxSellPrice = currentPrice * (1 - minSellPriceRatio);
+            const stopLossPrice = currentPrice * (1 + stopLossSellPriceRatio);
+            this.logger.log(`SELL ${coin}  minSellPrice: ${minSellPrice}, maxSellPrice: ${maxSellPrice}, stopLossPrice: ${stopLossPrice}, minTakeProfitRatio: ${minTakeProfitRatio}`);
 
-        if (minSellPrice >= maxSellPrice || stopLossPrice <= maxSellPrice) {
-            throw new Error(`Invalid SELL price configuration`);
-        }
-
-        const amountOfUsdtRisk = maxUsdt * riskPerTrade;
-        const totalCoinWillBeSold =
-            amountOfUsdtRisk / (stopLossPrice - minSellPrice);
-
-        if (totalCoinWillBeSold <= 0) return data;
-
-        const coinBalanceData = await this.getAccountBalance(coin);
-        const availableCoin = Number(
-            coinBalanceData?.data[0]?.details[0]?.availBal ?? 0
-        );
-
-        const coinToSell = Math.min(totalCoinWillBeSold, availableCoin);
-        if (coinToSell <= 0) return data;
-
-        const costByUsdt = coinToSell * (minSellPrice + stopLossPrice) / 2;
-        const numberOfSteps = Math.ceil(costByUsdt / amountOfUsdtPerStep);
-
-        const priceDistanceBetweenEachStep =
-            (stopLossPrice - minSellPrice) / numberOfSteps;
-
-        this.logger.log(`SELL costByUsdt: ${costByUsdt}, steps: ${numberOfSteps}`);
-        this.logger.log(`priceDistanceEachStep: ${priceDistanceBetweenEachStep}`);
-
-        const steps = Array.from({ length: numberOfSteps + 1 }, (_, i) => i);
-
-        let remainingCoin = coinToSell;
-        const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
-        const minTakeProfitPrice = avarageCost * (1 + minTakeProfitRatio); // tối thiểu phải có lãi 5%
-        if (!testing) {
-            this.emailService.sendEmail(process.env.EMAIL_TO, `Sell ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(currentPrice - avarageCost)/avarageCost*100}%, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}` });
-        }
-        this.logger.log(`avarageCost: ${avarageCost} minTakeProfitPrice ${minTakeProfitPrice}: ${avarageCost > 0 ? (minTakeProfitPrice / avarageCost - 1) * 100 : 0 }%`);
-        try {
-            for await (let step of steps) {
-                const orderPx = minSellPrice + step * priceDistanceBetweenEachStep;
-                const triggerPx = orderPx + orderPx * 0.002; // trigger cao hơn order
-                const sz = Math.min(
-                    amountOfUsdtPerStep / orderPx,
-                    remainingCoin
-                );
-
-                if (sz <= 0) {
-                    this.logger.log(`sz ${sz} <= 0, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
-                    break;
-                }
-                if (triggerPx > maxSellPrice) {
-                    this.logger.log(`triggerPx ${triggerPx} > maxSellPrice ${maxSellPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
-                    break;
-                }
-                if (orderPx < minTakeProfitPrice) {
-                    this.logger.log(`orderPx ${orderPx} < minTakeProfitPrice ${minTakeProfitPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
-                    continue;
-                }
-
-                if (!sellWithoutCheckAvarageCost && !!avarageCost && triggerPx < avarageCost) {
-                    this.logger.log(`triggerPx ${triggerPx} < avarageCost ${avarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
-                    continue;
-                }
-
-                this.logger.log(
-                    `SELL step ${step} | orderPx ${orderPx.toFixed(priceToFixed)} | triggerPx ${triggerPx.toFixed(priceToFixed)} | sz ${sz.toFixed(szToFixed)} | profit: ${(orderPx - avarageCost)/avarageCost*100}%`
-                );
-
-                const res = await this.placeOneOrder(
-                    coin,
-                    'sell',
-                    sz.toFixed(szToFixed),
-                    triggerPx.toFixed(priceToFixed),
-                    orderPx.toFixed(priceToFixed),
-                    testing
-                );
-
-                data.push({ step, data: res.data, body: res.body });
-                remainingCoin -= sz;
+            if (minSellPrice >= maxSellPrice || stopLossPrice <= maxSellPrice) {
+                throw new Error(`SELL ${coin} Invalid SELL price configuration`);
             }
-        } catch (error) {
-            this.logger.error(
-                'Error placing SELL orders:',
-                error.response?.data || error.message
+
+            const amountOfUsdtRisk = maxUsdt * riskPerTrade;
+            const totalCoinWillBeSold =
+                amountOfUsdtRisk / (stopLossPrice - minSellPrice);
+
+            if (totalCoinWillBeSold <= 0) return data;
+
+            const coinBalanceData = await this.getAccountBalance(coin);
+            const availableCoin = Number(
+                coinBalanceData?.data[0]?.details[0]?.availBal ?? 0
             );
-            throw error;
+
+            const coinToSell = Math.min(totalCoinWillBeSold, availableCoin);
+            if (coinToSell <= 0) return data;
+
+            const costByUsdt = coinToSell * (minSellPrice + stopLossPrice) / 2;
+            const numberOfSteps = Math.ceil(costByUsdt / amountOfUsdtPerStep);
+
+            const priceDistanceBetweenEachStep =
+                (stopLossPrice - minSellPrice) / numberOfSteps;
+
+            this.logger.log(`SELL ${coin} costByUsdt: ${costByUsdt}, steps: ${numberOfSteps}`);
+            this.logger.log(`SELL ${coin} priceDistanceEachStep: ${priceDistanceBetweenEachStep}`);
+
+            const steps = Array.from({ length: numberOfSteps + 1 }, (_, i) => i);
+
+            let remainingCoin = coinToSell;
+            const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
+            const minTakeProfitPrice = avarageCost * (1 + minTakeProfitRatio); // tối thiểu phải có lãi 5%
+            if (!testing) {
+                this.emailService.sendEmail(process.env.EMAIL_TO, `Sell ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(currentPrice - avarageCost)/avarageCost*100}%, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}` });
+            }
+            this.logger.log(`SELL ${coin} avarageCost: ${avarageCost} minTakeProfitPrice ${minTakeProfitPrice}: ${avarageCost > 0 ? (minTakeProfitPrice / avarageCost - 1) * 100 : 0 }%`);
+            try {
+                for await (let step of steps) {
+                    const orderPx = minSellPrice + step * priceDistanceBetweenEachStep;
+                    const triggerPx = orderPx + orderPx * 0.002; // trigger cao hơn order
+                    const sz = Math.min(
+                        amountOfUsdtPerStep / orderPx,
+                        remainingCoin
+                    );
+
+                    if (sz <= 0) {
+                        this.logger.log(`SELL ${coin} sz ${sz} <= 0, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                        break;
+                    }
+                    if (triggerPx > maxSellPrice) {
+                        this.logger.log(`SELL ${coin} triggerPx ${triggerPx} > maxSellPrice ${maxSellPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                        break;
+                    }
+                    if (orderPx < minTakeProfitPrice) {
+                        this.logger.log(`SELL ${coin} orderPx ${orderPx} < minTakeProfitPrice ${minTakeProfitPrice}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                        continue;
+                    }
+
+                    if (!sellWithoutCheckAvarageCost && !!avarageCost && triggerPx < avarageCost) {
+                        this.logger.log(`SELL ${coin} triggerPx ${triggerPx} < avarageCost ${avarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`);
+                        continue;
+                    }
+
+                    this.logger.log(
+                        `SELL ${coin}  step ${step} | orderPx ${orderPx.toFixed(priceToFixed)} | triggerPx ${triggerPx.toFixed(priceToFixed)} | sz ${sz.toFixed(szToFixed)} | profit: ${(orderPx - avarageCost)/avarageCost*100}%`
+                    );
+
+                    const res = await this.placeOneOrder(
+                        coin,
+                        'sell',
+                        sz.toFixed(szToFixed),
+                        triggerPx.toFixed(priceToFixed),
+                        orderPx.toFixed(priceToFixed),
+                        testing
+                    );
+
+                    data.push({ step, data: res.data, body: res.body });
+                    remainingCoin -= sz;
+                }
+            } catch (error) {
+                this.logger.error(
+                    'Error placing SELL orders:',
+                    error.response?.data || error.message
+                );
+                throw error;
+            }
+            if (!testing && data.length > 0) {
+                this.emailService.sendEmail(process.env.EMAIL_TO, `sell ${coin}`, data.map((item => `${item.body?.triggerPx}:${(item.body?.triggerPx - avarageCost)/avarageCost*100}%`)));
+            }
+            await this.sleep(5000 * 60);
+            const price = await this.getTicker(instId);
+            this.logger.log(`SELL ${coin} Current price: ${price}`);
+            // break if price decreases, otherwise continue order sell to get higher price        
+            if (currentPrice >= price) {
+                break;
+            }
+            currentPrice = price;
         }
-        if (!testing && data.length > 0) {
-            this.emailService.sendEmail(process.env.EMAIL_TO, `sell ${coin}`, data.map((item => `${item.body?.triggerPx}:${(item.body?.triggerPx - avarageCost)/avarageCost*100}%`)));
-        }
-        this.logger.log(`Current price: ${currentPrice}`);
         return data;
     }
 
@@ -677,8 +695,7 @@ export class OkxService {
         }
     }
 
-    async sellOneCoin({ coin, isTesting, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder }: { isTesting: boolean, removeExistingSellOrders: string, coin: string, addSellStopLoss: string, addSellTakeProfit: string, onlyForDown: string, justOneOrder: string }) {
-        const results: any[] = [];
+    async sellOneCoin({ coin, isTesting, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder, results }: { isTesting: boolean, removeExistingSellOrders: string, coin: string, addSellStopLoss: string, addSellTakeProfit: string, onlyForDown: string, justOneOrder: string, results: any[] }) {
         if (!isTesting) {
             if (removeExistingSellOrders === 'true') {
                 const res1 = await this.cancelOpenConditionSpotOrdersForOneCoin(coin, 'sell', onlyForDown === 'true');
@@ -702,6 +719,5 @@ export class OkxService {
             this.logger.log('Place auto sell order:', JSON.stringify(res4, null, 2));
             results.push({ coin, action: 'place_auto_sell_order', result: res4 });
         }
-        return results;
     }
 }

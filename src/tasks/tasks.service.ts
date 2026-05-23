@@ -38,10 +38,10 @@ export class TasksService {
             const isTesting = false,
                 removeExistingBuyOrders = 'false',
                 autobuy = 'true';                
-            for await (const coin of coins) {
+            await Promise.all(coins.map(async (coin) => {
                 this.logger.log(`Processing coin: ${coin.toUpperCase()}`);
                 await this.okxService.buyOneCoin(isTesting, removeExistingBuyOrders, coin, results, autobuy);
-            }
+            }));
             this.logger.log(`Auto buy results: ${JSON.stringify(results, null, 2)}`);
 
             this.logger.log(`✅ Successfully auto buy for down ${moment().format('YYYY/MM/DD HH:mm:ss')}`)
@@ -52,7 +52,7 @@ export class TasksService {
     }
 
     // run every hour at minute 0
-    @Cron('0 * * * *')
+    @Cron('38 * * * *')
     async autoSellSpotForDown() {
         this.logger.log(`Cron auto sell for down ${moment().format('YY/MM/DD HH:mm:ss')}`);
         try {
@@ -75,12 +75,12 @@ export class TasksService {
                 addSellTakeProfit = 'true',
                 onlyForDown = 'false',
                 justOneOrder = 'false';
-            for await (const coin of coins) {
+            await Promise.all(coins.map(async (coin) => {
                 this.logger.log(`Processing coin: ${coin.toUpperCase()}`);
                 // const result = await this.okxService.sellOneCoin({ coin, isTesting, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder });
-                const result = await this.okxService.sellOneCoin({ coin, isTesting, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder });
-                results.push(...result);
-            }
+                await this.okxService.sellOneCoin({ coin, isTesting, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder, results });                
+            }));
+            
             this.logger.log(`Auto sell results: ${JSON.stringify(results, null, 2)}`);
 
             this.logger.log(`✅ Successfully auto sell for down ${moment().format('YYYY/MM/DD HH:mm:ss')}`)

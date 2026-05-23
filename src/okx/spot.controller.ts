@@ -65,7 +65,9 @@ export class SpotController {
     @Query('justOneOrder') justOneOrder: string, // 'true' or 'false' only add one order for each type
   ) {
     const isTesting = testing !== 'false';
-    return await await this.okxService.sellOneCoin({ coin, isTesting, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder });
+    const results = [];
+    await this.okxService.sellOneCoin({ coin, isTesting, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder, results });
+    return results;
   }
 
   @Post('sell-at-price-all-coins')
@@ -86,11 +88,10 @@ export class SpotController {
     }
     coins = _.uniq(coins);
     this.logger.log(`Coins to process: ${JSON.stringify(coins)}`);
-    let results = [];
+    const results = [];
     for await (const coin of coins) {
       this.logger.log(`Processing coin: ${coin.toUpperCase()}`);
-      const result = await this.okxService.sellOneCoin({ isTesting, coin, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder });
-      results = results.concat(result);
+      await this.okxService.sellOneCoin({ isTesting, coin, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder, results });
     }
 
     return results;
