@@ -273,6 +273,7 @@ export class OkxService {
 
         const instId = `${coin.toUpperCase()}-USDT`;
         let currentPrice = await this.getTicker(instId);
+        let count = 0;
         while (true) {
             this.logger.log(`BUY ${coin} Current price: ${currentPrice}`, null, coin);
             const minBuyPrice = currentPrice * (1 + minBuyPriceRatio);
@@ -350,6 +351,7 @@ export class OkxService {
                     newBoughtCoin += sz;
                     newAvarageCost = newTotalCost / newBoughtCoin;
                     this.logger.log(`BUY ${coin} newTotalCost ${newTotalCost}, newBoughtCoin ${newBoughtCoin}, newWvarageCost ${newAvarageCost}`, null, coin);
+                    await this.sleep(1000 * Math.random());
                 }
 
             } catch (error) {
@@ -362,8 +364,9 @@ export class OkxService {
             await this.sleep(5000 * 60);
             const price = await this.getTicker(instId);
             this.logger.log(`BUY ${coin} Current price: ${price}, Previous price: ${currentPrice}`, null, coin);            
+            count++;
             // break if price increase, otherwise continue order buy to get lower price
-            if (currentPrice <= price) {
+            if (currentPrice*0.99 <= price || count > 10) {
                 this.logger.log(`BUY ${coin} stop`, null, coin);
                 break;
             }
@@ -399,6 +402,7 @@ export class OkxService {
 
         const instId = `${coin.toUpperCase()}-USDT`;
         let currentPrice = await this.getTicker(instId);
+        let count = 0
         while(true) {
             this.logger.log(`SELL ${coin}  Current price: ${currentPrice}`, null, coin);
 
@@ -486,6 +490,7 @@ export class OkxService {
 
                     data.push({ step, data: res.data, body: res.body });
                     remainingCoin -= sz;
+                    await this.sleep(1000 * Math.random());
                 }
             } catch (error) {
                 this.logger.error(
@@ -500,8 +505,9 @@ export class OkxService {
             await this.sleep(5000 * 60);
             const price = await this.getTicker(instId);
             this.logger.log(`SELL ${coin} Current price: ${price}, Previous price: ${currentPrice}`, null, coin);
+            count ++;
             // break if price decreases, otherwise continue order sell to get higher price        
-            if (currentPrice >= price) {
+            if (currentPrice*1.01 >= price || count > 10) {
                 this.logger.log(`SELL ${coin} stop`, null, coin);
                 break;
             }

@@ -19,7 +19,7 @@ export class TasksService {
     // run each 15 minutes
     // @Cron('*/1 * * * *')
     // run every hour at minute 30
-    @Cron('30 * * * *')
+    @Cron('0 * * * *')
     async autoBuySpotForDown() {
         this.logger.log(`Cron auto buy for down ${moment().format('YY/MM/DD HH:mm:ss')}`);
         try {
