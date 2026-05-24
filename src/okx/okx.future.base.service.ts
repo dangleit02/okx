@@ -580,7 +580,7 @@ export abstract class OkxFutureBaseService {
         const data: any[] = [];
         const amountOfUsdtPerStep = this.config.get<number>('amountOfUsdtPerStep');
 
-        this.logger.log(`Placing take profit orders for ${coin.toUpperCase()}, direction=${direction}, testing=${testing}`);
+        this.logger.log(`Placing take profit orders for ${coin.toUpperCase()}, direction=${direction}, testing=${testing}`, null, coin);
 
         const takeProfitPercentages = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05];
         const percentageOfPositionToClosePerStep = 0.05; // 5% position per step
@@ -694,7 +694,7 @@ export abstract class OkxFutureBaseService {
         // 1️⃣ cancel existing take profit orders if requested
         if (!isTesting && removeExistingOrders) {
             const cancelRes = await this.cancelAllTypeOfOpenOrdersForOneCoin({ coin, direction, enableTakeProfit, partialCloseOnRetrace, autoTrade });
-            this.logger.log(`Cancel existing ${direction} orders:`, JSON.stringify(cancelRes, null, 2));
+            this.logger.log(`Cancel existing ${direction} orders:`, JSON.stringify(cancelRes, null, 2), coin);
             results.push({ coin, action: 'cancel_existing_orders', direction, result: cancelRes });
         }
 
@@ -707,14 +707,14 @@ export abstract class OkxFutureBaseService {
                 justOnePartialOrder,
                 isTesting
             );
-            this.logger.log(`Place partial close orders for ${direction}:`, JSON.stringify(partialRes, null, 2));
+            this.logger.log(`Place partial close orders for ${direction}:`, JSON.stringify(partialRes, null, 2), coin);
             results.push({ coin, action: 'place_partial_close_orders', direction, result: partialRes });
         }
 
         // 3️⃣ auto open
         if (autoTrade) {
             const autoRes = await this.autoOpenPosition({ coin, direction, isTesting });
-            this.logger.log(`Place auto ${direction} orders:`, JSON.stringify(autoRes, null, 2));
+            this.logger.log(`Place auto ${direction} orders:`, JSON.stringify(autoRes, null, 2), coin);
             results.push({ coin, action: 'place_auto_order', direction, result: autoRes });
         }
 

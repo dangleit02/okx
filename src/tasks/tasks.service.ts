@@ -52,7 +52,7 @@ export class TasksService {
     }
 
     // run every hour at minute 0
-    @Cron('38 * * * *')
+    @Cron('42 * * * *')
     async autoSellSpotForDown() {
         this.logger.log(`Cron auto sell for down ${moment().format('YY/MM/DD HH:mm:ss')}`);
         try {
@@ -76,7 +76,7 @@ export class TasksService {
                 onlyForDown = 'false',
                 justOneOrder = 'false';
             await Promise.all(coins.map(async (coin) => {
-                this.logger.log(`Processing coin: ${coin.toUpperCase()}`);
+                this.logger.log(`Processing coin: ${coin.toUpperCase()}`, null, coin);
                 // const result = await this.okxService.sellOneCoin({ coin, isTesting, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder });
                 await this.okxService.sellOneCoin({ coin, isTesting, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder, results });                
             }));
@@ -91,7 +91,7 @@ export class TasksService {
     }
 
     // run every hour at minute 15
-    // @Cron('15 * * * *')
+    // @Cron('28 * * * *')
     async autoCloseShortPartialPositionForSwapOnRetrace() {
         this.logger.log(`Cron auto close short partial position for swap on retrace ${moment().format('YY/MM/DD HH:mm:ss')}`);
         try {
@@ -113,7 +113,7 @@ export class TasksService {
                 partialCloseOnRetrace = true;
 
             for await (const coin of coins) {
-                this.logger.log(`Processing coin: ${coin.toUpperCase()}`);
+                this.logger.log(`Processing coin: ${coin.toUpperCase()}`, null, coin);
                 const result = await this.okxFutureHedgeService.tradeOneCoin({ coin, direction: 'short', isTesting, removeExistingOrders, enableTakeProfit, partialCloseOnRetrace });
                 results.push(...result);
             }

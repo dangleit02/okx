@@ -23,17 +23,10 @@ export class AppLogger implements LoggerService {
     return moment().format('YYYY/MM/DD HH:mm:ss');
   }
 
-  private ensureLogFile() {
+  private writeToFile(level: string, message: any, context?: string, trace?: string, coin?: string) {
     const today = this.getDateString();
-    if (today !== this.currentDate) {
-      // Date changed → update log file path
-      this.currentDate = today;
-      this.logFile = path.join(this.logDir, `${today}.log`);
-    }
-  }
-
-  private writeToFile(level: string, message: any, context?: string, trace?: string) {
-    this.ensureLogFile(); // check if date changed
+    const logFilePath = path.join(this.logDir, `${today}_${coin ?? ''}.log`);
+    console.log('logFilePath', coin, logFilePath);
     let msgStr: string;
 
     if (typeof message === 'object') {
@@ -47,13 +40,13 @@ export class AppLogger implements LoggerService {
     }
 
     const logLine = `[${this.getTimestamp()}] [${level}]${context ? ' [' + context + ']' : ''} - ${msgStr}${trace ? '\n' + trace : ''}\n`;
-    fs.appendFileSync(this.logFile, logLine);
+    fs.appendFileSync(logFilePath, logLine);
   }
 
 
-  log(message: any, context?: string) {
+  log(message: any, context?: string, coin?: string) {
     console.log(`[${this.getTimestamp()}] [LOG]${context ? ' [' + context + ']' : ''} -`, message);
-    this.writeToFile('LOG', message, context);
+    this.writeToFile('LOG', message, context, null, coin);
   }
 
   error(message: any, trace?: string, context?: string) {
