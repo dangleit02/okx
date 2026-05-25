@@ -1,9 +1,9 @@
 export default () => ({
     runSpotTaskForBuy: true,
-    buyWithoutCheckAvarageCost: false,
+    buyWithoutCheckAvarageCost: true,
     runSpotTaskForSell: true,
     sellWithoutCheckAvarageCost: true,
-    minTakeProfitRatio: -0.05, // +5%
+    minTakeProfitRatio: 0.05, // +5%
     runSpotTaskHavingStopLoss: false,
     runSwapTaskForShort: false,
     runSwapTaskForLong: false,

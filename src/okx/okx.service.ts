@@ -343,9 +343,22 @@ export class OkxService {
                     }
 
                     this.logger.log(`BUY ${coin} Placing order: Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`, null, coin);
-                    const res = await this.placeOneOrder(coin, 'buy', sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPx.toFixed(priceToFixed), testing);
+                    let res = await this.placeOneOrder(coin, 'buy', sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPx.toFixed(priceToFixed), testing);
 
-                    data.push({ data: res.data, step, body: res.body });
+                    data.push({ type: 'BUY', data: step, body: res.body });
+
+                    const stopLossOrderPx = orderPx * (1 - stopLossBuyPriceRatio);                    
+                    const stopLossTriggerPx = stopLossOrderPx + stopLossOrderPx * 0.002; // trigger cao hơn order
+                    res = await this.placeOneOrder(
+                        coin,
+                        'sell',
+                        sz.toFixed(szToFixed),
+                        stopLossTriggerPx.toFixed(priceToFixed),
+                        stopLossOrderPx.toFixed(priceToFixed),
+                        testing
+                    );
+
+                    data.push({ type: 'STOPLOSS', step, body: res.body });
 
                     newTotalCost += orderPx * sz;
                     newBoughtCoin += sz;
@@ -359,7 +372,7 @@ export class OkxService {
                 throw error;
             }
             if (!testing && data.length > 0) {
-                this.emailService.sendEmail(process.env.EMAIL_TO, `buy ${coin}`, data.map((item => {return `item.body?.triggerPx:${(item.body?.triggerPr - avarageCost)/avarageCost*100}%`})));
+                this.emailService.sendEmail(process.env.EMAIL_TO, `buy ${coin}`, data.map((item => {return `${item.body?.triggerPx}:${(item.body?.triggerPr - avarageCost)/avarageCost*100}%`})));
             }
             await this.sleep(5000 * 60);
             const price = await this.getTicker(instId);
@@ -488,7 +501,7 @@ export class OkxService {
                         testing
                     );
 
-                    data.push({ step, data: res.data, body: res.body });
+                    data.push({ type: 'SELL', step, body: res.body });
                     remainingCoin -= sz;
                     await this.sleep(1000 * Math.random());
                 }
