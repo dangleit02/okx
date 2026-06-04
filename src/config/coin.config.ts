@@ -1,5 +1,5 @@
 export default () => ({
-    runSpotTaskForBuy: true,
+    runSpotTaskForBuy: false,
     buyWithoutCheckAvarageCost: true,
     runSpotTaskForSell: true,
     sellWithoutCheckAvarageCost: true,
@@ -512,10 +512,10 @@ export default () => ({
             addForTriggerPrice: 0.000000001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 3, // Số chữ số thập phân cho khối lượng
             priceToFixed: 9, // Số chữ số thập phân cho giá
-            minBuyPriceRatio: 0.03,
-            maxBuyPriceRatio: 0.04,
-            minSellPriceRatio: 0.03,
-            maxSellPriceRatio: 0.04,
+            minBuyPriceRatio: 0.01,
+            maxBuyPriceRatio: 0.02,
+            minSellPriceRatio: 0.01,
+            maxSellPriceRatio: 0.02,
         },
         WIF: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -666,10 +666,10 @@ export default () => ({
             addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 4, // Số chữ số thập phân cho khối lượng
             priceToFixed: 4, // Số chữ số thập phân cho giá
-            minBuyPriceRatio: 0.02,
-            maxBuyPriceRatio: 0.03,
-            minSellPriceRatio: 0.02,
-            maxSellPriceRatio: 0.03,
+            minBuyPriceRatio: 0.01,
+            maxBuyPriceRatio: 0.02,
+            minSellPriceRatio: 0.01,
+            maxSellPriceRatio: 0.02,
         },
         XLM: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -802,10 +802,10 @@ export default () => ({
             addForTriggerPrice: 0.000001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 2, // Số chữ số thập phân cho giá
-            minBuyPriceRatio: 0.02,
-            maxBuyPriceRatio: 0.03,
-            minSellPriceRatio: 0.02,
-            maxSellPriceRatio: 0.03,
+            minBuyPriceRatio: 0.01,
+            maxBuyPriceRatio: 0.02,
+            minSellPriceRatio: 0.01,
+            maxSellPriceRatio: 0.02,
         },
         XRP: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
