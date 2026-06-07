@@ -84,6 +84,7 @@ export default () => ({
         // 'ENA',
     ],
     coinsSpotForTakeProfit: [
+        'BTC',
         'ETH',
         'ADA',
         'PEPE',

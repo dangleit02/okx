@@ -318,6 +318,7 @@ export class OkxService {
             this.logger.log(`BUY ${coin} avarageCost ${avarageCost}`, null, coin);
             if (!testing) {
                 this.emailService.sendEmail(process.env.EMAIL_TO, `Buy ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(Number(coinBalanceData?.data[0]?.details[0]?.totalPnlRatio ?? 0)*100).toFixed(2)}% ${Number(coinBalanceData?.data[0]?.details[0]?.totalPnl ?? 0).toFixed(2)}USD, minBuyPrice ${minBuyPrice}, maxBuyPrice ${maxBuyPrice}, stopLossPrice ${stopLossPrice}` });
+                this.logger.log(`Buy ${coin} currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(Number(coinBalanceData?.data[0]?.details[0]?.totalPnlRatio ?? 0)*100).toFixed(2)}% ${Number(coinBalanceData?.data[0]?.details[0]?.totalPnl ?? 0).toFixed(2)}USD`, null, coin);
             }
             let newTotalCost = avarageCost * numberOfBoughtCoin;
             let newBoughtCoin = numberOfBoughtCoin;
@@ -460,6 +461,7 @@ export class OkxService {
             const minTakeProfitPrice = avarageCost * (1 + minTakeProfitRatio); // tối thiểu phải có lãi 5%
             if (!testing) {
                 this.emailService.sendEmail(process.env.EMAIL_TO, `Sell ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(Number(coinBalanceData?.data[0]?.details[0]?.totalPnlRatio ?? 0)*100).toFixed(2)}% ${Number(coinBalanceData?.data[0]?.details[0]?.totalPnl ?? 0).toFixed(2)}USD, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}` });
+                this.logger.log(`SELL ${coin} currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(Number(coinBalanceData?.data[0]?.details[0]?.totalPnlRatio ?? 0)*100).toFixed(2)}% ${Number(coinBalanceData?.data[0]?.details[0]?.totalPnl ?? 0).toFixed(2)}USD, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}`, null, coin);
             }
             this.logger.log(`SELL ${coin} avarageCost: ${avarageCost} minTakeProfitPrice ${minTakeProfitPrice}: ${avarageCost > 0 ? (minTakeProfitPrice / avarageCost - 1) * 100 : 0 }%`, null, coin);
             try {
