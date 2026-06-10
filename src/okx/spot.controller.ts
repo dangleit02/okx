@@ -3,6 +3,7 @@ import { OkxService } from './okx.service';
 import { ConfigService } from '@nestjs/config';
 import { AppLogger } from '../logger/logger.service';
 import * as _ from 'lodash';
+import { parseBool } from 'src/common/util';
 
 @Controller()
 export class SpotController {
@@ -51,6 +52,38 @@ export class SpotController {
       this.logger.log(`Processing coin: ${coin.toUpperCase()}`);
       await this.okxService.buyOneCoin(isTesting, removeExistingBuyOrders, coin, results, autobuy);
     }
+    return results;
+  }
+
+  @Post('buy-trigger-from-min-to-max/:coin')
+  async buyTriggerFromMinToMax(
+    @Param('coin') coin: string,
+    @Query() query: Record<string, string>,
+  ) {
+    const isTesting = query.testing !== 'false';
+    const minPrice = Number(query.minPrice);
+    const maxPrice = Number(query.maxPrice);
+    const numberOfOrders = query.numberOfOrders ?? query.numberOfSteps;
+    const results = [];
+
+    if (!isTesting && parseBool(query.removeExistingBuyOrders)) {
+      const res = await this.okxService.cancelOpenConditionSpotOrdersForOneCoin(coin, 'buy');
+      this.logger.log('Cancel existing buy orders:', JSON.stringify(res, null, 2));
+      results.push({ coin, action: 'cancel_existing_buy_orders', result: res });
+    }
+
+    const res = await this.okxService.buyTriggerFromMinPriceToMaxPrice(
+      coin,
+      minPrice,
+      maxPrice,
+      isTesting,
+      {
+        numberOfOrders: numberOfOrders ? Number(numberOfOrders) : undefined,
+        addStopLoss: parseBool(query.addStopLoss),
+      },
+    );
+    this.logger.log('Place trigger buy orders from min to max:', JSON.stringify(res, null, 2), coin);
+    results.push({ coin, action: 'place_trigger_buy_orders_from_min_to_max', result: res });
     return results;
   }
 

@@ -5,6 +5,12 @@ import axios from 'axios';
 import { AppLogger } from 'src/logger/logger.service';
 import * as _ from 'lodash';
 import { EmailService } from 'src/email/email.service';
+
+interface BuyTriggerRangeOptions {
+    numberOfOrders?: number;
+    addStopLoss?: boolean;
+}
+
 @Injectable()
 export class OkxService {
     constructor(
@@ -386,6 +392,138 @@ export class OkxService {
             }
             currentPrice = price;
         }
+        return data;
+    }
+
+    async buyTriggerFromMinPriceToMaxPrice(
+        coin: string,
+        minBuyPrice: number,
+        maxBuyPrice: number,
+        testing: boolean = true,
+        options: BuyTriggerRangeOptions = {},
+    ) {
+        const data = [];
+        const normalizedCoin = coin.toUpperCase();
+        this.logger.log(`Starting trigger BUY range for ${normalizedCoin}, minPrice: ${minBuyPrice}, maxPrice: ${maxBuyPrice}, testing: ${testing}`, null, coin);
+
+        if (!Number.isFinite(minBuyPrice) || minBuyPrice <= 0) {
+            throw new Error(`Invalid minPrice: ${minBuyPrice}`);
+        }
+        if (!Number.isFinite(maxBuyPrice) || maxBuyPrice <= 0) {
+            throw new Error(`Invalid maxPrice: ${maxBuyPrice}`);
+        }
+        if (minBuyPrice >= maxBuyPrice) {
+            throw new Error(`Invalid price range: minPrice (${minBuyPrice}) must be less than maxPrice (${maxBuyPrice})`);
+        }
+
+        const coinConfig = this.config.get<any>(`coin.${normalizedCoin}`);
+        this.logger.log(`Placing trigger BUY range for ${normalizedCoin} with config: ${JSON.stringify(coinConfig)}`, null, coin);
+        if (!coinConfig) {
+            throw new Error(`No configuration found for coin: ${JSON.stringify(coin)}`);
+        }
+
+        const amountOfUsdtPerStep = coinConfig?.amountOfUsdtPerStep ?? this.config.get<number>('amountOfUsdtPerStep');
+        const maxUsdt = this.config.get<number>('maxUsdt');
+        const riskPerTrade = coinConfig?.riskPerTrade ?? this.config.get<number>('riskPerTrade');
+        const stopLossBuyPriceRatio = this.config.get<number>('stopLossBuyPriceRatio');
+        const buyWithoutCheckAvarageCost = this.config.get<boolean>('buyWithoutCheckAvarageCost');
+        const { szToFixed, priceToFixed } = coinConfig;
+
+        if (amountOfUsdtPerStep <= 10) {
+            throw new Error(`Invalid configuration: amountOfUsdtPerStep (${amountOfUsdtPerStep}) must be greater than 10 USDT`);
+        }
+        if (!stopLossBuyPriceRatio || stopLossBuyPriceRatio <= 0) {
+            throw new Error(`Invalid configuration: stopLossBuyPriceRatio (${stopLossBuyPriceRatio}) must be greater than 0`);
+        }
+
+        const stopLossPrice = minBuyPrice * (1 - stopLossBuyPriceRatio);
+        if (stopLossPrice <= 0 || stopLossPrice >= minBuyPrice) {
+            throw new Error(`Invalid stopLossPrice calculated from minPrice: ${stopLossPrice}`);
+        }
+
+        const coinBalanceData = await this.getAccountBalance(coin);
+        const numberOfBoughtCoin = Number(coinBalanceData?.data[0]?.details[0]?.availBal ?? 0);
+        const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.accAvgPx ?? 0);
+        const amountOfUsdtRisk = maxUsdt * riskPerTrade;
+        const totalNnumberOfCoinWillBeBought = amountOfUsdtRisk / (maxBuyPrice - stopLossPrice);
+        const numberOfCoinWillBeBought = totalNnumberOfCoinWillBeBought - numberOfBoughtCoin;
+        const avarageBuyPrice = (minBuyPrice + maxBuyPrice) / 2;
+        const costByUsdt = numberOfCoinWillBeBought * avarageBuyPrice;
+
+        let numberOfOrders = options.numberOfOrders;
+        if (numberOfOrders === undefined || numberOfOrders === null) {
+            if (numberOfCoinWillBeBought <= 0) {
+                this.logger.log(`BUY ${coin} numberOfCoinWillBeBought <= 0: ${numberOfCoinWillBeBought}`, null, coin);
+                return data;
+            }
+            numberOfOrders = Math.ceil(costByUsdt / amountOfUsdtPerStep);
+        }
+
+        if (!Number.isFinite(numberOfOrders) || numberOfOrders <= 0) {
+            throw new Error(`Invalid numberOfOrders: ${numberOfOrders}`);
+        }
+        numberOfOrders = Math.ceil(numberOfOrders);
+
+        const priceDistanceBetweenEachStep = numberOfOrders === 1 ? 0 : (maxBuyPrice - minBuyPrice) / (numberOfOrders - 1);
+        this.logger.log(
+            `BUY ${coin} minBuyPrice: ${minBuyPrice}, maxBuyPrice: ${maxBuyPrice}, stopLossPrice: ${stopLossPrice}, amountOfUsdtRisk: ${amountOfUsdtRisk}, numberOfBoughtCoin: ${numberOfBoughtCoin}, numberOfCoinWillBeBought: ${numberOfCoinWillBeBought}, costByUsdt: ${costByUsdt}, numberOfOrders: ${numberOfOrders}, priceDistanceBetweenEachStep: ${priceDistanceBetweenEachStep}`,
+            null,
+            coin,
+        );
+
+        let newTotalCost = avarageCost * numberOfBoughtCoin;
+        let newBoughtCoin = numberOfBoughtCoin;
+        let newAvarageCost = avarageCost;
+
+        try {
+            for await (const step of Array.from({ length: numberOfOrders }, (_, i) => i)) {
+                const orderPx = maxBuyPrice - step * priceDistanceBetweenEachStep;
+                const triggerPx = orderPx - orderPx * 0.002;
+                const sz = amountOfUsdtPerStep / orderPx;
+
+                if (sz <= 0) {
+                    this.logger.log(`BUY ${coin} sz ${sz} <= 0, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`, null, coin);
+                    break;
+                }
+
+                if (!buyWithoutCheckAvarageCost && !!newAvarageCost && triggerPx >= newAvarageCost) {
+                    this.logger.log(`BUY ${coin} triggerPx ${triggerPx} >= newAvarageCost ${newAvarageCost}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`, null, coin);
+                    continue;
+                }
+
+                this.logger.log(`BUY ${coin} Placing range trigger order: Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`, null, coin);
+                let res = await this.placeOneOrder(coin, 'buy', sz.toFixed(szToFixed), triggerPx.toFixed(priceToFixed), orderPx.toFixed(priceToFixed), testing);
+                data.push({ type: 'BUY', step, body: res.body });
+
+                if (options.addStopLoss) {
+                    const stopLossOrderPx = orderPx * (1 - stopLossBuyPriceRatio);
+                    const stopLossTriggerPx = stopLossOrderPx + stopLossOrderPx * 0.002;
+                    res = await this.placeOneOrder(
+                        coin,
+                        'sell',
+                        sz.toFixed(szToFixed),
+                        stopLossTriggerPx.toFixed(priceToFixed),
+                        stopLossOrderPx.toFixed(priceToFixed),
+                        testing
+                    );
+                    data.push({ type: 'STOPLOSS', step, body: res.body });
+                }
+
+                newTotalCost += orderPx * sz;
+                newBoughtCoin += sz;
+                newAvarageCost = newTotalCost / newBoughtCoin;
+                this.logger.log(`BUY ${coin} newTotalCost ${newTotalCost}, newBoughtCoin ${newBoughtCoin}, newAvarageCost ${newAvarageCost}`, null, coin);
+                await this.sleep(1000 * Math.random());
+            }
+        } catch (error) {
+            this.logger.log(`BUY ${coin} Error placing range trigger order:`, error.response?.data || error.message, coin);
+            throw error;
+        }
+
+        if (!testing && data.length > 0) {
+            this.emailService.sendEmail(process.env.EMAIL_TO, `buy range ${coin}`, data.map((item => `${item.body?.triggerPx}:${item.body?.orderPx}`)));
+        }
+
         return data;
     }
 

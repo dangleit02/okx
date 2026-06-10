@@ -22,13 +22,23 @@ removeExistingBuyOrders=true&\
 autobuy=true" \
   -H "Content-Type: application/json"
 
+# buy trigger from min to max for one coin
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/ETH?\
+testing=true&\
+removeExistingBuyOrders=false&\
+minPrice=3000&\
+maxPrice=3200&\
+numberOfOrders=10&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
+
 # autosell for one coin
-curl -X POST "http://localhost:3030/sell-at-price/ADA?\
+curl -X POST "http://localhost:3030/sell-at-price/ETH?\
 testing=false&\
 removeExistingSellOrders=false&\
 addSellTakeProfit=true"
 
-curl -X POST "http://localhost:3030/sell-at-price/ADA?\
+curl -X POST "http://localhost:3030/sell-at-price/ETH?\
 testing=true&\
 removeExistingSellOrders=false&\
 addSellTakeProfit=true"
