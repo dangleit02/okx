@@ -122,10 +122,10 @@ export class SpotController {
     coins = _.uniq(coins);
     this.logger.log(`Coins to process: ${JSON.stringify(coins)}`);
     const results = [];
-    for await (const coin of coins) {
+    await Promise.all(coins.map(async (coin: string) => {
       this.logger.log(`Processing coin: ${coin.toUpperCase()}`);
       await this.okxService.sellOneCoin({ isTesting, coin, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder, results });
-    }
+    }));
 
     return results;
   }

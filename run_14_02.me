@@ -5,12 +5,12 @@
 # remove all trigger sell orders
 curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
 testing=false&\
-removeExistingSellOrders=true&\
+removeExistingSellOrders=true \
   -H "Content-Type: application/json"
 
 
 # autobuy for one coin
-curl -X POST "http://localhost:3030/buy-at-price/ETH?\
+curl -X POST "http://localhost:3030/buy-at-price/ADA?\
 testing=false&\
 removeExistingBuyOrders=true&\
 autobuy=true" \
@@ -23,11 +23,21 @@ autobuy=true" \
   -H "Content-Type: application/json"
 
 # buy trigger from min to max for one coin
-curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/ETH?\
+
+# without numberOfOrders=10&\
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/BTC?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=50000&\
+maxPrice=61000&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/BTC?\
 testing=true&\
 removeExistingBuyOrders=false&\
-minPrice=3000&\
-maxPrice=3200&\
+minPrice=50000&\
+maxPrice=60000&\
 numberOfOrders=10&\
 addStopLoss=false" \
   -H "Content-Type: application/json"
