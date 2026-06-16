@@ -320,7 +320,7 @@ export class OkxService {
 
             const steps = Array.from({ length: numberOfSteps + 1 }, (_, i) => i);
             this.logger.log('BUY ${coin} steps:', JSON.stringify(steps), coin);
-            const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.accAvgPx ?? 0);
+            const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
             this.logger.log(`BUY ${coin} avarageCost ${avarageCost}`, null, coin);
             if (!testing) {
                 this.emailService.sendEmail(process.env.EMAIL_TO, `Buy ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(Number(coinBalanceData?.data[0]?.details[0]?.totalPnlRatio ?? 0)*100).toFixed(2)}% ${Number(coinBalanceData?.data[0]?.details[0]?.totalPnl ?? 0).toFixed(2)}USD, minBuyPrice ${minBuyPrice}, maxBuyPrice ${maxBuyPrice}, stopLossPrice ${stopLossPrice}` });
@@ -443,7 +443,7 @@ export class OkxService {
 
         const coinBalanceData = await this.getAccountBalance(coin);
         const numberOfBoughtCoin = Number(coinBalanceData?.data[0]?.details[0]?.availBal ?? 0);
-        const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.accAvgPx ?? 0);
+        const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
         const amountOfUsdtRisk = maxUsdt * riskPerTrade;
         const totalNnumberOfCoinWillBeBought = amountOfUsdtRisk / (maxBuyPrice - stopLossPrice);
         const numberOfCoinWillBeBought = totalNnumberOfCoinWillBeBought - numberOfBoughtCoin;
@@ -595,7 +595,7 @@ export class OkxService {
             const steps = Array.from({ length: numberOfSteps + 1 }, (_, i) => i);
 
             let remainingCoin = coinToSell;
-            const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.accAvgPx ?? 0);
+            const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
             const minTakeProfitPrice = avarageCost * (1 + minTakeProfitRatio); // tối thiểu phải có lãi 5%
             if (!testing) {
                 this.emailService.sendEmail(process.env.EMAIL_TO, `Sell ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(Number(coinBalanceData?.data[0]?.details[0]?.totalPnlRatio ?? 0)*100).toFixed(2)}% ${Number(coinBalanceData?.data[0]?.details[0]?.totalPnl ?? 0).toFixed(2)}USD, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}` });
@@ -709,7 +709,7 @@ export class OkxService {
         if (!numberOfBoughtCoin || numberOfBoughtCoin <= 0) {
             return data;
         }
-        const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.accAvgPx ?? 0);
+        const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
         this.logger.log(`avarageCost: ${avarageCost}`);
         if (avarageCost <= 0) {
             return data;
@@ -778,7 +778,7 @@ export class OkxService {
         if (!numberOfBoughtCoin || numberOfBoughtCoin <= 0) {
             return data;
         }
-        const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.accAvgPx ?? 0);
+        const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
         this.logger.log(`avarageCost: ${avarageCost}`, null, coin);
         if (avarageCost <= 0 || avarageCost < currentPrice) {
             return data;

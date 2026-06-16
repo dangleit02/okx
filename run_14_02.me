@@ -34,6 +34,97 @@ addStopLoss=false" \
   -H "Content-Type: application/json"
 
 curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/BTC?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=49000&\
+maxPrice=60000&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
+
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/BTC?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=48000&\
+maxPrice=59000&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/BTC?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=47000&\
+maxPrice=58000&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/BTC?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=46000&\
+maxPrice=57000&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/BTC?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=45000&\
+maxPrice=56000&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/BTC?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=44000&\
+maxPrice=55000&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
+
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/BTC?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=43000&\
+maxPrice=54000&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/BTC?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=42000&\
+maxPrice=53000&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/BTC?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=41000&\
+maxPrice=52000&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"  
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/BTC?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=40000&\
+maxPrice=51000&\
+addStopLoss=false" \
+  -H "Content-Type: application/json" 
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/BTC?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=39000&\
+maxPrice=50000&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"         
+
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/BTC?\
 testing=true&\
 removeExistingBuyOrders=false&\
 minPrice=50000&\
@@ -41,6 +132,15 @@ maxPrice=60000&\
 numberOfOrders=10&\
 addStopLoss=false" \
   -H "Content-Type: application/json"
+
+# autobuy for all
+curl -X POST "http://localhost:3030/buy-at-price-all-coins?\
+testing=false&\
+removeExistingBuyOrders=true&\
+autobuy=true" \
+  -H "Content-Type: application/json"
+
+
 
 # autosell for one coin
 curl -X POST "http://localhost:3030/sell-at-price/ETH?\
@@ -53,28 +153,11 @@ testing=true&\
 removeExistingSellOrders=false&\
 addSellTakeProfit=true"
 
-
-# autobuy for all
-curl -X POST "http://localhost:3030/buy-at-price-all-coins?\
-testing=false&\
-removeExistingBuyOrders=true&\
-autobuy=true" \
-  -H "Content-Type: application/json"
-
-# sell when up for one coin (to take profit)
-curl -X POST "http://localhost:3030/sell-at-price/ETH?\
-testing=false&\
-removeExistingSellOrders=true&\
-addSellTakeProfit=true" \
--H "Content-Type: application/json"
-
-
-# sell when up for all coinsSpotForTakeProfit (to take profit)
+# autosell for all coin
 curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
 testing=false&\
 removeExistingSellOrders=true&\
-addSellTakeProfit=true" \
--H "Content-Type: application/json"
+addSellTakeProfit=true"
 
 # sell when down for one coin (to take profit but when down like stop loss)
 curl -X POST "http://localhost:3030/sell-at-price/ETH?\
