@@ -323,8 +323,8 @@ export class OkxService {
             const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
             this.logger.log(`BUY ${coin} avarageCost ${avarageCost}`, null, coin);
             if (!testing) {
-                this.emailService.sendEmail(process.env.EMAIL_TO, `Buy ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(Number(coinBalanceData?.data[0]?.details[0]?.spotUplRatio ?? 0)*100).toFixed(2)}% ${Number(coinBalanceData?.data[0]?.details[0]?.totalPnl ?? 0).toFixed(2)}USD, minBuyPrice ${minBuyPrice}, maxBuyPrice ${maxBuyPrice}, stopLossPrice ${stopLossPrice}` });
-                this.logger.log(`Buy ${coin} currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(Number(coinBalanceData?.data[0]?.details[0]?.spotUplRatio ?? 0)*100).toFixed(2)}% ${Number(coinBalanceData?.data[0]?.details[0]?.totalPnl ?? 0).toFixed(2)}USD`, null, coin);
+                this.emailService.sendEmail(process.env.EMAIL_TO, `Buy ${coin} status`, { info: `currentPrice ${currentPrice.toFixed(priceToFixed)}, avarageCost ${avarageCost.toFixed(priceToFixed)}, profit: ${(Number(coinBalanceData?.data[0]?.details[0]?.spotUplRatio ?? 0)*100).toFixed(2)}% ${Number(coinBalanceData?.data[0]?.details[0]?.spotUpl ?? 0).toFixed(2)}USD${Number(coinBalanceData?.data[0]?.details[0]?.totalPnl ?? 0).toFixed(2)}USD` });
+                this.logger.log(`Buy ${coin} currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(Number(coinBalanceData?.data[0]?.details[0]?.spotUplRatio ?? 0)*100).toFixed(2)}% ${Number(coinBalanceData?.data[0]?.details[0]?.spotUpl ?? 0).toFixed(2)}USD${Number(coinBalanceData?.data[0]?.details[0]?.totalPnl ?? 0).toFixed(2)}USD`, null, coin);
             }
             let newTotalCost = avarageCost * numberOfBoughtCoin;
             let newBoughtCoin = numberOfBoughtCoin;
@@ -379,7 +379,7 @@ export class OkxService {
                 throw error;
             }
             if (!testing && data.length > 0) {
-                this.emailService.sendEmail(process.env.EMAIL_TO, `buy ${coin}`, data.map((item => {return `${item.body?.triggerPx}:${(item.body?.triggerPr - avarageCost)/avarageCost*100}%`})));
+                this.emailService.sendEmail(process.env.EMAIL_TO, `buy ${coin}`, data.map((item => {return `${item.body?.triggerPx.toFixed(priceToFixed)}:${((item.body?.triggerPr - avarageCost)/avarageCost*100).toFixed(2)}%`})));
             }
             await this.sleep(5000 * 60);
             const price = await this.getTicker(instId);
@@ -521,7 +521,7 @@ export class OkxService {
         }
 
         if (!testing && data.length > 0) {
-            this.emailService.sendEmail(process.env.EMAIL_TO, `buy range ${coin}`, data.map((item => `${item.body?.triggerPx}:${item.body?.orderPx}`)));
+            this.emailService.sendEmail(process.env.EMAIL_TO, `buy range ${coin}`, data.map((item => `${item.body?.triggerPx.toFixed(priceToFixed)}:${item.body?.orderPx.toFixed(priceToFixed)}`)));
         }
 
         return data;
@@ -598,8 +598,8 @@ export class OkxService {
             const avarageCost = Number(coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0);
             const minTakeProfitPrice = avarageCost * (1 + minTakeProfitRatio); // tối thiểu phải có lãi 5%
             if (!testing) {
-                this.emailService.sendEmail(process.env.EMAIL_TO, `Sell ${coin} status`, { info: `currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(Number(coinBalanceData?.data[0]?.details[0]?.spotUplRatio ?? 0)*100).toFixed(2)}% ${Number(coinBalanceData?.data[0]?.details[0]?.totalPnl ?? 0).toFixed(2)}USD, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}` });
-                this.logger.log(`SELL ${coin} currentPrice ${currentPrice}, avarageCost ${avarageCost}, profit: ${(Number(coinBalanceData?.data[0]?.details[0]?.spotUplRatio ?? 0)*100).toFixed(2)}% ${Number(coinBalanceData?.data[0]?.details[0]?.totalPnl ?? 0).toFixed(2)}USD, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}`, null, coin);
+                this.emailService.sendEmail(process.env.EMAIL_TO, `Sell ${coin} status`, { info: `currentPrice ${currentPrice.toFixed(priceToFixed)}, avarageCost ${avarageCost.toFixed(priceToFixed)}, profit: ${(Number(coinBalanceData?.data[0]?.details[0]?.spotUplRatio ?? 0)*100).toFixed(2)}% ${Number(coinBalanceData?.data[0]?.details[0]?.spotUpl ?? 0).toFixed(2)}USD${Number(coinBalanceData?.data[0]?.details[0]?.totalPnl ?? 0).toFixed(2)}USD` });
+                this.logger.log(`SELL ${coin} currentPrice ${currentPrice.toFixed(priceToFixed)}, avarageCost ${avarageCost.toFixed(priceToFixed)}, profit: ${(Number(coinBalanceData?.data[0]?.details[0]?.spotUplRatio ?? 0)*100).toFixed(2)}% ${Number(coinBalanceData?.data[0]?.details[0]?.spotUpl ?? 0).toFixed(2)}USD${Number(coinBalanceData?.data[0]?.details[0]?.totalPnl ?? 0).toFixed(2)}USD, minTakeProfitPrice ${minTakeProfitPrice}, minSellPrice ${minSellPrice}, maxSellPrice ${maxSellPrice}, stopLossPrice ${stopLossPrice}`, null, coin);
             }
             this.logger.log(`SELL ${coin} avarageCost: ${avarageCost} minTakeProfitPrice ${minTakeProfitPrice}: ${avarageCost > 0 ? (minTakeProfitPrice / avarageCost - 1) * 100 : 0 }%`, null, coin);
             try {
@@ -654,7 +654,7 @@ export class OkxService {
                 throw error;
             }
             if (!testing && data.length > 0) {
-                this.emailService.sendEmail(process.env.EMAIL_TO, `sell ${coin}`, data.map((item => `${item.body?.triggerPx}:${(item.body?.triggerPx - avarageCost)/avarageCost*100}%`)));
+                this.emailService.sendEmail(process.env.EMAIL_TO, `SELL ${coin}`, data.map((item => `${item.body?.triggerPx.toFixed(priceToFixed)}:${((item.body?.triggerPx - avarageCost)/avarageCost*100).toFixed(2)}%`)));
             }
             await this.sleep(5000 * 60);
             const price = await this.getTicker(instId);
