@@ -11,6 +11,26 @@ interface BuyTriggerRangeOptions {
     addStopLoss?: boolean;
 }
 
+export interface PendingBuyOrdersTotal {
+    coin: string;
+    instId: string;
+    quoteCurrency: string;
+    orderCount: number;
+    pricedOrderCount: number;
+    unpricedOrderCount: number;
+    totalAmount: number;
+}
+
+export interface AllPendingBuyOrdersTotal {
+    quoteCurrency: string;
+    coinCount: number;
+    orderCount: number;
+    pricedOrderCount: number;
+    unpricedOrderCount: number;
+    totalAmount: number;
+    coins: PendingBuyOrdersTotal[];
+}
+
 @Injectable()
 export class OkxService {
     constructor(
@@ -56,6 +76,106 @@ export class OkxService {
         const url = `${this.config.get<string>('okx.baseUrl')}/api/v5/market/ticker?instId=${instId}`;
         const res = await axios.get(url);
         return Number(res.data.data[0]?.last);
+    }
+
+    private async getPendingTriggerSpotOrders(coin?: string) {
+        const orders: any[] = [];
+        const normalizedCoin = coin?.toUpperCase();
+        const instId = normalizedCoin ? `${normalizedCoin}-USDT` : undefined;
+        let after: string | undefined;
+
+        while (true) {
+            const query = [
+                'instType=SPOT',
+                'ordType=trigger',
+                `limit=100`,
+                instId ? `instId=${encodeURIComponent(instId)}` : null,
+                after ? `after=${encodeURIComponent(after)}` : null,
+            ].filter(Boolean).join('&');
+            const getPath = `/api/v5/trade/orders-algo-pending?${query}`;
+            const timestamp = new Date().toISOString();
+            const getSign = this.sign(timestamp, 'GET', getPath);
+            const response = await axios.get(
+                this.config.get<string>('okx.baseUrl') + getPath,
+                {
+                    headers: {
+                        'OK-ACCESS-KEY': this.config.get<string>('okx.apiKey'),
+                        'OK-ACCESS-SIGN': getSign,
+                        'OK-ACCESS-TIMESTAMP': timestamp,
+                        'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphrase'),
+                    },
+                }
+            );
+
+            const page = response.data?.data || [];
+            orders.push(...page);
+
+            const nextAfter = page[page.length - 1]?.algoId;
+            if (page.length < 100 || !nextAfter || nextAfter === after) {
+                break;
+            }
+            after = nextAfter;
+        }
+
+        return orders;
+    }
+
+    private summarizePendingBuyOrders(orders: any[], instId: string): PendingBuyOrdersTotal {
+        const buyOrders = orders.filter((order: any) => (
+            order.side === 'buy' && order.instId === instId
+        ));
+        let pricedOrderCount = 0;
+        let totalAmount = 0;
+
+        for (const order of buyOrders) {
+            const orderPrice = Number(order.ordPx);
+            const size = Number(order.sz);
+            if (!Number.isFinite(orderPrice) || orderPrice <= 0 || !Number.isFinite(size) || size <= 0) {
+                continue;
+            }
+
+            pricedOrderCount++;
+            totalAmount += orderPrice * size;
+        }
+
+        return {
+            coin: instId.split('-')[0],
+            instId,
+            quoteCurrency: 'USDT',
+            orderCount: buyOrders.length,
+            pricedOrderCount,
+            unpricedOrderCount: buyOrders.length - pricedOrderCount,
+            totalAmount: Number(totalAmount.toFixed(8)),
+        };
+    }
+
+    async getPendingBuyOrdersTotalForCoin(coin: string): Promise<PendingBuyOrdersTotal> {
+        const normalizedCoin = coin.trim().toUpperCase();
+        const instId = `${normalizedCoin}-USDT`;
+        const orders = await this.getPendingTriggerSpotOrders(normalizedCoin);
+        return this.summarizePendingBuyOrders(orders, instId);
+    }
+
+    async getPendingBuyOrdersTotalForAllCoins(): Promise<AllPendingBuyOrdersTotal> {
+        const orders = await this.getPendingTriggerSpotOrders();
+        const instIds = Array.from(new Set(
+            orders
+                .filter((order: any) => order.side === 'buy' && String(order.instId).endsWith('-USDT'))
+                .map((order: any) => String(order.instId))
+        )).sort();
+        const coins = instIds.map((instId) => this.summarizePendingBuyOrders(orders, instId));
+
+        return {
+            quoteCurrency: 'USDT',
+            coinCount: coins.length,
+            orderCount: coins.reduce((total, item) => total + item.orderCount, 0),
+            pricedOrderCount: coins.reduce((total, item) => total + item.pricedOrderCount, 0),
+            unpricedOrderCount: coins.reduce((total, item) => total + item.unpricedOrderCount, 0),
+            totalAmount: Number(
+                coins.reduce((total, item) => total + item.totalAmount, 0).toFixed(8)
+            ),
+            coins,
+        };
     }
 
     async cancelOpenConditionSpotOrdersForOneCoin(coin: string, side: 'buy' | 'sell' | null = null, onlyForDown: boolean = false) {

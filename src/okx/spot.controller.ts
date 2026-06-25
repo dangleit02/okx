@@ -20,6 +20,16 @@ export class SpotController {
     return result;
   }
 
+  @Get('buy-orders-total/:coin')
+  async getBuyOrdersTotalForCoin(@Param('coin') coin: string) {
+    return this.okxService.getPendingBuyOrdersTotalForCoin(coin);
+  }
+
+  @Get('buy-orders-total-all-coins')
+  async getBuyOrdersTotalForAllCoins() {
+    return this.okxService.getPendingBuyOrdersTotalForAllCoins();
+  }
+
   @Post('buy-at-price/:coin')
   async buyAtPrice(
     @Param('coin') coin: string,
