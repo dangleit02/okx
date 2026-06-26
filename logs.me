@@ -1,4 +1,19 @@
-WIF
-[LOG] - Current price: 0.3971
-[LOG] - minBuyPrice: 0.401071, maxBuyPrice: 0.416955, stopLossPrice: 0.27797, amountOfUsdtRisk 40
-[LOG] - totalNnumberOfCoinWillBeBought: 287.80084181746224, numberOfBoughtCoin: 0, numberOfCoinWillBeBought: 287.80084181746224, totalCostByUsdt 119.99999999999997, costByUsdt: 119.99999999999997, numberOfSteps: 10
+dangle@dangles-MacBook-Air okx % curl -X GET 'http://localhost:3030/buy-orders-total/BTC?minPrice=50000&maxPrice=61000' \
+  -H "Content-Type: application/json"
+{"coin":"BTC","instId":"BTC-USDT","quoteCurrency":"USDT","orderCount":117,"pricedOrderCount":117,"unpricedOrderCount":0,"totalAmount":1404.00914248,"minPrice":50000,"maxPrice":61000}%                                                                              
+dangle@dangles-MacBook-Air okx % curl -X GET 'http://localhost:3030/buy-orders-total/BTC?minPrice=55000&maxPrice=61000' \
+  -H "Content-Type: application/json"
+{"coin":"BTC","instId":"BTC-USDT","quoteCurrency":"USDT","orderCount":32,"pricedOrderCount":32,"unpricedOrderCount":0,"totalAmount":384.00816634,"minPrice":55000,"maxPrice":61000}%                                                    
+dangle@dangles-MacBook-Air okx % curl -X GET 'http://localhost:3030/buy-orders-total/BTC?minPrice=50000&maxPrice=55000' \
+  -H "Content-Type: application/json"
+{"coin":"BTC","instId":"BTC-USDT","quoteCurrency":"USDT","orderCount":87,"pricedOrderCount":87,"unpricedOrderCount":0,"totalAmount":1044.00297614,"minPrice":50000,"maxPrice":55000}%                                                   
+dangle@dangles-MacBook-Air okx % curl -X GET 'http://localhost:3030/buy-orders-total/BTC?minPrice=40000&maxPrice=50000' \
+  -H "Content-Type: application/json"
+{"coin":"BTC","instId":"BTC-USDT","quoteCurrency":"USDT","orderCount":120,"pricedOrderCount":120,"unpricedOrderCount":0,"totalAmount":1440.00432667,"minPrice":40000,"maxPrice":50000}%                                                 
+dangle@dangles-MacBook-Air okx % curl -X GET 'http://localhost:3030/buy-orders-total/BTC?minPrice=45000&maxPrice=50000' \
+  -H "Content-Type: application/json"
+{"coin":"BTC","instId":"BTC-USDT","quoteCurrency":"USDT","orderCount":85,"pricedOrderCount":85,"unpricedOrderCount":0,"totalAmount":1019.99973337,"minPrice":45000,"maxPrice":50000}%                                                   
+dangle@dangles-MacBook-Air okx % curl -X GET 'http://localhost:3030/buy-orders-total/BTC?minPrice=40000&maxPrice=45000' \
+  -H "Content-Type: application/json"
+{"coin":"BTC","instId":"BTC-USDT","quoteCurrency":"USDT","orderCount":37,"pricedOrderCount":37,"unpricedOrderCount":0,"totalAmount":444.0075933,"minPrice":40000,"maxPrice":45000}%                                                     
+dangle@dangles-MacBook-Air okx % 

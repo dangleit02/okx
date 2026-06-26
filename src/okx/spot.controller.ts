@@ -21,8 +21,15 @@ export class SpotController {
   }
 
   @Get('buy-orders-total/:coin')
-  async getBuyOrdersTotalForCoin(@Param('coin') coin: string) {
-    return this.okxService.getPendingBuyOrdersTotalForCoin(coin);
+  async getBuyOrdersTotalForCoin(
+    @Param('coin') coin: string,
+    @Query('minPrice') minPrice?: string,
+    @Query('maxPrice') maxPrice?: string,
+  ) {
+    return this.okxService.getPendingBuyOrdersTotalForCoin(coin, {
+      minPrice: minPrice ? Number(minPrice) : undefined,
+      maxPrice: maxPrice ? Number(maxPrice) : undefined,
+    });
   }
 
   @Get('buy-orders-total-all-coins')

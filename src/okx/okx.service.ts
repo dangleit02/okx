@@ -11,10 +11,17 @@ interface BuyTriggerRangeOptions {
     addStopLoss?: boolean;
 }
 
+interface PendingBuyOrdersTotalOptions {
+    minPrice?: number;
+    maxPrice?: number;
+}
+
 export interface PendingBuyOrdersTotal {
     coin: string;
     instId: string;
     quoteCurrency: string;
+    minPrice?: number;
+    maxPrice?: number;
     orderCount: number;
     pricedOrderCount: number;
     unpricedOrderCount: number;
@@ -120,9 +127,11 @@ export class OkxService {
         return orders;
     }
 
-    private summarizePendingBuyOrders(orders: any[], instId: string): PendingBuyOrdersTotal {
+    private summarizePendingBuyOrders(orders: any[], instId: string, options: PendingBuyOrdersTotalOptions = {}): PendingBuyOrdersTotal {
         const buyOrders = orders.filter((order: any) => (
-            order.side === 'buy' && order.instId === instId
+            order.side === 'buy'
+            && order.instId === instId
+            && this.isOrderWithinPriceRange(order, options)
         ));
         let pricedOrderCount = 0;
         let totalAmount = 0;
@@ -138,7 +147,7 @@ export class OkxService {
             totalAmount += orderPrice * size;
         }
 
-        return {
+        const result: PendingBuyOrdersTotal = {
             coin: instId.split('-')[0],
             instId,
             quoteCurrency: 'USDT',
@@ -147,13 +156,53 @@ export class OkxService {
             unpricedOrderCount: buyOrders.length - pricedOrderCount,
             totalAmount: Number(totalAmount.toFixed(8)),
         };
+
+        if (options.minPrice !== undefined) {
+            result.minPrice = options.minPrice;
+        }
+        if (options.maxPrice !== undefined) {
+            result.maxPrice = options.maxPrice;
+        }
+
+        return result;
     }
 
-    async getPendingBuyOrdersTotalForCoin(coin: string): Promise<PendingBuyOrdersTotal> {
+    private isOrderWithinPriceRange(order: any, options: PendingBuyOrdersTotalOptions): boolean {
+        if (options.minPrice === undefined && options.maxPrice === undefined) {
+            return true;
+        }
+
+        const orderPrice = Number(order.ordPx);
+        if (!Number.isFinite(orderPrice)) {
+            return false;
+        }
+
+        if (options.minPrice !== undefined && orderPrice < options.minPrice) {
+            return false;
+        }
+
+        if (options.maxPrice !== undefined && orderPrice > options.maxPrice) {
+            return false;
+        }
+
+        return true;
+    }
+
+    async getPendingBuyOrdersTotalForCoin(coin: string, options: PendingBuyOrdersTotalOptions = {}): Promise<PendingBuyOrdersTotal> {
+        if (options.minPrice !== undefined && (!Number.isFinite(options.minPrice) || options.minPrice <= 0)) {
+            throw new Error(`Invalid minPrice: ${options.minPrice}`);
+        }
+        if (options.maxPrice !== undefined && (!Number.isFinite(options.maxPrice) || options.maxPrice <= 0)) {
+            throw new Error(`Invalid maxPrice: ${options.maxPrice}`);
+        }
+        if (options.minPrice !== undefined && options.maxPrice !== undefined && options.minPrice > options.maxPrice) {
+            throw new Error(`Invalid price range: minPrice (${options.minPrice}) must be less than or equal to maxPrice (${options.maxPrice})`);
+        }
+
         const normalizedCoin = coin.trim().toUpperCase();
         const instId = `${normalizedCoin}-USDT`;
         const orders = await this.getPendingTriggerSpotOrders(normalizedCoin);
-        return this.summarizePendingBuyOrders(orders, instId);
+        return this.summarizePendingBuyOrders(orders, instId, options);
     }
 
     async getPendingBuyOrdersTotalForAllCoins(): Promise<AllPendingBuyOrdersTotal> {
