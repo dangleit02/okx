@@ -548,7 +548,10 @@ export class OkxService {
                 throw error;
             }
             if (!testing && data.length > 0) {
-                this.emailService.sendEmail(process.env.EMAIL_TO, `buy ${coin}`, data.map((item => {return `${item.body?.triggerPx.toFixed(priceToFixed)}:${((item.body?.triggerPr - avarageCost)/avarageCost*100).toFixed(2)}%`})));
+                this.emailService.sendEmail(process.env.EMAIL_TO, `buy ${coin}`, data.map((item => {
+                    const triggerPx = Number(item.body?.triggerPx);
+                    return `${triggerPx.toFixed(priceToFixed)}:${((triggerPx - avarageCost) / avarageCost * 100).toFixed(2)}%`;
+                })));
             }
             await this.sleep(5000 * 60);
             const price = await this.getTicker(instId);
@@ -690,7 +693,9 @@ export class OkxService {
         }
 
         if (!testing && data.length > 0) {
-            this.emailService.sendEmail(process.env.EMAIL_TO, `buy range ${coin}`, data.map((item => `${item.body?.triggerPx.toFixed(priceToFixed)}:${item.body?.orderPx.toFixed(priceToFixed)}`)));
+            this.emailService.sendEmail(process.env.EMAIL_TO, `buy range ${coin}`, data.map((item =>
+                `${Number(item.body?.triggerPx).toFixed(priceToFixed)}:${Number(item.body?.orderPx).toFixed(priceToFixed)}`
+            )));
         }
 
         return data;
@@ -823,7 +828,10 @@ export class OkxService {
                 throw error;
             }
             if (!testing && data.length > 0) {
-                this.emailService.sendEmail(process.env.EMAIL_TO, `SELL ${coin}`, data.map((item => `${item.body?.triggerPx.toFixed(priceToFixed)}:${((item.body?.triggerPx - avarageCost)/avarageCost*100).toFixed(2)}%`)));
+                this.emailService.sendEmail(process.env.EMAIL_TO, `SELL ${coin}`, data.map((item => {
+                    const triggerPx = Number(item.body?.triggerPx);
+                    return `${triggerPx.toFixed(priceToFixed)}:${((triggerPx - avarageCost) / avarageCost * 100).toFixed(2)}%`;
+                })));
             }
             await this.sleep(5000 * 60);
             const price = await this.getTicker(instId);

@@ -3,7 +3,7 @@ export default () => ({
     buyWithoutCheckAvarageCost: true,
     runSpotTaskForSell: true,
     sellWithoutCheckAvarageCost: true,
-    minTakeProfitRatio: 0.05, // +5%
+    minTakeProfitRatio: -0.3, // +5%
     runSpotTaskHavingStopLoss: false,
     runSwapTaskForShort: false,
     runSwapTaskForLong: false,
@@ -515,8 +515,8 @@ export default () => ({
             priceToFixed: 9, // Số chữ số thập phân cho giá
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.01,
-            maxSellPriceRatio: 0.02,
+            minSellPriceRatio: 0.05,
+            maxSellPriceRatio: 0.06,
         },
         WIF: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -669,8 +669,8 @@ export default () => ({
             priceToFixed: 4, // Số chữ số thập phân cho giá
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.01,
-            maxSellPriceRatio: 0.02,
+            minSellPriceRatio: 0.05,
+            maxSellPriceRatio: 0.06,
         },
         XLM: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -805,8 +805,8 @@ export default () => ({
             priceToFixed: 2, // Số chữ số thập phân cho giá
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.01,
-            maxSellPriceRatio: 0.02,
+            minSellPriceRatio: 0.05,
+            maxSellPriceRatio: 0.06,
         },
         XRP: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
