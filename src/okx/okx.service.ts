@@ -193,16 +193,16 @@ export class OkxService {
             return true;
         }
 
-        const orderPrice = Number(order.ordPx);
-        if (!Number.isFinite(orderPrice)) {
+        const triggerPrice = Number(order.triggerPx);
+        if (!Number.isFinite(triggerPrice)) {
             return false;
         }
 
-        if (options.minPrice !== undefined && orderPrice < options.minPrice) {
+        if (options.minPrice !== undefined && triggerPrice < options.minPrice) {
             return false;
         }
 
-        if (options.maxPrice !== undefined && orderPrice > options.maxPrice) {
+        if (options.maxPrice !== undefined && triggerPrice > options.maxPrice) {
             return false;
         }
 
@@ -228,10 +228,10 @@ export class OkxService {
                     return false;
                 }
 
-                const orderPrice = Number(order.ordPx);
-                return Number.isFinite(orderPrice)
-                    && orderPrice >= rangeMinPrice
-                    && (maxPriceInclusive ? orderPrice <= rangeMaxPrice : orderPrice < rangeMaxPrice);
+                const triggerPrice = Number(order.triggerPx);
+                return Number.isFinite(triggerPrice)
+                    && triggerPrice >= rangeMinPrice
+                    && (maxPriceInclusive ? triggerPrice <= rangeMaxPrice : triggerPrice < rangeMaxPrice);
             });
             let totalAmount = 0;
 
@@ -328,6 +328,115 @@ export class OkxService {
             ),
             coins,
         };
+    }
+
+    async cancelPendingBuyOrdersByPriceRange(
+        coin: string,
+        minPrice: number,
+        maxPrice: number,
+        testing: boolean = true,
+    ) {
+        if (!Number.isFinite(minPrice) || minPrice <= 0) {
+            throw new Error(`Invalid minPrice: ${minPrice}`);
+        }
+        if (!Number.isFinite(maxPrice) || maxPrice <= 0) {
+            throw new Error(`Invalid maxPrice: ${maxPrice}`);
+        }
+        if (minPrice > maxPrice) {
+            throw new Error(`Invalid price range: minPrice (${minPrice}) must be less than or equal to maxPrice (${maxPrice})`);
+        }
+
+        const normalizedCoin = coin.trim().toUpperCase();
+        const instId = `${normalizedCoin}-USDT`;
+        const pendingOrders = await this.getPendingTriggerSpotOrders(normalizedCoin);
+        const matchedOrders = pendingOrders
+            .filter((order: any) => {
+                const triggerPrice = Number(order.triggerPx);
+                return order.side === 'buy'
+                    && order.instId === instId
+                    && Boolean(order.algoId)
+                    && Number.isFinite(triggerPrice)
+                    && triggerPrice >= minPrice
+                    && triggerPrice <= maxPrice;
+            })
+            .map((order: any) => {
+                const triggerPrice = Number(order.triggerPx);
+                const orderPrice = Number(order.ordPx);
+                const size = Number(order.sz);
+                return {
+                    algoId: String(order.algoId),
+                    triggerPrice,
+                    orderPrice,
+                    size: Number.isFinite(size) ? size : 0,
+                    amount: Number.isFinite(size) ? Number((orderPrice * size).toFixed(8)) : 0,
+                };
+            });
+        const totalAmount = Number(
+            matchedOrders.reduce((total, order) => total + order.amount, 0).toFixed(8)
+        );
+        const baseResult = {
+            coin: normalizedCoin,
+            instId,
+            minPrice,
+            maxPrice,
+            testing,
+            matchedOrderCount: matchedOrders.length,
+            totalAmount,
+            orders: matchedOrders,
+        };
+
+        if (testing) {
+            return {
+                status: 'preview',
+                ...baseResult,
+            };
+        }
+
+        if (matchedOrders.length === 0) {
+            return {
+                status: 'no_matching_orders',
+                ...baseResult,
+                cancelledOrderCount: 0,
+                failedOrderCount: 0,
+                responses: [],
+            };
+        }
+
+        const chunks = this.chunk(
+            matchedOrders.map((order) => ({ algoId: order.algoId, instId })),
+            20,
+        );
+        const responses: any[] = [];
+        let cancelledOrderCount = 0;
+        let failedOrderCount = 0;
+
+        for (const ordersToCancel of chunks) {
+            const cancelPath = '/api/v5/trade/cancel-algos';
+            const bodyString = JSON.stringify(ordersToCancel);
+            const timestamp = new Date().toISOString();
+            const headers = this.buildHeaders(timestamp, 'POST', cancelPath, bodyString);
+            const response = await axios.post(
+                this.config.get<string>('okx.baseUrl') + cancelPath,
+                bodyString,
+                { headers },
+            );
+            const responseItems = response.data?.data ?? [];
+
+            cancelledOrderCount += responseItems.filter((item: any) => String(item.sCode) === '0').length;
+            failedOrderCount += responseItems.filter((item: any) => String(item.sCode) !== '0').length
+                + Math.max(ordersToCancel.length - responseItems.length, 0);
+            responses.push(response.data);
+        }
+
+        const result = {
+            status: failedOrderCount === 0 ? 'cancelled' : 'partially_cancelled',
+            ...baseResult,
+            cancelledOrderCount,
+            failedOrderCount,
+            responses,
+        };
+        this.logger.log(JSON.stringify(result, null, 2), 'Cancel pending BUY orders by price range', normalizedCoin);
+        return result;
     }
 
     async cancelOpenConditionSpotOrdersForOneCoin(coin: string, side: 'buy' | 'sell' | null = null, onlyForDown: boolean = false) {

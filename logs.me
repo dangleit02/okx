@@ -1,19 +1,32 @@
-dangle@dangles-MacBook-Air okx % curl -X GET 'http://localhost:3030/buy-orders-total/BTC?minPrice=50000&maxPrice=61000' \
+curl -X GET 'http://localhost:3030/buy-orders-total/BTC?minPrice=38000&maxPrice=62000&priceStep=1000&format=table' \
   -H "Content-Type: application/json"
-{"coin":"BTC","instId":"BTC-USDT","quoteCurrency":"USDT","orderCount":117,"pricedOrderCount":117,"unpricedOrderCount":0,"totalAmount":1404.00914248,"minPrice":50000,"maxPrice":61000}%                                                                              
-dangle@dangles-MacBook-Air okx % curl -X GET 'http://localhost:3030/buy-orders-total/BTC?minPrice=55000&maxPrice=61000' \
-  -H "Content-Type: application/json"
-{"coin":"BTC","instId":"BTC-USDT","quoteCurrency":"USDT","orderCount":32,"pricedOrderCount":32,"unpricedOrderCount":0,"totalAmount":384.00816634,"minPrice":55000,"maxPrice":61000}%                                                    
-dangle@dangles-MacBook-Air okx % curl -X GET 'http://localhost:3030/buy-orders-total/BTC?minPrice=50000&maxPrice=55000' \
-  -H "Content-Type: application/json"
-{"coin":"BTC","instId":"BTC-USDT","quoteCurrency":"USDT","orderCount":87,"pricedOrderCount":87,"unpricedOrderCount":0,"totalAmount":1044.00297614,"minPrice":50000,"maxPrice":55000}%                                                   
-dangle@dangles-MacBook-Air okx % curl -X GET 'http://localhost:3030/buy-orders-total/BTC?minPrice=40000&maxPrice=50000' \
-  -H "Content-Type: application/json"
-{"coin":"BTC","instId":"BTC-USDT","quoteCurrency":"USDT","orderCount":120,"pricedOrderCount":120,"unpricedOrderCount":0,"totalAmount":1440.00432667,"minPrice":40000,"maxPrice":50000}%                                                 
-dangle@dangles-MacBook-Air okx % curl -X GET 'http://localhost:3030/buy-orders-total/BTC?minPrice=45000&maxPrice=50000' \
-  -H "Content-Type: application/json"
-{"coin":"BTC","instId":"BTC-USDT","quoteCurrency":"USDT","orderCount":85,"pricedOrderCount":85,"unpricedOrderCount":0,"totalAmount":1019.99973337,"minPrice":45000,"maxPrice":50000}%                                                   
-dangle@dangles-MacBook-Air okx % curl -X GET 'http://localhost:3030/buy-orders-total/BTC?minPrice=40000&maxPrice=45000' \
-  -H "Content-Type: application/json"
-{"coin":"BTC","instId":"BTC-USDT","quoteCurrency":"USDT","orderCount":37,"pricedOrderCount":37,"unpricedOrderCount":0,"totalAmount":444.0075933,"minPrice":40000,"maxPrice":45000}%                                                     
-dangle@dangles-MacBook-Air okx % 
+BTC-USDT pending BUY orders
+Filter: minPrice=38000, maxPrice=62000, priceStep=1000
+Summary: 186 orders | 2231.97901524 USDT
+
+FROM PRICE | TO PRICE | AMOUNT (USDT)
+-----------+----------+--------------
+38000      | 39000    | 12.0003      
+39000      | 40000    | 108.00375481 
+40000      | 41000    | 96.0016158   
+41000      | 42000    | 119.99419564 
+42000      | 43000    | 95.99739771  
+43000      | 44000    | 107.9973742  
+44000      | 45000    | 95.9986114   
+45000      | 46000    | 95.9964163   
+46000      | 47000    | 96.00040907  
+47000      | 48000    | 107.99766246 
+48000      | 49000    | 107.99701616 
+49000      | 50000    | 96.00361689  
+50000      | 51000    | 96.00272884  
+51000      | 52000    | 107.99670887 
+52000      | 53000    | 108.00374491 
+53000      | 54000    | 96.00058136  
+54000      | 55000    | 107.99650104 
+55000      | 56000    | 96.00010054  
+56000      | 57000    | 95.99708878  
+57000      | 58000    | 95.9986102   
+58000      | 59000    | 96.00180806  
+59000      | 60000    | 96.00373864  
+60000      | 61000    | 95.98903356  
+61000      | 62000    | 0  

@@ -33,13 +33,21 @@ describe('SpotController buy order total response format', () => {
 
   let controller: SpotController;
   let logger: { log: jest.Mock };
+  let okxService: {
+    getPendingBuyOrdersTotalForCoin: jest.Mock;
+    cancelPendingBuyOrdersByPriceRange: jest.Mock;
+  };
 
   beforeEach(() => {
     logger = { log: jest.fn() };
+    okxService = {
+      getPendingBuyOrdersTotalForCoin: jest.fn().mockResolvedValue(response),
+      cancelPendingBuyOrdersByPriceRange: jest.fn().mockResolvedValue({
+        status: 'preview',
+      }),
+    };
     controller = new SpotController(
-      {
-        getPendingBuyOrdersTotalForCoin: jest.fn().mockResolvedValue(response),
-      } as any,
+      okxService as any,
       {} as any,
       logger as any,
     );
@@ -80,6 +88,22 @@ describe('SpotController buy order total response format', () => {
       JSON.stringify(response, null, 2),
       'Pending buy orders JSON',
       'BTC',
+    );
+  });
+
+  it('defaults deletion to preview mode', async () => {
+    const result = await controller.deleteBuyOrdersByPriceRange(
+      'BTC',
+      '40000',
+      '50000',
+    );
+
+    expect(result).toEqual({ status: 'preview' });
+    expect(okxService.cancelPendingBuyOrdersByPriceRange).toHaveBeenCalledWith(
+      'BTC',
+      40000,
+      50000,
+      true,
     );
   });
 });

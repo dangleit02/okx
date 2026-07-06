@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { OkxService, PendingBuyOrdersTotalResponse } from './okx.service';
 import { ConfigService } from '@nestjs/config';
 import { AppLogger } from '../logger/logger.service';
@@ -206,6 +206,21 @@ export class SpotController {
     @Query('side') side?: 'buy' | 'sell' | null,
   ) {
     return await this.okxService.cancelOpenConditionSpotOrdersForOneCoin(coin, side);
+  }
+
+  @Delete('buy-orders/:coin')
+  async deleteBuyOrdersByPriceRange(
+    @Param('coin') coin: string,
+    @Query('minPrice') minPrice?: string,
+    @Query('maxPrice') maxPrice?: string,
+    @Query('testing') testing?: string,
+  ) {
+    return this.okxService.cancelPendingBuyOrdersByPriceRange(
+      coin,
+      Number(minPrice),
+      Number(maxPrice),
+      testing !== 'false',
+    );
   }
 
   // @Post('order-multiple/:coin')
