@@ -1,9 +1,9 @@
 import { Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { OkxService } from './okx.service';
+import { OkxService, PendingBuyOrdersTotalResponse } from './okx.service';
 import { ConfigService } from '@nestjs/config';
 import { AppLogger } from '../logger/logger.service';
 import * as _ from 'lodash';
-import { parseBool } from 'src/common/util';
+import { parseBool } from '../common/util';
 
 @Controller()
 export class SpotController {
@@ -25,11 +25,57 @@ export class SpotController {
     @Param('coin') coin: string,
     @Query('minPrice') minPrice?: string,
     @Query('maxPrice') maxPrice?: string,
+    @Query('priceStep') priceStep?: string,
+    @Query('format') format: string = 'json',
   ) {
-    return this.okxService.getPendingBuyOrdersTotalForCoin(coin, {
+    const result = await this.okxService.getPendingBuyOrdersTotalForCoin(coin, {
       minPrice: minPrice ? Number(minPrice) : undefined,
       maxPrice: maxPrice ? Number(maxPrice) : undefined,
+      priceStep: priceStep ? Number(priceStep) : undefined,
     });
+
+    if (format.toLowerCase() === 'table') {
+      const table = this.formatPendingBuyOrdersAsTable(result);
+      this.logger.log(table, 'Pending buy orders table', coin.toUpperCase());
+      return table;
+    }
+
+    this.logger.log(
+      JSON.stringify(result, null, 2),
+      'Pending buy orders JSON',
+      coin.toUpperCase(),
+    );
+    return result;
+  }
+
+  private formatPendingBuyOrdersAsTable(
+    result: PendingBuyOrdersTotalResponse,
+  ): string {
+    const headers = ['FROM PRICE', 'TO PRICE', `AMOUNT (${result.quoteCurrency})`];
+    const rows = (result.ranges ?? []).map((range) => [
+      String(range.fromPrice),
+      String(range.toPrice),
+      String(range.amount),
+    ]);
+    const widths = headers.map((header, index) =>
+      Math.max(header.length, ...rows.map((row) => row[index].length)),
+    );
+    const formatRow = (row: string[]) =>
+      row.map((value, index) => value.padEnd(widths[index])).join(' | ');
+    const separator = widths.map((width) => '-'.repeat(width)).join('-+-');
+    const filter = Object.entries(result.filter)
+      .map(([key, value]) => `${key}=${value}`)
+      .join(', ');
+
+    return [
+      `${result.instId} pending BUY orders`,
+      `Filter: ${filter || 'none'}`,
+      `Summary: ${result.summary.orderCount} orders | ${result.summary.totalAmount} ${result.quoteCurrency}`,
+      '',
+      formatRow(headers),
+      separator,
+      ...(rows.length > 0 ? rows.map(formatRow) : ['No matching orders']),
+    ].join('\n');
   }
 
   @Get('buy-orders-total-all-coins')

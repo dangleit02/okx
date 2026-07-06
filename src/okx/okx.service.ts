@@ -2,18 +2,39 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import axios from 'axios';
-import { AppLogger } from 'src/logger/logger.service';
+import { AppLogger } from '../logger/logger.service';
 import * as _ from 'lodash';
-import { EmailService } from 'src/email/email.service';
+import { EmailService } from '../email/email.service';
 
 interface BuyTriggerRangeOptions {
     numberOfOrders?: number;
     addStopLoss?: boolean;
 }
 
-interface PendingBuyOrdersTotalOptions {
+export interface PendingBuyOrdersTotalOptions {
     minPrice?: number;
     maxPrice?: number;
+    priceStep?: number;
+}
+
+export interface PendingBuyOrdersRangeTotal {
+    fromPrice: number;
+    toPrice: number;
+    amount: number;
+}
+
+export interface PendingBuyOrdersTotalResponse {
+    coin: string;
+    instId: string;
+    quoteCurrency: string;
+    filter: PendingBuyOrdersTotalOptions;
+    summary: {
+        orderCount: number;
+        pricedOrderCount: number;
+        unpricedOrderCount: number;
+        totalAmount: number;
+    };
+    ranges?: PendingBuyOrdersRangeTotal[];
 }
 
 export interface PendingBuyOrdersTotal {
@@ -188,7 +209,51 @@ export class OkxService {
         return true;
     }
 
-    async getPendingBuyOrdersTotalForCoin(coin: string, options: PendingBuyOrdersTotalOptions = {}): Promise<PendingBuyOrdersTotal> {
+    private summarizePendingBuyOrdersByPriceStep(
+        orders: any[],
+        instId: string,
+        minPrice: number,
+        maxPrice: number,
+        priceStep: number,
+    ): PendingBuyOrdersRangeTotal[] {
+        const rawRangeCount = (maxPrice - minPrice) / priceStep;
+        const rangeCount = Math.max(1, Math.ceil(Number(rawRangeCount.toPrecision(12))));
+
+        return Array.from({ length: rangeCount }, (_, index) => {
+            const rangeMinPrice = Number((minPrice + index * priceStep).toPrecision(15));
+            const rangeMaxPrice = Number(Math.min(minPrice + (index + 1) * priceStep, maxPrice).toPrecision(15));
+            const maxPriceInclusive = index === rangeCount - 1;
+            const rangeOrders = orders.filter((order: any) => {
+                if (order.side !== 'buy' || order.instId !== instId) {
+                    return false;
+                }
+
+                const orderPrice = Number(order.ordPx);
+                return Number.isFinite(orderPrice)
+                    && orderPrice >= rangeMinPrice
+                    && (maxPriceInclusive ? orderPrice <= rangeMaxPrice : orderPrice < rangeMaxPrice);
+            });
+            let totalAmount = 0;
+
+            for (const order of rangeOrders) {
+                const orderPrice = Number(order.ordPx);
+                const size = Number(order.sz);
+                if (orderPrice <= 0 || !Number.isFinite(size) || size <= 0) {
+                    continue;
+                }
+
+                totalAmount += orderPrice * size;
+            }
+
+            return {
+                fromPrice: rangeMinPrice,
+                toPrice: rangeMaxPrice,
+                amount: Number(totalAmount.toFixed(8)),
+            };
+        });
+    }
+
+    async getPendingBuyOrdersTotalForCoin(coin: string, options: PendingBuyOrdersTotalOptions = {}): Promise<PendingBuyOrdersTotalResponse> {
         if (options.minPrice !== undefined && (!Number.isFinite(options.minPrice) || options.minPrice <= 0)) {
             throw new Error(`Invalid minPrice: ${options.minPrice}`);
         }
@@ -198,11 +263,49 @@ export class OkxService {
         if (options.minPrice !== undefined && options.maxPrice !== undefined && options.minPrice > options.maxPrice) {
             throw new Error(`Invalid price range: minPrice (${options.minPrice}) must be less than or equal to maxPrice (${options.maxPrice})`);
         }
+        if (options.priceStep !== undefined && (!Number.isFinite(options.priceStep) || options.priceStep <= 0)) {
+            throw new Error(`Invalid priceStep: ${options.priceStep}`);
+        }
+        if (options.priceStep !== undefined && (options.minPrice === undefined || options.maxPrice === undefined)) {
+            throw new Error('minPrice and maxPrice are required when priceStep is provided');
+        }
+        if (
+            options.priceStep !== undefined
+            && options.minPrice !== undefined
+            && options.maxPrice !== undefined
+            && Math.ceil(Number(((options.maxPrice - options.minPrice) / options.priceStep).toPrecision(12))) > 10000
+        ) {
+            throw new Error('priceStep creates more than 10000 price ranges');
+        }
 
         const normalizedCoin = coin.trim().toUpperCase();
         const instId = `${normalizedCoin}-USDT`;
         const orders = await this.getPendingTriggerSpotOrders(normalizedCoin);
-        return this.summarizePendingBuyOrders(orders, instId, options);
+        const total = this.summarizePendingBuyOrders(orders, instId, options);
+        const result: PendingBuyOrdersTotalResponse = {
+            coin: total.coin,
+            instId: total.instId,
+            quoteCurrency: total.quoteCurrency,
+            filter: { ...options },
+            summary: {
+                orderCount: total.orderCount,
+                pricedOrderCount: total.pricedOrderCount,
+                unpricedOrderCount: total.unpricedOrderCount,
+                totalAmount: total.totalAmount,
+            },
+        };
+
+        if (options.priceStep !== undefined && options.minPrice !== undefined && options.maxPrice !== undefined) {
+            result.ranges = this.summarizePendingBuyOrdersByPriceStep(
+                orders,
+                instId,
+                options.minPrice,
+                options.maxPrice,
+                options.priceStep,
+            );
+        }
+
+        return result;
     }
 
     async getPendingBuyOrdersTotalForAllCoins(): Promise<AllPendingBuyOrdersTotal> {
