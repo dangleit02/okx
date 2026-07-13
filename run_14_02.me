@@ -19,7 +19,7 @@ curl -X DELETE 'http://localhost:3030/buy-orders/BTC?minPrice=40000&maxPrice=500
 
 # get total amount of pending buy orders for all coins
 curl -X GET 'http://localhost:3030/buy-orders-total-all-coins' \
-  -H "Content-Type: application/json"
+  -H "Content-Type: text/plain"
 
 # remove all trigger sell orders
 curl -X POST "http://localhost:3030/sell-at-price-all-coins?\

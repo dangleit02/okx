@@ -156,10 +156,18 @@ export class OkxService {
         ));
         let pricedOrderCount = 0;
         let totalAmount = 0;
+        let minPrice: number | undefined;
+        let maxPrice: number | undefined;
 
         for (const order of buyOrders) {
+            const triggerPrice = Number(order.triggerPx);
             const orderPrice = Number(order.ordPx);
             const size = Number(order.sz);
+            if (Number.isFinite(triggerPrice) && triggerPrice > 0) {
+                minPrice = minPrice === undefined ? triggerPrice : Math.min(minPrice, triggerPrice);
+                maxPrice = maxPrice === undefined ? triggerPrice : Math.max(maxPrice, triggerPrice);
+            }
+
             if (!Number.isFinite(orderPrice) || orderPrice <= 0 || !Number.isFinite(size) || size <= 0) {
                 continue;
             }
@@ -178,11 +186,11 @@ export class OkxService {
             totalAmount: Number(totalAmount.toFixed(8)),
         };
 
-        if (options.minPrice !== undefined) {
-            result.minPrice = options.minPrice;
+        if (minPrice !== undefined) {
+            result.minPrice = minPrice;
         }
-        if (options.maxPrice !== undefined) {
-            result.maxPrice = options.maxPrice;
+        if (maxPrice !== undefined) {
+            result.maxPrice = maxPrice;
         }
 
         return result;
@@ -207,6 +215,32 @@ export class OkxService {
         }
 
         return true;
+    }
+
+    private validatePendingBuyOrdersTotalOptions(options: PendingBuyOrdersTotalOptions) {
+        if (options.minPrice !== undefined && (!Number.isFinite(options.minPrice) || options.minPrice <= 0)) {
+            throw new Error(`Invalid minPrice: ${options.minPrice}`);
+        }
+        if (options.maxPrice !== undefined && (!Number.isFinite(options.maxPrice) || options.maxPrice <= 0)) {
+            throw new Error(`Invalid maxPrice: ${options.maxPrice}`);
+        }
+        if (options.minPrice !== undefined && options.maxPrice !== undefined && options.minPrice > options.maxPrice) {
+            throw new Error(`Invalid price range: minPrice (${options.minPrice}) must be less than or equal to maxPrice (${options.maxPrice})`);
+        }
+        if (options.priceStep !== undefined && (!Number.isFinite(options.priceStep) || options.priceStep <= 0)) {
+            throw new Error(`Invalid priceStep: ${options.priceStep}`);
+        }
+        if (options.priceStep !== undefined && (options.minPrice === undefined || options.maxPrice === undefined)) {
+            throw new Error('minPrice and maxPrice are required when priceStep is provided');
+        }
+        if (
+            options.priceStep !== undefined
+            && options.minPrice !== undefined
+            && options.maxPrice !== undefined
+            && Math.ceil(Number(((options.maxPrice - options.minPrice) / options.priceStep).toPrecision(12))) > 10000
+        ) {
+            throw new Error('priceStep creates more than 10000 price ranges');
+        }
     }
 
     private summarizePendingBuyOrdersByPriceStep(
@@ -254,29 +288,7 @@ export class OkxService {
     }
 
     async getPendingBuyOrdersTotalForCoin(coin: string, options: PendingBuyOrdersTotalOptions = {}): Promise<PendingBuyOrdersTotalResponse> {
-        if (options.minPrice !== undefined && (!Number.isFinite(options.minPrice) || options.minPrice <= 0)) {
-            throw new Error(`Invalid minPrice: ${options.minPrice}`);
-        }
-        if (options.maxPrice !== undefined && (!Number.isFinite(options.maxPrice) || options.maxPrice <= 0)) {
-            throw new Error(`Invalid maxPrice: ${options.maxPrice}`);
-        }
-        if (options.minPrice !== undefined && options.maxPrice !== undefined && options.minPrice > options.maxPrice) {
-            throw new Error(`Invalid price range: minPrice (${options.minPrice}) must be less than or equal to maxPrice (${options.maxPrice})`);
-        }
-        if (options.priceStep !== undefined && (!Number.isFinite(options.priceStep) || options.priceStep <= 0)) {
-            throw new Error(`Invalid priceStep: ${options.priceStep}`);
-        }
-        if (options.priceStep !== undefined && (options.minPrice === undefined || options.maxPrice === undefined)) {
-            throw new Error('minPrice and maxPrice are required when priceStep is provided');
-        }
-        if (
-            options.priceStep !== undefined
-            && options.minPrice !== undefined
-            && options.maxPrice !== undefined
-            && Math.ceil(Number(((options.maxPrice - options.minPrice) / options.priceStep).toPrecision(12))) > 10000
-        ) {
-            throw new Error('priceStep creates more than 10000 price ranges');
-        }
+        this.validatePendingBuyOrdersTotalOptions(options);
 
         const normalizedCoin = coin.trim().toUpperCase();
         const instId = `${normalizedCoin}-USDT`;
@@ -308,14 +320,18 @@ export class OkxService {
         return result;
     }
 
-    async getPendingBuyOrdersTotalForAllCoins(): Promise<AllPendingBuyOrdersTotal> {
+    async getPendingBuyOrdersTotalForAllCoins(options: PendingBuyOrdersTotalOptions = {}): Promise<AllPendingBuyOrdersTotal> {
+        this.validatePendingBuyOrdersTotalOptions(options);
+
         const orders = await this.getPendingTriggerSpotOrders();
         const instIds = Array.from(new Set(
             orders
                 .filter((order: any) => order.side === 'buy' && String(order.instId).endsWith('-USDT'))
                 .map((order: any) => String(order.instId))
         )).sort();
-        const coins = instIds.map((instId) => this.summarizePendingBuyOrders(orders, instId));
+        const coins = instIds
+            .map((instId) => this.summarizePendingBuyOrders(orders, instId, options))
+            .filter((item) => item.orderCount > 0);
 
         return {
             quoteCurrency: 'USDT',

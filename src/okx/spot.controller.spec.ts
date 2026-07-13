@@ -1,5 +1,5 @@
 import { SpotController } from './spot.controller';
-import { PendingBuyOrdersTotalResponse } from './okx.service';
+import { AllPendingBuyOrdersTotal, PendingBuyOrdersTotalResponse } from './okx.service';
 
 describe('SpotController buy order total response format', () => {
   const response: PendingBuyOrdersTotalResponse = {
@@ -30,11 +30,44 @@ describe('SpotController buy order total response format', () => {
       },
     ],
   };
+  const allCoinsResponse: AllPendingBuyOrdersTotal = {
+    quoteCurrency: 'USDT',
+    coinCount: 2,
+    orderCount: 3,
+    pricedOrderCount: 3,
+    unpricedOrderCount: 0,
+    totalAmount: 1335,
+    coins: [
+      {
+        coin: 'ADA',
+        instId: 'ADA-USDT',
+        quoteCurrency: 'USDT',
+        minPrice: 0.4,
+        maxPrice: 0.45,
+        orderCount: 2,
+        pricedOrderCount: 2,
+        unpricedOrderCount: 0,
+        totalAmount: 425,
+      },
+      {
+        coin: 'BTC',
+        instId: 'BTC-USDT',
+        quoteCurrency: 'USDT',
+        minPrice: 45000,
+        maxPrice: 50000,
+        orderCount: 1,
+        pricedOrderCount: 1,
+        unpricedOrderCount: 0,
+        totalAmount: 910,
+      },
+    ],
+  };
 
   let controller: SpotController;
   let logger: { log: jest.Mock };
   let okxService: {
     getPendingBuyOrdersTotalForCoin: jest.Mock;
+    getPendingBuyOrdersTotalForAllCoins: jest.Mock;
     cancelPendingBuyOrdersByPriceRange: jest.Mock;
   };
 
@@ -42,6 +75,7 @@ describe('SpotController buy order total response format', () => {
     logger = { log: jest.fn() };
     okxService = {
       getPendingBuyOrdersTotalForCoin: jest.fn().mockResolvedValue(response),
+      getPendingBuyOrdersTotalForAllCoins: jest.fn().mockResolvedValue(allCoinsResponse),
       cancelPendingBuyOrdersByPriceRange: jest.fn().mockResolvedValue({
         status: 'preview',
       }),
@@ -50,6 +84,37 @@ describe('SpotController buy order total response format', () => {
       okxService as any,
       {} as any,
       logger as any,
+    );
+  });
+
+  it('returns a compact all-coins table by default', async () => {
+    const result = await controller.getBuyOrdersTotalForAllCoins();
+
+    expect(result).toContain('COIN | MIN PRICE | MAX PRICE | AMOUNT (USD)');
+    expect(result).toContain('ADA  | 0.4       | 0.45      | 425');
+    expect(result).toContain('BTC  | 45000     | 50000     | 910');
+    expect(result).not.toContain('Summary:');
+    expect(okxService.getPendingBuyOrdersTotalForAllCoins).toHaveBeenCalledWith({
+      minPrice: undefined,
+      maxPrice: undefined,
+    });
+    expect(logger.log).toHaveBeenCalledWith(
+      result,
+      'Pending buy orders all coins table',
+    );
+  });
+
+  it('keeps JSON available for all-coins when format=json', async () => {
+    const result = await controller.getBuyOrdersTotalForAllCoins(
+      undefined,
+      undefined,
+      'json',
+    );
+
+    expect(result).toBe(allCoinsResponse);
+    expect(logger.log).toHaveBeenCalledWith(
+      JSON.stringify(allCoinsResponse, null, 2),
+      'Pending buy orders all coins JSON',
     );
   });
 

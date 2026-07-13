@@ -136,6 +136,64 @@ describe('OkxService pending buy order totals', () => {
       { fromPrice: 0.2, toPrice: 0.3 },
     ]);
   });
+
+  it('summarizes all coins with min and max pending buy trigger prices', async () => {
+    jest
+      .spyOn(service as any, 'getPendingTriggerSpotOrders')
+      .mockResolvedValue([
+        {
+          algoId: '1',
+          instId: 'BTC-USDT',
+          side: 'buy',
+          triggerPx: '45000',
+          ordPx: '45500',
+          sz: '0.01',
+        },
+        {
+          algoId: '2',
+          instId: 'BTC-USDT',
+          side: 'buy',
+          triggerPx: '40000',
+          ordPx: '40500',
+          sz: '0.02',
+        },
+        {
+          algoId: '3',
+          instId: 'ADA-USDT',
+          side: 'buy',
+          triggerPx: '0.45',
+          ordPx: '0.45',
+          sz: '1000',
+        },
+        {
+          algoId: '4',
+          instId: 'ADA-USDT',
+          side: 'sell',
+          triggerPx: '0.5',
+          ordPx: '0.5',
+          sz: '1000',
+        },
+      ]);
+
+    const result = await service.getPendingBuyOrdersTotalForAllCoins();
+
+    expect(result.coinCount).toBe(2);
+    expect(result.totalAmount).toBe(1715);
+    expect(result.coins).toEqual([
+      expect.objectContaining({
+        coin: 'ADA',
+        minPrice: 0.45,
+        maxPrice: 0.45,
+        totalAmount: 450,
+      }),
+      expect.objectContaining({
+        coin: 'BTC',
+        minPrice: 40000,
+        maxPrice: 45000,
+        totalAmount: 1265,
+      }),
+    ]);
+  });
 });
 
 describe('OkxService cancel pending buy orders by price range', () => {

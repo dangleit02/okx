@@ -1,5 +1,5 @@
 import { Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
-import { OkxService, PendingBuyOrdersTotalResponse } from './okx.service';
+import { AllPendingBuyOrdersTotal, OkxService, PendingBuyOrdersTotalResponse } from './okx.service';
 import { ConfigService } from '@nestjs/config';
 import { AppLogger } from '../logger/logger.service';
 import * as _ from 'lodash';
@@ -79,8 +79,51 @@ export class SpotController {
   }
 
   @Get('buy-orders-total-all-coins')
-  async getBuyOrdersTotalForAllCoins() {
-    return this.okxService.getPendingBuyOrdersTotalForAllCoins();
+  async getBuyOrdersTotalForAllCoins(
+    @Query('minPrice') minPrice?: string,
+    @Query('maxPrice') maxPrice?: string,
+    @Query('format') format: string = 'table',
+  ) {
+    const result = await this.okxService.getPendingBuyOrdersTotalForAllCoins({
+      minPrice: minPrice ? Number(minPrice) : undefined,
+      maxPrice: maxPrice ? Number(maxPrice) : undefined,
+    });
+
+    if (format.toLowerCase() === 'json') {
+      this.logger.log(
+        JSON.stringify(result, null, 2),
+        'Pending buy orders all coins JSON',
+      );
+      return result;
+    }
+
+    const table = this.formatAllPendingBuyOrdersAsTable(result);
+    this.logger.log(table, 'Pending buy orders all coins table');
+    return table;
+  }
+
+  private formatAllPendingBuyOrdersAsTable(
+    result: AllPendingBuyOrdersTotal,
+  ): string {
+    const headers = ['COIN', 'MIN PRICE', 'MAX PRICE', 'AMOUNT (USD)'];
+    const rows = result.coins.map((coin) => [
+      coin.coin,
+      coin.minPrice === undefined ? '' : String(coin.minPrice),
+      coin.maxPrice === undefined ? '' : String(coin.maxPrice),
+      String(coin.totalAmount),
+    ]);
+    const widths = headers.map((header, index) =>
+      Math.max(header.length, ...rows.map((row) => row[index].length)),
+    );
+    const formatRow = (row: string[]) =>
+      row.map((value, index) => value.padEnd(widths[index])).join(' | ');
+    const separator = widths.map((width) => '-'.repeat(width)).join('-+-');
+
+    return [
+      formatRow(headers),
+      separator,
+      ...rows.map(formatRow),
+    ].join('\n');
   }
 
   @Post('buy-at-price/:coin')

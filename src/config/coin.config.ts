@@ -87,11 +87,11 @@ export default () => ({
         // 'BTC',
         'ETH',
         // 'ADA',
-        'PEPE',
+        // 'PEPE',
         // TOP 100
         // 'BTC',
         // 'ETH',
-        // 'XRP',
+    // 'XRP',
         // 'BNB',
         // 'SOL',
         // 'DOGE',
@@ -246,6 +246,10 @@ export default () => ({
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 8, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
+            minBuyPriceRatio: 0.01,
+            maxBuyPriceRatio: 0.02,
+            minSellPriceRatio: 0.05,
+            maxSellPriceRatio: 0.06,
         },
         DOGS: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -672,6 +676,22 @@ export default () => ({
             minSellPriceRatio: 0.05,
             maxSellPriceRatio: 0.06,
         },
+        LTC: {
+            maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
+            currentPrice: 0.8589, // Giá hiện tại (USDT)
+            minBuyPrice: 0.5467, // Giá mua thấp nhất (USDT)
+            maxBuyPrice: 0.6163, // Giá mua cao nhất (USDT)
+            stopLossPrice: 0.5034, // Giá dừng lỗ (USDT)
+            amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
+            riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
+            addForTriggerPrice: 0.0001, // Đơn vị giá để tính giá kích hoạt
+            szToFixed: 6, // Số chữ số thập phân cho khối lượng
+            priceToFixed: 2, // Số chữ số thập phân cho giá
+            minBuyPriceRatio: 0.01,
+            maxBuyPriceRatio: 0.02,
+            minSellPriceRatio: 0.05,
+            maxSellPriceRatio: 0.06,
+        },
         XLM: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
             // currentPrice: 0.0000261, // Giá hiện tại (USDT)
@@ -683,6 +703,10 @@ export default () => ({
             addForTriggerPrice: 0.000000001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 5, // Số chữ số thập phân cho giá
+            minBuyPriceRatio: 0.01,
+            maxBuyPriceRatio: 0.02,
+            minSellPriceRatio: 0.05,
+            maxSellPriceRatio: 0.06,
         },
         UNI: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -827,6 +851,10 @@ export default () => ({
         SOL: {
             szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 2, // Số chữ số thập phân cho giá 
+            minBuyPriceRatio: 0.01,
+            maxBuyPriceRatio: 0.02,
+            minSellPriceRatio: 0.05,
+            maxSellPriceRatio: 0.06,
         },
         LINK: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
