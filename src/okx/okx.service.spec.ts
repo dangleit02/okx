@@ -317,3 +317,223 @@ describe('OkxService cancel pending buy orders by price range', () => {
     expect(JSON.parse(String(post.mock.calls[1][1]))).toHaveLength(1);
   });
 });
+
+describe('OkxService sell all at current price', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  const createService = () => {
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'okx.baseUrl') return 'https://okx.test';
+        if (key === 'okx.secretKey') return 'secret';
+        if (key.startsWith('coin.')) {
+          return { priceToFixed: 2, szToFixed: 8 };
+        }
+        return 'test';
+      }),
+    };
+    const logger = { log: jest.fn() };
+    return {
+      service: new OkxService(config as any, logger as any, {} as any),
+      logger,
+    };
+  };
+
+  it('previews a trigger sell using the requested percentage of available balance', async () => {
+    const { service } = createService();
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [{ details: [{ ccy: 'BTC', availBal: '0.01234567' }] }],
+    });
+    jest.spyOn(service as any, 'getTicker').mockResolvedValue(60000);
+    const placeOneOrder = jest.spyOn(service, 'placeOneOrder');
+
+    const result = await service.sellAllAtCurrentPrice(' btc ', 25);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'preview',
+        coin: 'BTC',
+        percentage: 25,
+        availableBalance: '0.01234567',
+        sizeToSell: '0.00308641',
+        currentPrice: 60000,
+        estimatedValueUsdt: 185.1846,
+        order: {
+          data: undefined,
+          body: {
+            instId: 'BTC-USDT',
+            tdMode: 'cash',
+            side: 'sell',
+            ordType: 'trigger',
+            sz: '0.00308641',
+            triggerPx: '60000.00',
+            orderPx: '60000.00',
+          },
+        },
+      }),
+    );
+    expect(placeOneOrder).toHaveBeenCalledWith(
+      'BTC',
+      'sell',
+      '0.00308641',
+      '60000.00',
+      '60000.00',
+      true,
+    );
+  });
+
+  it('submits the trigger order only when testing is false', async () => {
+    const { service, logger } = createService();
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [{ details: [{ ccy: 'ETH', availBal: '1.25' }] }],
+    });
+    jest.spyOn(service as any, 'getTicker').mockResolvedValue(3000);
+    const placeOneOrder = jest.spyOn(service, 'placeOneOrder').mockResolvedValue({
+      data: { code: '0', data: [{ algoId: '123' }] },
+      body: { ordType: 'trigger' },
+    } as any);
+
+    const result = await service.sellAllAtCurrentPrice('ETH', 100, false);
+
+    expect(result.status).toBe('submitted');
+    expect(placeOneOrder).toHaveBeenCalledWith(
+      'ETH',
+      'sell',
+      '1.25000000',
+      '3000.00',
+      '3000.00',
+      false,
+    );
+    expect(logger.log).toHaveBeenCalled();
+  });
+
+  it('does not request a ticker or place an order without available balance', async () => {
+    const { service } = createService();
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [{ details: [{ ccy: 'ADA', availBal: '0' }] }],
+    });
+    const ticker = jest.spyOn(service as any, 'getTicker');
+    const placeOneOrder = jest.spyOn(service, 'placeOneOrder');
+
+    await expect(service.sellAllAtCurrentPrice('ADA', 100, false)).resolves.toEqual({
+      status: 'no_available_balance',
+      coin: 'ADA',
+      instId: 'ADA-USDT',
+      testing: false,
+      percentage: 100,
+      availableBalance: '0',
+    });
+    expect(ticker).not.toHaveBeenCalled();
+    expect(placeOneOrder).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid percentage before reading the balance', async () => {
+    const { service } = createService();
+    const getBalance = jest.spyOn(service, 'getAccountBalance');
+
+    await expect(service.sellAllAtCurrentPrice('BTC', 0)).rejects.toThrow(
+      'Invalid percentage',
+    );
+    expect(getBalance).not.toHaveBeenCalled();
+  });
+});
+
+describe('OkxService sell percentage at a requested trigger price', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  const createService = () => {
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key.startsWith('coin.')) {
+          return { priceToFixed: 2, szToFixed: 4 };
+        }
+        return 'test';
+      }),
+    };
+    const logger = { log: jest.fn() };
+    const service = new OkxService(config as any, logger as any, {} as any);
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [{ details: [{ ccy: 'BTC', availBal: '1.23459' }] }],
+    });
+    jest.spyOn(service as any, 'getTicker').mockResolvedValue(60000);
+    return { service, logger };
+  };
+
+  it('sets orderPx below triggerPx when the sell price is below current price', async () => {
+    const { service } = createService();
+    const placeOneOrder = jest.spyOn(service, 'placeOneOrder');
+
+    const result = await service.sellAtTriggerPrice('BTC', 50000, 25);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'preview',
+        currentPrice: 60000,
+        percentage: 25,
+        sizeToSell: '0.3086',
+        triggerPrice: 50000,
+        orderPrice: 49900,
+        priceDirection: 'below_current_price',
+      }),
+    );
+    expect(placeOneOrder).toHaveBeenCalledWith(
+      'BTC',
+      'sell',
+      '0.3086',
+      '50000.00',
+      '49900.00',
+      true,
+    );
+  });
+
+  it('sets orderPx above triggerPx when the sell price is above current price', async () => {
+    const { service } = createService();
+    const placeOneOrder = jest.spyOn(service, 'placeOneOrder').mockResolvedValue({
+      data: { code: '0', data: [{ algoId: '123' }] },
+      body: { ordType: 'trigger' },
+    } as any);
+
+    const result = await service.sellAtTriggerPrice('BTC', 70000, 25, false);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'submitted',
+        triggerPrice: 70000,
+        orderPrice: 70140,
+        priceDirection: 'above_current_price',
+      }),
+    );
+    expect(placeOneOrder).toHaveBeenCalledWith(
+      'BTC',
+      'sell',
+      '0.3086',
+      '70000.00',
+      '70140.00',
+      false,
+    );
+  });
+
+  it('rejects a missing or invalid requested price before reading the balance', async () => {
+    const { service } = createService();
+
+    await expect(service.sellAtTriggerPrice('BTC', Number.NaN, 25)).rejects.toThrow(
+      'Invalid price',
+    );
+    expect(service.getAccountBalance).not.toHaveBeenCalled();
+  });
+
+  it('rejects a percentage outside the 0 to 100 range', async () => {
+    const { service } = createService();
+
+    await expect(service.sellAtTriggerPrice('BTC', 50000, 0)).rejects.toThrow(
+      'Invalid percentage',
+    );
+    await expect(service.sellAtTriggerPrice('BTC', 50000, 101)).rejects.toThrow(
+      'Invalid percentage',
+    );
+  });
+});

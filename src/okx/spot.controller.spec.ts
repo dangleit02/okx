@@ -69,6 +69,8 @@ describe('SpotController buy order total response format', () => {
     getPendingBuyOrdersTotalForCoin: jest.Mock;
     getPendingBuyOrdersTotalForAllCoins: jest.Mock;
     cancelPendingBuyOrdersByPriceRange: jest.Mock;
+    sellAllAtCurrentPrice: jest.Mock;
+    sellAtTriggerPrice: jest.Mock;
   };
 
   beforeEach(() => {
@@ -79,6 +81,8 @@ describe('SpotController buy order total response format', () => {
       cancelPendingBuyOrdersByPriceRange: jest.fn().mockResolvedValue({
         status: 'preview',
       }),
+      sellAllAtCurrentPrice: jest.fn().mockResolvedValue({ status: 'preview' }),
+      sellAtTriggerPrice: jest.fn().mockResolvedValue({ status: 'preview' }),
     };
     controller = new SpotController(
       okxService as any,
@@ -168,6 +172,28 @@ describe('SpotController buy order total response format', () => {
       'BTC',
       40000,
       50000,
+      true,
+    );
+  });
+
+  it('defaults current-price sell to preview mode and requires testing=false to submit', async () => {
+    await expect(controller.sellAllAtCurrentPrice('btc', '25')).resolves.toEqual({
+      status: 'preview',
+    });
+    expect(okxService.sellAllAtCurrentPrice).toHaveBeenLastCalledWith('btc', 25, true);
+
+    await controller.sellAllAtCurrentPrice('btc', '25', 'false');
+    expect(okxService.sellAllAtCurrentPrice).toHaveBeenLastCalledWith('btc', 25, false);
+  });
+
+  it('passes the requested trigger price and defaults to preview mode', async () => {
+    await expect(
+      controller.sellAtTriggerPrice('btc', '50000', '25'),
+    ).resolves.toEqual({ status: 'preview' });
+    expect(okxService.sellAtTriggerPrice).toHaveBeenCalledWith(
+      'btc',
+      50000,
+      25,
       true,
     );
   });

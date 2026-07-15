@@ -648,6 +648,188 @@ export class OkxService {
         return response.data;
     }
 
+    async sellAllAtCurrentPrice(
+        coin: string,
+        percentage: number,
+        testing: boolean = true,
+    ) {
+        const normalizedCoin = coin?.trim().toUpperCase();
+        if (!normalizedCoin || !/^[A-Z0-9]+$/.test(normalizedCoin)) {
+            throw new Error(`Invalid coin: ${coin}`);
+        }
+        this.validateSellPercentage(percentage);
+
+        const instId = `${normalizedCoin}-USDT`;
+        const coinConfig = this.config.get<any>(`coin.${normalizedCoin}`);
+        if (!coinConfig) {
+            throw new Error(`No configuration found for coin: ${normalizedCoin}`);
+        }
+
+        const balanceData = await this.getAccountBalance(normalizedCoin);
+        const balance = (balanceData?.data?.[0]?.details ?? []).find(
+            (detail: any) => String(detail.ccy).toUpperCase() === normalizedCoin,
+        );
+        const availableBalance = String(balance?.availBal ?? '0');
+        const size = Number(availableBalance);
+
+        if (!Number.isFinite(size) || size <= 0) {
+            return {
+                status: 'no_available_balance',
+                coin: normalizedCoin,
+                instId,
+                testing,
+                percentage,
+                availableBalance,
+            };
+        }
+
+        const currentPrice = await this.getTicker(instId);
+        if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+            throw new Error(`Invalid current price fetched for ${instId}: ${currentPrice}`);
+        }
+
+        const { priceToFixed, szToFixed } = coinConfig;
+        const sizeToSell = size * percentage / 100;
+        const sizeFactor = 10 ** szToFixed;
+        const formattedSize = (Math.floor(sizeToSell * sizeFactor) / sizeFactor).toFixed(szToFixed);
+        const formattedPrice = currentPrice.toFixed(priceToFixed);
+        if (Number(formattedSize) <= 0) {
+            throw new Error(`Available balance ${availableBalance} is below the order size precision for ${normalizedCoin}`);
+        }
+
+        const order = await this.placeOneOrder(
+            normalizedCoin,
+            'sell',
+            formattedSize,
+            formattedPrice,
+            formattedPrice,
+            testing,
+        );
+        const result = {
+            status: testing ? 'preview' : 'submitted',
+            coin: normalizedCoin,
+            instId,
+            testing,
+            percentage,
+            availableBalance,
+            sizeToSell: formattedSize,
+            currentPrice,
+            estimatedValueUsdt: Number((Number(formattedSize) * currentPrice).toFixed(8)),
+            order,
+        };
+
+        this.logger.log(
+            JSON.stringify(result, null, 2),
+            'Sell percentage of available balance at current price',
+            normalizedCoin,
+        );
+        return result;
+    }
+
+    async sellAtTriggerPrice(
+        coin: string,
+        triggerPrice: number,
+        percentage: number,
+        testing: boolean = true,
+    ) {
+        const normalizedCoin = coin?.trim().toUpperCase();
+        if (!normalizedCoin || !/^[A-Z0-9]+$/.test(normalizedCoin)) {
+            throw new Error(`Invalid coin: ${coin}`);
+        }
+        if (!Number.isFinite(triggerPrice) || triggerPrice <= 0) {
+            throw new Error(`Invalid price: ${triggerPrice}`);
+        }
+        this.validateSellPercentage(percentage);
+
+        const instId = `${normalizedCoin}-USDT`;
+        const coinConfig = this.config.get<any>(`coin.${normalizedCoin}`);
+        if (!coinConfig) {
+            throw new Error(`No configuration found for coin: ${normalizedCoin}`);
+        }
+
+        const balanceData = await this.getAccountBalance(normalizedCoin);
+        const balance = (balanceData?.data?.[0]?.details ?? []).find(
+            (detail: any) => String(detail.ccy).toUpperCase() === normalizedCoin,
+        );
+        const availableBalance = String(balance?.availBal ?? '0');
+        const size = Number(availableBalance);
+        if (!Number.isFinite(size) || size <= 0) {
+            return {
+                status: 'no_available_balance',
+                coin: normalizedCoin,
+                instId,
+                testing,
+                percentage,
+                availableBalance,
+            };
+        }
+
+        const currentPrice = await this.getTicker(instId);
+        if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+            throw new Error(`Invalid current price fetched for ${instId}: ${currentPrice}`);
+        }
+
+        const { priceToFixed, szToFixed } = coinConfig;
+        const sizeToSell = size * percentage / 100;
+        const sizeFactor = 10 ** szToFixed;
+        const formattedSize = (Math.floor(sizeToSell * sizeFactor) / sizeFactor).toFixed(szToFixed);
+        if (Number(formattedSize) <= 0) {
+            throw new Error(`Available balance ${availableBalance} is below the order size precision for ${normalizedCoin}`);
+        }
+
+        const orderPriceOffsetRatio = 0.002;
+        const orderPrice = triggerPrice < currentPrice
+            ? triggerPrice * (1 - orderPriceOffsetRatio)
+            : triggerPrice > currentPrice
+                ? triggerPrice * (1 + orderPriceOffsetRatio)
+                : triggerPrice;
+        const formattedTriggerPrice = triggerPrice.toFixed(priceToFixed);
+        const formattedOrderPrice = orderPrice.toFixed(priceToFixed);
+        const priceDirection = triggerPrice < currentPrice
+            ? 'below_current_price'
+            : triggerPrice > currentPrice
+                ? 'above_current_price'
+                : 'at_current_price';
+
+        const order = await this.placeOneOrder(
+            normalizedCoin,
+            'sell',
+            formattedSize,
+            formattedTriggerPrice,
+            formattedOrderPrice,
+            testing,
+        );
+        const result = {
+            status: testing ? 'preview' : 'submitted',
+            coin: normalizedCoin,
+            instId,
+            testing,
+            percentage,
+            availableBalance,
+            sizeToSell: formattedSize,
+            currentPrice,
+            triggerPrice: Number(formattedTriggerPrice),
+            orderPrice: Number(formattedOrderPrice),
+            priceDirection,
+            orderPriceOffsetRatio,
+            estimatedValueUsdt: Number((Number(formattedSize) * triggerPrice).toFixed(8)),
+            order,
+        };
+
+        this.logger.log(
+            JSON.stringify(result, null, 2),
+            'Sell percentage of available balance at trigger price',
+            normalizedCoin,
+        );
+        return result;
+    }
+
+    private validateSellPercentage(percentage: number) {
+        if (!Number.isFinite(percentage) || percentage <= 0 || percentage > 100) {
+            throw new Error(`Invalid percentage: ${percentage}. It must be greater than 0 and less than or equal to 100`);
+        }
+    }
+
     async autobuyFromMaxPriceToStopLostPriceForUp(coin: string, testing: boolean = true) {
         const data = [];
         this.logger.log(`Starting to place auto orders for ${coin.toUpperCase()}, testing mode: ${testing}`, null, coin);

@@ -86,7 +86,7 @@ export default () => ({
     coinsSpotForTakeProfit: [
         // 'BTC',
         'ETH',
-        // 'ADA',
+        'ADA',
         // 'PEPE',
         // TOP 100
         // 'BTC',

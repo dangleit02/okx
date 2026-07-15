@@ -1,6 +1,29 @@
+chơi theo tháng
+mua giá rẻ nhất tháng
+bán giá cao nhất tháng
+
+
 # get balance
   curl -X GET 'http://localhost:3030/balance?ccy=DOGS' \
     -H "Content-Type: application/json"    
+
+# preview trigger sell of 25% available balance at the current price
+curl -X POST 'http://localhost:3030/sell-all-at-price/ETH?percentage=25&testing=true' \
+  -H "Content-Type: application/json"
+
+# WARNING: actually place the trigger order to sell 25% at the current price
+curl -X POST 'http://localhost:3030/sell-all-at-price/ETH?percentage=25&testing=false' \
+  -H "Content-Type: application/json"
+
+# preview selling 25% BTC when price falls to 50000 (orderPx is 0.2% below triggerPx)
+curl -X POST 'http://localhost:3030/sell-at-trigger-price/ETH?price=2000&percentage=50&testing=true' \
+  -H "Content-Type: application/json"
+
+# sell 25% BTC above current price (orderPx is 0.2% above triggerPx)
+curl -X POST 'http://localhost:3030/sell-at-trigger-price/ETH?price=2000&percentage=50&testing=false' \
+  -H "Content-Type: application/json"
+curl -X POST 'http://localhost:3030/sell-at-trigger-price/ADA?price=0.1900&percentage=50&testing=false' \
+  -H "Content-Type: application/json"
 
 # get total amount of pending buy orders for one coin
 curl -X GET 'http://localhost:3030/buy-orders-total/BTC?minPrice=40000&maxPrice=61000&priceStep=5000&format=json' \
