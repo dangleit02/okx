@@ -1,7 +1,7 @@
 import { OkxService } from './okx.service';
 import axios from 'axios';
 
-describe('OkxService pending buy order totals', () => {
+describe('OkxService pending order totals', () => {
   let service: OkxService;
 
   beforeEach(() => {
@@ -134,6 +134,62 @@ describe('OkxService pending buy order totals', () => {
     ).toEqual([
       { fromPrice: 0.1, toPrice: 0.2 },
       { fromPrice: 0.2, toPrice: 0.3 },
+    ]);
+  });
+
+  it('summarizes only pending sell orders by trigger price step', async () => {
+    jest
+      .spyOn(service as any, 'getPendingTriggerSpotOrders')
+      .mockResolvedValue([
+        {
+          algoId: '1',
+          instId: 'ETH-USDT',
+          side: 'sell',
+          triggerPx: '2000',
+          ordPx: '2010',
+          sz: '0.5',
+        },
+        {
+          algoId: '2',
+          instId: 'ETH-USDT',
+          side: 'sell',
+          triggerPx: '2100',
+          ordPx: '2110',
+          sz: '0.25',
+        },
+        {
+          algoId: '3',
+          instId: 'ETH-USDT',
+          side: 'sell',
+          triggerPx: '2200',
+          ordPx: '2210',
+          sz: '0.1',
+        },
+        {
+          algoId: '4',
+          instId: 'ETH-USDT',
+          side: 'buy',
+          triggerPx: '2050',
+          ordPx: '2050',
+          sz: '10',
+        },
+      ]);
+
+    const result = await service.getPendingSellOrdersTotalForCoin('eth', {
+      minPrice: 2000,
+      maxPrice: 2200,
+      priceStep: 100,
+    });
+
+    expect(result.summary).toEqual({
+      orderCount: 3,
+      pricedOrderCount: 3,
+      unpricedOrderCount: 0,
+      totalAmount: 1753.5,
+    });
+    expect(result.ranges).toEqual([
+      { fromPrice: 2000, toPrice: 2100, amount: 1005 },
+      { fromPrice: 2100, toPrice: 2200, amount: 748.5 },
     ]);
   });
 

@@ -17,6 +17,8 @@ export interface PendingBuyOrdersTotalOptions {
     priceStep?: number;
 }
 
+export type PendingSellOrdersTotalOptions = PendingBuyOrdersTotalOptions;
+
 export interface PendingBuyOrdersRangeTotal {
     fromPrice: number;
     toPrice: number;
@@ -36,6 +38,8 @@ export interface PendingBuyOrdersTotalResponse {
     };
     ranges?: PendingBuyOrdersRangeTotal[];
 }
+
+export type PendingSellOrdersTotalResponse = PendingBuyOrdersTotalResponse;
 
 export interface PendingBuyOrdersTotal {
     coin: string;
@@ -148,9 +152,9 @@ export class OkxService {
         return orders;
     }
 
-    private summarizePendingBuyOrders(orders: any[], instId: string, options: PendingBuyOrdersTotalOptions = {}): PendingBuyOrdersTotal {
-        const buyOrders = orders.filter((order: any) => (
-            order.side === 'buy'
+    private summarizePendingOrders(orders: any[], instId: string, side: 'buy' | 'sell', options: PendingBuyOrdersTotalOptions = {}): PendingBuyOrdersTotal {
+        const matchingOrders = orders.filter((order: any) => (
+            order.side === side
             && order.instId === instId
             && this.isOrderWithinPriceRange(order, options)
         ));
@@ -159,7 +163,7 @@ export class OkxService {
         let minPrice: number | undefined;
         let maxPrice: number | undefined;
 
-        for (const order of buyOrders) {
+        for (const order of matchingOrders) {
             const triggerPrice = Number(order.triggerPx);
             const orderPrice = Number(order.ordPx);
             const size = Number(order.sz);
@@ -180,9 +184,9 @@ export class OkxService {
             coin: instId.split('-')[0],
             instId,
             quoteCurrency: 'USDT',
-            orderCount: buyOrders.length,
+            orderCount: matchingOrders.length,
             pricedOrderCount,
-            unpricedOrderCount: buyOrders.length - pricedOrderCount,
+            unpricedOrderCount: matchingOrders.length - pricedOrderCount,
             totalAmount: Number(totalAmount.toFixed(8)),
         };
 
@@ -243,9 +247,10 @@ export class OkxService {
         }
     }
 
-    private summarizePendingBuyOrdersByPriceStep(
+    private summarizePendingOrdersByPriceStep(
         orders: any[],
         instId: string,
+        side: 'buy' | 'sell',
         minPrice: number,
         maxPrice: number,
         priceStep: number,
@@ -258,7 +263,7 @@ export class OkxService {
             const rangeMaxPrice = Number(Math.min(minPrice + (index + 1) * priceStep, maxPrice).toPrecision(15));
             const maxPriceInclusive = index === rangeCount - 1;
             const rangeOrders = orders.filter((order: any) => {
-                if (order.side !== 'buy' || order.instId !== instId) {
+                if (order.side !== side || order.instId !== instId) {
                     return false;
                 }
 
@@ -293,7 +298,7 @@ export class OkxService {
         const normalizedCoin = coin.trim().toUpperCase();
         const instId = `${normalizedCoin}-USDT`;
         const orders = await this.getPendingTriggerSpotOrders(normalizedCoin);
-        const total = this.summarizePendingBuyOrders(orders, instId, options);
+        const total = this.summarizePendingOrders(orders, instId, 'buy', options);
         const result: PendingBuyOrdersTotalResponse = {
             coin: total.coin,
             instId: total.instId,
@@ -308,9 +313,44 @@ export class OkxService {
         };
 
         if (options.priceStep !== undefined && options.minPrice !== undefined && options.maxPrice !== undefined) {
-            result.ranges = this.summarizePendingBuyOrdersByPriceStep(
+            result.ranges = this.summarizePendingOrdersByPriceStep(
                 orders,
                 instId,
+                'buy',
+                options.minPrice,
+                options.maxPrice,
+                options.priceStep,
+            );
+        }
+
+        return result;
+    }
+
+    async getPendingSellOrdersTotalForCoin(coin: string, options: PendingSellOrdersTotalOptions = {}): Promise<PendingSellOrdersTotalResponse> {
+        this.validatePendingBuyOrdersTotalOptions(options);
+
+        const normalizedCoin = coin.trim().toUpperCase();
+        const instId = `${normalizedCoin}-USDT`;
+        const orders = await this.getPendingTriggerSpotOrders(normalizedCoin);
+        const total = this.summarizePendingOrders(orders, instId, 'sell', options);
+        const result: PendingSellOrdersTotalResponse = {
+            coin: total.coin,
+            instId: total.instId,
+            quoteCurrency: total.quoteCurrency,
+            filter: { ...options },
+            summary: {
+                orderCount: total.orderCount,
+                pricedOrderCount: total.pricedOrderCount,
+                unpricedOrderCount: total.unpricedOrderCount,
+                totalAmount: total.totalAmount,
+            },
+        };
+
+        if (options.priceStep !== undefined && options.minPrice !== undefined && options.maxPrice !== undefined) {
+            result.ranges = this.summarizePendingOrdersByPriceStep(
+                orders,
+                instId,
+                'sell',
                 options.minPrice,
                 options.maxPrice,
                 options.priceStep,
@@ -330,7 +370,7 @@ export class OkxService {
                 .map((order: any) => String(order.instId))
         )).sort();
         const coins = instIds
-            .map((instId) => this.summarizePendingBuyOrders(orders, instId, options))
+            .map((instId) => this.summarizePendingOrders(orders, instId, 'buy', options))
             .filter((item) => item.orderCount > 0);
 
         return {

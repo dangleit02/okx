@@ -18,6 +18,8 @@ curl -X POST 'http://localhost:3030/sell-all-at-price/ETH?percentage=25&testing=
 # preview selling 25% BTC when price falls to 50000 (orderPx is 0.2% below triggerPx)
 curl -X POST 'http://localhost:3030/sell-at-trigger-price/ETH?price=2000&percentage=50&testing=true' \
   -H "Content-Type: application/json"
+curl -X POST 'http://localhost:3030/sell-at-trigger-price/ADA?price=0.1900&percentage=50&testing=true' \
+  -H "Content-Type: application/json"
 
 # sell 25% BTC above current price (orderPx is 0.2% above triggerPx)
 curl -X POST 'http://localhost:3030/sell-at-trigger-price/ETH?price=2000&percentage=50&testing=false' \
@@ -32,12 +34,21 @@ curl -X GET 'http://localhost:3030/buy-orders-total/BTC?minPrice=40000&maxPrice=
 curl -X GET 'http://localhost:3030/buy-orders-total/BTC?minPrice=40000&maxPrice=61000&priceStep=5000&format=table' \
   -H "Content-Type: text/plain"
 
+# get total amount of pending sell orders for one coin, grouped by trigger price step
+curl -X GET 'http://localhost:3030/sell-orders-total/ETH?minPrice=2000&maxPrice=3000&priceStep=100&format=table' \
+  -H "Content-Type: text/plain"
+curl -X GET 'http://localhost:3030/sell-orders-total/ADA?minPrice=0.1497&maxPrice=0.25&priceStep=0.01&format=table' \
+  -H "Content-Type: text/plain"  
+
 # preview delete pending buy orders in price range (does not cancel)
 curl -X DELETE 'http://localhost:3030/buy-orders/BTC?minPrice=40000&maxPrice=50000&testing=true' \
   -H "Content-Type: application/json"
 
 # delete pending buy orders in price range
 curl -X DELETE 'http://localhost:3030/buy-orders/BTC?minPrice=40000&maxPrice=50000&testing=false' \
+  -H "Content-Type: application/json"
+
+curl -X DELETE 'http://localhost:3030/buy-orders/UNI?minPrice=3.194&maxPrice=3.383&testing=false' \
   -H "Content-Type: application/json"
 
 # get total amount of pending buy orders for all coins
@@ -65,6 +76,87 @@ autobuy=true" \
   -H "Content-Type: application/json"
 
 # buy trigger from min to max for one coin
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/ETH?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=1500&\
+maxPrice=1600&\
+numberOfOrders=10&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/DOGE?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=0.070&\
+maxPrice=0.071&\
+numberOfOrders=10&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/ETC?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=6.7&\
+maxPrice=6.8&\
+numberOfOrders=10&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/LTC?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=40&\
+maxPrice=41&\
+numberOfOrders=10&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/XLM?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=0.16&\
+maxPrice=0.17&\
+numberOfOrders=10&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/XRP?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=0.9&\
+maxPrice=1&\
+numberOfOrders=10&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/NEAR?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=1.6&\
+maxPrice=1.7&\
+numberOfOrders=10&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/UNI?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=3.2&\
+maxPrice=3.39&\
+numberOfOrders=10&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
+
+curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/OKB?\
+testing=false&\
+removeExistingBuyOrders=false&\
+minPrice=71.83&\
+maxPrice=75&\
+numberOfOrders=10&\
+addStopLoss=false" \
+  -H "Content-Type: application/json"
 
 # without numberOfOrders=10&\
 curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/BTC?\

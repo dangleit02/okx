@@ -1,5 +1,5 @@
 import { Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
-import { AllPendingBuyOrdersTotal, OkxService, PendingBuyOrdersTotalResponse } from './okx.service';
+import { AllPendingBuyOrdersTotal, OkxService, PendingBuyOrdersTotalResponse, PendingSellOrdersTotalResponse } from './okx.service';
 import { ConfigService } from '@nestjs/config';
 import { AppLogger } from '../logger/logger.service';
 import * as _ from 'lodash';
@@ -35,7 +35,7 @@ export class SpotController {
     });
 
     if (format.toLowerCase() === 'table') {
-      const table = this.formatPendingBuyOrdersAsTable(result);
+      const table = this.formatPendingOrdersAsTable(result, 'BUY');
       this.logger.log(table, 'Pending buy orders table', coin.toUpperCase());
       return table;
     }
@@ -48,8 +48,9 @@ export class SpotController {
     return result;
   }
 
-  private formatPendingBuyOrdersAsTable(
-    result: PendingBuyOrdersTotalResponse,
+  private formatPendingOrdersAsTable(
+    result: PendingBuyOrdersTotalResponse | PendingSellOrdersTotalResponse,
+    side: 'BUY' | 'SELL',
   ): string {
     const headers = ['FROM PRICE', 'TO PRICE', `AMOUNT (${result.quoteCurrency})`];
     const rows = (result.ranges ?? []).map((range) => [
@@ -68,7 +69,7 @@ export class SpotController {
       .join(', ');
 
     return [
-      `${result.instId} pending BUY orders`,
+      `${result.instId} pending ${side} orders`,
       `Filter: ${filter || 'none'}`,
       `Summary: ${result.summary.orderCount} orders | ${result.summary.totalAmount} ${result.quoteCurrency}`,
       '',
@@ -76,6 +77,34 @@ export class SpotController {
       separator,
       ...(rows.length > 0 ? rows.map(formatRow) : ['No matching orders']),
     ].join('\n');
+  }
+
+  @Get('sell-orders-total/:coin')
+  async getSellOrdersTotalForCoin(
+    @Param('coin') coin: string,
+    @Query('minPrice') minPrice?: string,
+    @Query('maxPrice') maxPrice?: string,
+    @Query('priceStep') priceStep?: string,
+    @Query('format') format: string = 'json',
+  ) {
+    const result = await this.okxService.getPendingSellOrdersTotalForCoin(coin, {
+      minPrice: minPrice ? Number(minPrice) : undefined,
+      maxPrice: maxPrice ? Number(maxPrice) : undefined,
+      priceStep: priceStep ? Number(priceStep) : undefined,
+    });
+
+    if (format.toLowerCase() === 'table') {
+      const table = this.formatPendingOrdersAsTable(result, 'SELL');
+      this.logger.log(table, 'Pending sell orders table', coin.toUpperCase());
+      return table;
+    }
+
+    this.logger.log(
+      JSON.stringify(result, null, 2),
+      'Pending sell orders JSON',
+      coin.toUpperCase(),
+    );
+    return result;
   }
 
   @Get('buy-orders-total-all-coins')

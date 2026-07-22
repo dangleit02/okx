@@ -68,6 +68,7 @@ describe('SpotController buy order total response format', () => {
   let okxService: {
     getPendingBuyOrdersTotalForCoin: jest.Mock;
     getPendingBuyOrdersTotalForAllCoins: jest.Mock;
+    getPendingSellOrdersTotalForCoin: jest.Mock;
     cancelPendingBuyOrdersByPriceRange: jest.Mock;
     sellAllAtCurrentPrice: jest.Mock;
     sellAtTriggerPrice: jest.Mock;
@@ -78,6 +79,11 @@ describe('SpotController buy order total response format', () => {
     okxService = {
       getPendingBuyOrdersTotalForCoin: jest.fn().mockResolvedValue(response),
       getPendingBuyOrdersTotalForAllCoins: jest.fn().mockResolvedValue(allCoinsResponse),
+      getPendingSellOrdersTotalForCoin: jest.fn().mockResolvedValue({
+        ...response,
+        coin: 'ETH',
+        instId: 'ETH-USDT',
+      }),
       cancelPendingBuyOrdersByPriceRange: jest.fn().mockResolvedValue({
         status: 'preview',
       }),
@@ -157,6 +163,27 @@ describe('SpotController buy order total response format', () => {
       JSON.stringify(response, null, 2),
       'Pending buy orders JSON',
       'BTC',
+    );
+  });
+
+  it('returns a pending sell orders table grouped by price step', async () => {
+    const result = await controller.getSellOrdersTotalForCoin(
+      'eth',
+      '2000',
+      '3000',
+      '100',
+      'table',
+    );
+
+    expect(result).toContain('ETH-USDT pending SELL orders');
+    expect(okxService.getPendingSellOrdersTotalForCoin).toHaveBeenCalledWith(
+      'eth',
+      { minPrice: 2000, maxPrice: 3000, priceStep: 100 },
+    );
+    expect(logger.log).toHaveBeenCalledWith(
+      result,
+      'Pending sell orders table',
+      'ETH',
     );
   });
 

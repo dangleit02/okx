@@ -85,8 +85,9 @@ export default () => ({
     ],
     coinsSpotForTakeProfit: [
         // 'BTC',
-        'ETH',
+        // 'ETH',
         'ADA',
+        'ETC',
         // 'PEPE',
         // TOP 100
         // 'BTC',
@@ -714,11 +715,15 @@ export default () => ({
             minBuyPrice: 8.28, // Giá mua thấp nhất (USDT)
             maxBuyPrice: 9.36, // Giá mua cao nhất (USDT)
             stopLossPrice: 4.515, // Giá dừng lỗ (USDT)
-            amountOfUsdtPerStep: 22, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
+            amountOfUsdtPerStep: 12, // Số tiền đầu tư mỗi bước (USDT), must greater than 10
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá
+            minBuyPriceRatio: 0.01,
+            maxBuyPriceRatio: 0.02,
+            minSellPriceRatio: 0.05,
+            maxSellPriceRatio: 0.06,
         },
         SUI: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -842,7 +847,11 @@ export default () => ({
             riskPerTrade: 0.02, // Tỷ lệ rủi ro trên mỗi giao dịch (2%)
             addForTriggerPrice: 0.00001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 6, // Số chữ số thập phân cho khối lượng
-            priceToFixed: 4, // Số chữ số thập phân cho giá            
+            priceToFixed: 4, // Số chữ số thập phân cho giá      
+            minBuyPriceRatio: 0.01,
+            maxBuyPriceRatio: 0.02,
+            minSellPriceRatio: 0.05,
+            maxSellPriceRatio: 0.06,      
         },
         BNB: {
             szToFixed: 6, // Số chữ số thập phân cho khối lượng
@@ -899,6 +908,10 @@ export default () => ({
             addForTriggerPrice: 0.000000001, // Đơn vị giá để tính giá kích hoạt
             szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 2, // Số chữ số thập phân cho giá 
+            minBuyPriceRatio: 0.01,
+            maxBuyPriceRatio: 0.02,
+            minSellPriceRatio: 0.05,
+            maxSellPriceRatio: 0.06,
         },   
         SUSHI: {
             szToFixed: 6, // Số chữ số thập phân cho khối lượng
@@ -911,6 +924,10 @@ export default () => ({
         ETC: {
             szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 2, // Số chữ số thập phân cho giá 
+            minBuyPriceRatio: 0.01,
+            maxBuyPriceRatio: 0.02,
+            minSellPriceRatio: 0.05,
+            maxSellPriceRatio: 0.06,
         },
         ENA: {
             szToFixed: 2, // Số chữ số thập phân cho khối lượng
