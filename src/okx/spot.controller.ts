@@ -1,5 +1,5 @@
-import { Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
-import { AllPendingBuyOrdersTotal, OkxService, PendingBuyOrdersTotalResponse, PendingSellOrdersTotalResponse } from './okx.service';
+import { BadRequestException, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import { AllPendingOrdersTotal, AllSpotBoughtCoins, OkxService, PendingOrdersSide, PendingOrdersTotalResponse } from './okx.service';
 import { ConfigService } from '@nestjs/config';
 import { AppLogger } from '../logger/logger.service';
 import * as _ from 'lodash';
@@ -20,37 +20,88 @@ export class SpotController {
     return result;
   }
 
-  @Get('buy-orders-total/:coin')
-  async getBuyOrdersTotalForCoin(
+  @Get('spot-bought-coins')
+  async getAllSpotBoughtCoins(
+    @Query('format') format: string = 'table',
+  ) {
+    const result = await this.okxService.getAllSpotBoughtCoins();
+
+    if (format.toLowerCase() === 'json') {
+      return result;
+    }
+
+    const table = this.formatAllSpotBoughtCoinsAsTable(result);
+    this.logger.log(table, 'All bought coins in spot');
+    return table;
+  }
+
+  private formatAllSpotBoughtCoinsAsTable(result: AllSpotBoughtCoins): string {
+    const headers = [
+      'COIN',
+      'AMOUNT (USDT)',
+      'AVARAGE COST',
+      'CURRENT PRICE',
+      'PROFIT (%)',
+      'PROFIT (USDT)',
+    ];
+    const rows = result.coins.map((coin) => [
+      coin.coin,
+      String(coin.amountUsdt),
+      String(coin.averageCost),
+      String(coin.currentPrice),
+      String(coin.profitPercentage),
+      String(coin.profitUsdt),
+    ]);
+    const widths = headers.map((header, index) =>
+      Math.max(header.length, ...rows.map((row) => row[index].length)),
+    );
+    const formatRow = (row: string[]) =>
+      row.map((value, index) => value.padEnd(widths[index])).join(' | ');
+    const separator = widths.map((width) => '-'.repeat(width)).join('-+-');
+
+    return [
+      formatRow(headers),
+      separator,
+      ...rows.map(formatRow),
+    ].join('\n');
+  }
+
+  @Get('orders-one-coin/:coin')
+  async getOrdersTotalForCoin(
     @Param('coin') coin: string,
+    @Query('side') side?: string,
     @Query('minPrice') minPrice?: string,
     @Query('maxPrice') maxPrice?: string,
-    @Query('priceStep') priceStep?: string,
+    @Query('step') step?: string,
     @Query('format') format: string = 'json',
   ) {
-    const result = await this.okxService.getPendingBuyOrdersTotalForCoin(coin, {
+    if (side !== 'buy' && side !== 'sell') {
+      throw new BadRequestException('side must be buy or sell');
+    }
+
+    const result = await this.okxService.getPendingOrdersTotalForCoin(coin, side, {
       minPrice: minPrice ? Number(minPrice) : undefined,
       maxPrice: maxPrice ? Number(maxPrice) : undefined,
-      priceStep: priceStep ? Number(priceStep) : undefined,
+      step: step ? Number(step) : undefined,
     });
 
     if (format.toLowerCase() === 'table') {
-      const table = this.formatPendingOrdersAsTable(result, 'BUY');
-      this.logger.log(table, 'Pending buy orders table', coin.toUpperCase());
+      const table = this.formatPendingOrdersAsTable(result, side);
+      this.logger.log(table, `Pending ${side} orders table`, coin.toUpperCase());
       return table;
     }
 
     this.logger.log(
       JSON.stringify(result, null, 2),
-      'Pending buy orders JSON',
+      `Pending ${side} orders JSON`,
       coin.toUpperCase(),
     );
     return result;
   }
 
   private formatPendingOrdersAsTable(
-    result: PendingBuyOrdersTotalResponse | PendingSellOrdersTotalResponse,
-    side: 'BUY' | 'SELL',
+    result: PendingOrdersTotalResponse,
+    side: PendingOrdersSide,
   ): string {
     const headers = ['FROM PRICE', 'TO PRICE', `AMOUNT (${result.quoteCurrency})`];
     const rows = (result.ranges ?? []).map((range) => [
@@ -69,7 +120,7 @@ export class SpotController {
       .join(', ');
 
     return [
-      `${result.instId} pending ${side} orders`,
+      `${result.instId} pending ${side.toUpperCase()} orders`,
       `Filter: ${filter || 'none'}`,
       `Summary: ${result.summary.orderCount} orders | ${result.summary.totalAmount} ${result.quoteCurrency}`,
       '',
@@ -79,68 +130,57 @@ export class SpotController {
     ].join('\n');
   }
 
-  @Get('sell-orders-total/:coin')
-  async getSellOrdersTotalForCoin(
-    @Param('coin') coin: string,
+  @Get('orders-all-coins')
+  async getOrdersTotalForAllCoins(
+    @Query('side') side?: string,
     @Query('minPrice') minPrice?: string,
     @Query('maxPrice') maxPrice?: string,
-    @Query('priceStep') priceStep?: string,
-    @Query('format') format: string = 'json',
-  ) {
-    const result = await this.okxService.getPendingSellOrdersTotalForCoin(coin, {
-      minPrice: minPrice ? Number(minPrice) : undefined,
-      maxPrice: maxPrice ? Number(maxPrice) : undefined,
-      priceStep: priceStep ? Number(priceStep) : undefined,
-    });
-
-    if (format.toLowerCase() === 'table') {
-      const table = this.formatPendingOrdersAsTable(result, 'SELL');
-      this.logger.log(table, 'Pending sell orders table', coin.toUpperCase());
-      return table;
-    }
-
-    this.logger.log(
-      JSON.stringify(result, null, 2),
-      'Pending sell orders JSON',
-      coin.toUpperCase(),
-    );
-    return result;
-  }
-
-  @Get('buy-orders-total-all-coins')
-  async getBuyOrdersTotalForAllCoins(
-    @Query('minPrice') minPrice?: string,
-    @Query('maxPrice') maxPrice?: string,
+    @Query('step') step?: string,
     @Query('format') format: string = 'table',
   ) {
-    const result = await this.okxService.getPendingBuyOrdersTotalForAllCoins({
+    if (side !== 'buy' && side !== 'sell') {
+      throw new BadRequestException('side must be buy or sell');
+    }
+
+    const result = await this.okxService.getPendingOrdersTotalForAllCoins(side, {
       minPrice: minPrice ? Number(minPrice) : undefined,
       maxPrice: maxPrice ? Number(maxPrice) : undefined,
+      step: step ? Number(step) : undefined,
     });
 
     if (format.toLowerCase() === 'json') {
       this.logger.log(
         JSON.stringify(result, null, 2),
-        'Pending buy orders all coins JSON',
+        `Pending ${side} orders all coins JSON`,
       );
       return result;
     }
 
-    const table = this.formatAllPendingBuyOrdersAsTable(result);
-    this.logger.log(table, 'Pending buy orders all coins table');
+    const table = this.formatAllPendingOrdersAsTable(result);
+    this.logger.log(table, `Pending ${side} orders all coins table`);
     return table;
   }
 
-  private formatAllPendingBuyOrdersAsTable(
-    result: AllPendingBuyOrdersTotal,
+  private formatAllPendingOrdersAsTable(
+    result: AllPendingOrdersTotal,
   ): string {
-    const headers = ['COIN', 'MIN PRICE', 'MAX PRICE', 'AMOUNT (USD)'];
-    const rows = result.coins.map((coin) => [
-      coin.coin,
-      coin.minPrice === undefined ? '' : String(coin.minPrice),
-      coin.maxPrice === undefined ? '' : String(coin.maxPrice),
-      String(coin.totalAmount),
-    ]);
+    const hasRanges = result.filter.step !== undefined;
+    const headers = hasRanges
+      ? ['COIN', 'FROM PRICE', 'TO PRICE', 'AMOUNT (USD)']
+      : ['COIN', 'MIN PRICE', 'MAX PRICE', 'AMOUNT (USD)'];
+    const rows = result.coins.flatMap((coin) => hasRanges
+      ? (coin.ranges ?? []).map((range) => [
+        coin.coin,
+        String(range.fromPrice),
+        String(range.toPrice),
+        String(range.amount),
+      ])
+      : [[
+        coin.coin,
+        coin.minPrice === undefined ? '' : String(coin.minPrice),
+        coin.maxPrice === undefined ? '' : String(coin.maxPrice),
+        String(coin.totalAmount),
+      ]]);
     const widths = headers.map((header, index) =>
       Math.max(header.length, ...rows.map((row) => row[index].length)),
     );

@@ -1,0 +1,26 @@
+chơi theo tháng
+mua giá rẻ nhất tháng
+bán giá cao nhất tháng
+
+# cancel all orders for one coin
+  curl -X POST 'http://localhost:3030/cancel-orders/BTC' \
+    -H "Content-Type: application/json"
+
+  # cancel buy orders for one coin
+    curl -X POST 'http://localhost:3030/cancel-orders/BTC?side=buy' \
+      -H "Content-Type: application/json"
+
+  # cancel sell orders for one coin
+    curl -X POST 'http://localhost:3030/cancel-orders/BTC?side=sell' \
+      -H "Content-Type: application/json"
+
+# preview cancel pending buy orders in price range (does not cancel)
+  curl -X DELETE 'http://localhost:3030/buy-orders/BTC?minPrice=40000&maxPrice=50000&testing=true' \
+    -H "Content-Type: application/json"
+
+  # delete cancel buy orders in price range
+    curl -X DELETE 'http://localhost:3030/buy-orders/BTC?minPrice=40000&maxPrice=50000&testing=false' \
+      -H "Content-Type: application/json"
+
+    curl -X DELETE 'http://localhost:3030/buy-orders/UNI?minPrice=3.194&maxPrice=3.383&testing=false' \
+      -H "Content-Type: application/json"

@@ -1,0 +1,10 @@
+chơi theo tháng
+mua giá rẻ nhất tháng
+bán giá cao nhất tháng
+
+# autobuy for all defined coins
+  curl -X POST "http://localhost:3030/buy-at-price-all-coins?\
+  testing=false&\
+  removeExistingBuyOrders=true&\
+  autobuy=true" \
+    -H "Content-Type: application/json"

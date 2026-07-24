@@ -1,0 +1,17 @@
+chơi theo tháng
+mua giá rẻ nhất tháng
+bán giá cao nhất tháng
+
+# get total amount of pending orders for all coins
+  curl -X GET 'http://localhost:3030/orders-all-coins?side=buy&step=5&format=table' \
+    -H "Content-Type: text/plain"
+
+  curl -X GET 'http://localhost:3030/orders-all-coins?side=sell&step=5&format=table' \
+    -H "Content-Type: text/plain"
+
+  curl -X GET 'http://localhost:3030/orders-all-coins?side=buy&step=5&format=json' \
+    -H "Content-Type: application/json"
+
+# get total bought coins
+  curl -X GET 'http://localhost:3030/spot-bought-coins' \
+  -H "Content-Type: text/plain"

@@ -1,0 +1,16 @@
+chơi theo tháng
+mua giá rẻ nhất tháng
+bán giá cao nhất tháng
+
+# cancel all orders for all coins
+  curl -X POST 'http://localhost:3030/cancel-all-orders' \
+    -H "Content-Type: application/json"    
+
+  # cancel buy orders for all coins
+    curl -X POST 'http://localhost:3030/cancel-all-orders?side=buy' \
+      -H "Content-Type: application/json"    
+
+  # cancel sell orders for all coins
+    curl -X POST 'http://localhost:3030/cancel-all-orders?side=sell' \
+      -H "Content-Type: application/json"    
+

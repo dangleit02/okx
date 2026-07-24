@@ -62,42 +62,42 @@ describe('OkxService pending order totals', () => {
         },
       ]);
 
-    const result = await service.getPendingBuyOrdersTotalForCoin('btc', {
+    const result = await service.getPendingOrdersTotalForCoin('btc', 'buy', {
       minPrice: 40000,
       maxPrice: 61000,
-      priceStep: 5000,
+      step: 5,
     });
 
     expect(result.filter).toEqual({
       minPrice: 40000,
       maxPrice: 61000,
-      priceStep: 5000,
+      step: 5,
     });
     expect(result.summary.orderCount).toBe(5);
     expect(result.summary.totalAmount).toBe(2509);
     expect(result.ranges).toEqual([
       expect.objectContaining({
         fromPrice: 40000,
-        toPrice: 45000,
+        toPrice: 44200,
         amount: 399,
       }),
       expect.objectContaining({
-        fromPrice: 45000,
-        toPrice: 50000,
+        fromPrice: 44200,
+        toPrice: 48400,
         amount: 450,
       }),
       expect.objectContaining({
-        fromPrice: 50000,
-        toPrice: 55000,
+        fromPrice: 48400,
+        toPrice: 52600,
         amount: 500,
       }),
       expect.objectContaining({
-        fromPrice: 55000,
-        toPrice: 60000,
+        fromPrice: 52600,
+        toPrice: 56800,
         amount: 550,
       }),
       expect.objectContaining({
-        fromPrice: 60000,
+        fromPrice: 56800,
         toPrice: 61000,
         amount: 610,
       }),
@@ -107,12 +107,51 @@ describe('OkxService pending order totals', () => {
     ).toBe(result.summary.totalAmount);
   });
 
-  it('requires minPrice and maxPrice when priceStep is provided', async () => {
-    await expect(
-      service.getPendingBuyOrdersTotalForCoin('BTC', { priceStep: 5000 }),
-    ).rejects.toThrow(
-      'minPrice and maxPrice are required when priceStep is provided',
-    );
+  it('derives minPrice and maxPrice from trigger orders on the requested side', async () => {
+    jest
+      .spyOn(service as any, 'getPendingTriggerSpotOrders')
+      .mockResolvedValue([
+        { instId: 'BTC-USDT', side: 'sell', triggerPx: '42000', ordPx: '42000', sz: '1' },
+        { instId: 'BTC-USDT', side: 'sell', triggerPx: '62000', ordPx: '62000', sz: '1' },
+        { instId: 'BTC-USDT', side: 'buy', triggerPx: '50000', ordPx: '50000', sz: '0.01' },
+      ]);
+
+    const result = await service.getPendingOrdersTotalForCoin('BTC', 'buy', { step: 2 });
+
+    expect(result.filter).toEqual({ minPrice: 50000, maxPrice: 50000, step: 2 });
+    expect(result.ranges).toEqual([
+      { fromPrice: 50000, toPrice: 50000, amount: 500 },
+    ]);
+  });
+
+  it('uses the buy trigger range regardless of existing sell trigger orders', async () => {
+    jest
+      .spyOn(service as any, 'getPendingTriggerSpotOrders')
+      .mockResolvedValue([
+        { instId: 'BTC-USDT', side: 'sell', triggerPx: '30000', ordPx: '30000', sz: '0.01' },
+        { instId: 'BTC-USDT', side: 'sell', triggerPx: '35000', ordPx: '35000', sz: '0.01' },
+        { instId: 'BTC-USDT', side: 'buy', triggerPx: '40000', ordPx: '40000', sz: '0.01' },
+        { instId: 'BTC-USDT', side: 'buy', triggerPx: '50000', ordPx: '50000', sz: '0.01' },
+      ]);
+
+    const result = await service.getPendingOrdersTotalForCoin('BTC', 'buy', { step: 2 });
+
+    expect(result.filter).toEqual({ minPrice: 40000, maxPrice: 50000, step: 2 });
+    expect(result.ranges).toEqual([
+      { fromPrice: 40000, toPrice: 45000, amount: 400 },
+      { fromPrice: 45000, toPrice: 50000, amount: 500 },
+    ]);
+  });
+
+  it('returns empty ranges when no trigger orders exist', async () => {
+    jest
+      .spyOn(service as any, 'getPendingTriggerSpotOrders')
+      .mockResolvedValue([]);
+
+    const result = await service.getPendingOrdersTotalForCoin('BTC', 'sell', { step: 5 });
+
+    expect(result.summary.orderCount).toBe(0);
+    expect(result.ranges).toEqual([]);
   });
 
   it('keeps decimal range boundaries stable', async () => {
@@ -120,10 +159,10 @@ describe('OkxService pending order totals', () => {
       .spyOn(service as any, 'getPendingTriggerSpotOrders')
       .mockResolvedValue([]);
 
-    const result = await service.getPendingBuyOrdersTotalForCoin('ADA', {
+    const result = await service.getPendingOrdersTotalForCoin('ADA', 'buy', {
       minPrice: 0.1,
       maxPrice: 0.3,
-      priceStep: 0.1,
+      step: 2,
     });
 
     expect(
@@ -175,10 +214,10 @@ describe('OkxService pending order totals', () => {
         },
       ]);
 
-    const result = await service.getPendingSellOrdersTotalForCoin('eth', {
+    const result = await service.getPendingOrdersTotalForCoin('eth', 'sell', {
       minPrice: 2000,
       maxPrice: 2200,
-      priceStep: 100,
+      step: 2,
     });
 
     expect(result.summary).toEqual({
@@ -231,8 +270,9 @@ describe('OkxService pending order totals', () => {
         },
       ]);
 
-    const result = await service.getPendingBuyOrdersTotalForAllCoins();
+    const result = await service.getPendingOrdersTotalForAllCoins('buy');
 
+    expect(result.side).toBe('buy');
     expect(result.coinCount).toBe(2);
     expect(result.totalAmount).toBe(1715);
     expect(result.coins).toEqual([
@@ -249,6 +289,53 @@ describe('OkxService pending order totals', () => {
         totalAmount: 1265,
       }),
     ]);
+  });
+});
+
+describe('OkxService bought spot coins', () => {
+  it('calculates current profit for every positive non-USDT spot balance', async () => {
+    const service = new OkxService({} as any, {} as any, {} as any);
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [{
+        details: [
+          { ccy: 'BTC', cashBal: '0.1', openAvgPx: '50000' },
+          { ccy: 'ETH', cashBal: '2', openAvgPx: '3000' },
+          { ccy: 'USDT', cashBal: '1000', openAvgPx: '1' },
+          { ccy: 'ADA', cashBal: '0', openAvgPx: '0.5' },
+        ],
+      }],
+    });
+    jest.spyOn(service as any, 'getSpotTickers').mockResolvedValue(new Map([
+      ['BTC-USDT', 51000],
+      ['ETH-USDT', 2700],
+      ['ADA-USDT', 0.6],
+    ]));
+
+    const result = await service.getAllSpotBoughtCoins();
+
+    expect(result).toEqual({
+      quoteCurrency: 'USDT',
+      coinCount: 2,
+      totalProfitUsdt: -500,
+      coins: [
+        {
+          coin: 'BTC',
+          amountUsdt: 5100,
+          averageCost: 50000,
+          currentPrice: 51000,
+          profitPercentage: 2,
+          profitUsdt: 100,
+        },
+        {
+          coin: 'ETH',
+          amountUsdt: 5400,
+          averageCost: 3000,
+          currentPrice: 2700,
+          profitPercentage: -10,
+          profitUsdt: -600,
+        },
+      ],
+    });
   });
 });
 
