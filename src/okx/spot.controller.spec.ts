@@ -96,6 +96,7 @@ describe('SpotController buy order total response format', () => {
     sellAllAtCurrentPrice: jest.Mock;
     sellAtTriggerPrice: jest.Mock;
     sellOneCoin: jest.Mock;
+    sellAtPriceAllCoins: jest.Mock;
   };
 
   beforeEach(() => {
@@ -120,6 +121,7 @@ describe('SpotController buy order total response format', () => {
       sellAllAtCurrentPrice: jest.fn().mockResolvedValue({ status: 'preview' }),
       sellAtTriggerPrice: jest.fn().mockResolvedValue({ status: 'preview' }),
       sellOneCoin: jest.fn().mockResolvedValue(undefined),
+      sellAtPriceAllCoins: jest.fn().mockResolvedValue([]),
     };
     controller = new SpotController(
       okxService as any,
@@ -320,15 +322,7 @@ describe('SpotController buy order total response format', () => {
     );
   });
 
-  it('only processes configured coins that have been bought', async () => {
-    controller = new SpotController(
-      okxService as any,
-      {
-        get: jest.fn().mockReturnValue(['btc', 'ETH']),
-      } as any,
-      logger as any,
-    );
-
+  it('delegates all-coins selling to the shared service flow', async () => {
     await expect(
       controller.sellAtPriceAllCoins(
         'false',
@@ -340,49 +334,13 @@ describe('SpotController buy order total response format', () => {
       ),
     ).resolves.toEqual([]);
 
-    expect(okxService.getAllSpotBoughtCoins).toHaveBeenCalledTimes(1);
-    expect(okxService.sellOneCoin).toHaveBeenCalledTimes(1);
-    expect(okxService.sellOneCoin).toHaveBeenCalledWith({
+    expect(okxService.sellAtPriceAllCoins).toHaveBeenCalledWith({
       isTesting: false,
-      coin: 'btc',
       removeExistingSellOrders: 'true',
       addSellStopLoss: 'true',
       addSellTakeProfit: 'true',
       onlyForDown: 'false',
       justOneOrder: 'false',
-      results: [],
     });
-    expect(okxService.sellOneCoin).not.toHaveBeenCalledWith(
-      expect.objectContaining({ coin: 'ETH' }),
-    );
-  });
-
-  it('does not cancel or place sell orders when no configured coin has been bought', async () => {
-    okxService.getAllSpotBoughtCoins.mockResolvedValueOnce({
-      quoteCurrency: 'USDT',
-      coinCount: 0,
-      totalProfitUsdt: 0,
-      coins: [],
-    });
-    controller = new SpotController(
-      okxService as any,
-      {
-        get: jest.fn().mockReturnValue(['BTC', 'ETH']),
-      } as any,
-      logger as any,
-    );
-
-    await expect(
-      controller.sellAtPriceAllCoins(
-        'false',
-        'true',
-        'true',
-        'true',
-        'false',
-        'false',
-      ),
-    ).resolves.toEqual([]);
-
-    expect(okxService.sellOneCoin).not.toHaveBeenCalled();
   });
 });

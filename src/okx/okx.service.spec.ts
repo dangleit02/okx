@@ -395,6 +395,55 @@ describe('OkxService cancel pending spot trigger orders for one coin', () => {
       failedOrderCount: 0,
     }));
   });
+
+  it('retries only algo orders rejected with rate-limit code 50011', async () => {
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'okx.baseUrl') return 'https://www.okx.test';
+        if (key === 'okx.secretKey') return 'secret';
+        return 'value';
+      }),
+    };
+    const service = new OkxService(config as any, { log: jest.fn() } as any, {} as any);
+    jest
+      .spyOn(service as any, 'getPendingTriggerSpotOrders')
+      .mockResolvedValue([
+        { algoId: '1', instId: 'ETC-USDT', side: 'sell' },
+        { algoId: '2', instId: 'ETC-USDT', side: 'sell' },
+      ]);
+    const sleep = jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+    const post = jest
+      .spyOn(axios, 'post')
+      .mockResolvedValueOnce({
+        data: {
+          code: '0',
+          data: [
+            { algoId: '1', sCode: '0', sMsg: '' },
+            { algoId: '2', sCode: '50011', sMsg: 'Rate limit reached' },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          code: '0',
+          data: [{ algoId: '2', sCode: '0', sMsg: '' }],
+        },
+      });
+
+    const result = await service.cancelOpenConditionSpotOrdersForOneCoin('ETC', 'sell');
+
+    expect(post).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(String(post.mock.calls[1][1]))).toEqual([
+      { algoId: '2', instId: 'ETC-USDT' },
+    ]);
+    expect(sleep).toHaveBeenCalledWith(1100);
+    expect(result).toEqual(expect.objectContaining({
+      status: 'cancelled',
+      matchedOrderCount: 2,
+      cancelledOrderCount: 2,
+      failedOrderCount: 0,
+    }));
+  });
 });
 
 describe('OkxService cancel pending buy orders by price range', () => {
@@ -475,7 +524,7 @@ describe('OkxService cancel pending buy orders by price range', () => {
     expect(sellResult.orders.map((order) => order.algoId)).toEqual(['4']);
   });
 
-  it('cancels matching orders in batches of 20 when testing=false', async () => {
+  it('cancels matching orders in throttled batches of 10 when testing=false', async () => {
     const config = {
       get: jest.fn((key: string) => {
         if (key === 'okx.baseUrl') return 'https://okx.test';
@@ -496,6 +545,7 @@ describe('OkxService cancel pending buy orders by price range', () => {
     jest
       .spyOn(service as any, 'getPendingTriggerSpotOrders')
       .mockResolvedValue(orders);
+    const sleep = jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
     const post = jest
       .spyOn(axios, 'post')
       .mockImplementation(async (_url, body) => {
@@ -528,9 +578,12 @@ describe('OkxService cancel pending buy orders by price range', () => {
         failedOrderCount: 0,
       }),
     );
-    expect(post).toHaveBeenCalledTimes(2);
-    expect(JSON.parse(String(post.mock.calls[0][1]))).toHaveLength(20);
-    expect(JSON.parse(String(post.mock.calls[1][1]))).toHaveLength(1);
+    expect(post).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(String(post.mock.calls[0][1]))).toHaveLength(10);
+    expect(JSON.parse(String(post.mock.calls[1][1]))).toHaveLength(10);
+    expect(JSON.parse(String(post.mock.calls[2][1]))).toHaveLength(1);
+    expect(sleep).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledWith(1100);
   });
 });
 
@@ -778,5 +831,69 @@ describe('OkxService sell percentage at a requested trigger price', () => {
     await expect(service.sellAtTriggerPrice('BTC', 50000, 101)).rejects.toThrow(
       'Invalid percentage',
     );
+  });
+});
+
+describe('OkxService sell all configured bought coins', () => {
+  const options = {
+    isTesting: false,
+    removeExistingSellOrders: 'false',
+    addSellStopLoss: 'false',
+    addSellTakeProfit: 'true',
+    onlyForDown: 'false',
+    justOneOrder: 'false',
+  };
+
+  const createService = () => {
+    const config = {
+      get: jest.fn((key: string) =>
+        key === 'coinsSpotForTakeProfit' ? ['btc', 'ETH'] : undefined,
+      ),
+    };
+    const logger = { log: jest.fn() };
+    const service = new OkxService(config as any, logger as any, {} as any);
+    return { service, logger };
+  };
+
+  it('only processes configured coins that have been bought', async () => {
+    const { service } = createService();
+    jest.spyOn(service, 'getAllSpotBoughtCoins').mockResolvedValue({
+      quoteCurrency: 'USDT',
+      coinCount: 1,
+      totalProfitUsdt: 100,
+      coins: [{
+        coin: 'BTC',
+        amountUsdt: 5100,
+        averageCost: 50000,
+        currentPrice: 51000,
+        profitPercentage: 2,
+        profitUsdt: 100,
+      }],
+    });
+    const sellOneCoin = jest.spyOn(service, 'sellOneCoin').mockResolvedValue(undefined);
+
+    await expect(service.sellAtPriceAllCoins(options)).resolves.toEqual([]);
+
+    expect(sellOneCoin).toHaveBeenCalledTimes(1);
+    expect(sellOneCoin).toHaveBeenCalledWith({
+      coin: 'btc',
+      ...options,
+      results: [],
+    });
+  });
+
+  it('does not cancel or place orders when no configured coin has been bought', async () => {
+    const { service } = createService();
+    jest.spyOn(service, 'getAllSpotBoughtCoins').mockResolvedValue({
+      quoteCurrency: 'USDT',
+      coinCount: 0,
+      totalProfitUsdt: 0,
+      coins: [],
+    });
+    const sellOneCoin = jest.spyOn(service, 'sellOneCoin');
+
+    await expect(service.sellAtPriceAllCoins(options)).resolves.toEqual([]);
+
+    expect(sellOneCoin).not.toHaveBeenCalled();
   });
 });

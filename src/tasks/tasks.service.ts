@@ -1,11 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { ConfigService } from "@nestjs/config";
-import { OkxService } from "src/okx/okx.service";
-import { AppLogger } from "src/logger/logger.service";
+import { OkxService } from "../okx/okx.service";
+import { AppLogger } from "../logger/logger.service";
 import * as _ from 'lodash';
 import * as moment from 'moment';
-import { OkxFutureHedgeService } from "src/okx/okx.future.hedge.service";
+import { OkxFutureHedgeService } from "../okx/okx.future.hedge.service";
 @Injectable()
 export class TasksService {
     constructor(
@@ -62,24 +62,20 @@ export class TasksService {
             }
             const runSpotTaskHavingStopLoss = this.config.get<boolean>('runSpotTaskHavingStopLoss');
             this.logger.log(`Starting to place all orders for all coins ${moment().format('YY/MM/DD HH:mm:ss')}`);
-            let coins = this.config.get<any>(`coinsSpotForTakeProfit`);
-            if (!coins) {
-                throw new Error(`No configuration found for coinsSpotForTakeProfit: ${JSON.stringify(coins)}`);
-            }
-            coins = _.uniq(coins);
-            this.logger.log(`Coins to process: ${JSON.stringify(coins)}`);
-            const results = [];
             const isTesting = false,
                 removeExistingSellOrders = 'false',
                 addSellStopLoss = runSpotTaskHavingStopLoss ? 'true' : 'false',
                 addSellTakeProfit = 'true',
                 onlyForDown = 'false',
                 justOneOrder = 'false';
-            await Promise.all(coins.map(async (coin) => {
-                this.logger.log(`Processing coin: ${coin.toUpperCase()}`, null, coin);
-                // const result = await this.okxService.sellOneCoin({ coin, isTesting, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder });
-                await this.okxService.sellOneCoin({ coin, isTesting, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder, results });                
-            }));
+            const results = await this.okxService.sellAtPriceAllCoins({
+                isTesting,
+                removeExistingSellOrders,
+                addSellStopLoss,
+                addSellTakeProfit,
+                onlyForDown,
+                justOneOrder,
+            });
             
             this.logger.log(`Auto sell results: ${JSON.stringify(results, null, 2)}`);
 

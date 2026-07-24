@@ -88,6 +88,15 @@ export interface AllSpotBoughtCoins {
     coins: SpotBoughtCoin[];
 }
 
+export interface SellAtPriceAllCoinsOptions {
+    isTesting: boolean;
+    removeExistingSellOrders: string;
+    addSellStopLoss: string;
+    addSellTakeProfit: string;
+    onlyForDown: string;
+    justOneOrder: string;
+}
+
 @Injectable()
 export class OkxService {
     constructor(
@@ -127,6 +136,73 @@ export class OkxService {
 
     private sleep(ms: number) {
         return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    private async cancelAlgoOrders(
+        orders: Array<{ algoId: string; instId: string }>,
+        maxAttempts: number = 3,
+    ) {
+        const cancelPath = '/api/v5/trade/cancel-algos';
+        const responses: any[] = [];
+        const succeededAlgoIds = new Set<string>();
+        const failedAlgoIds = new Set<string>();
+        let requestCount = 0;
+
+        for (const initialChunk of this.chunk(orders, 10)) {
+            let ordersToRetry = initialChunk;
+
+            for (let attempt = 1; attempt <= maxAttempts && ordersToRetry.length > 0; attempt++) {
+                if (requestCount > 0) {
+                    // OKX allows 20 algo cancellations per 2 seconds for one instrument.
+                    // A 10-item request every 1.1 seconds remains inside that limit.
+                    await this.sleep(1100);
+                }
+                requestCount++;
+
+                const bodyString = JSON.stringify(ordersToRetry);
+                const timestamp = new Date().toISOString();
+                const headers = this.buildHeaders(timestamp, 'POST', cancelPath, bodyString);
+                const response = await axios.post(
+                    this.config.get<string>('okx.baseUrl') + cancelPath,
+                    bodyString,
+                    { headers },
+                );
+                responses.push(response.data);
+
+                const responseItems = response.data?.data ?? [];
+                const responseItemsByAlgoId = new Map(
+                    responseItems.map((item: any) => [String(item.algoId), item]),
+                );
+                const topLevelRateLimited = String(response.data?.code) === '50011';
+                const nextRetry: Array<{ algoId: string; instId: string }> = [];
+
+                for (const order of ordersToRetry) {
+                    const item: any = responseItemsByAlgoId.get(String(order.algoId));
+                    const itemCode = String(item?.sCode ?? '');
+
+                    if (itemCode === '0') {
+                        succeededAlgoIds.add(String(order.algoId));
+                        failedAlgoIds.delete(String(order.algoId));
+                    } else if (topLevelRateLimited || itemCode === '50011') {
+                        if (attempt < maxAttempts) {
+                            nextRetry.push(order);
+                        } else {
+                            failedAlgoIds.add(String(order.algoId));
+                        }
+                    } else {
+                        failedAlgoIds.add(String(order.algoId));
+                    }
+                }
+
+                ordersToRetry = nextRetry;
+            }
+        }
+
+        return {
+            responses,
+            cancelledOrderCount: succeededAlgoIds.size,
+            failedOrderCount: failedAlgoIds.size,
+        };
     }
 
     private async getTicker(instId: string) {
@@ -524,31 +600,9 @@ export class OkxService {
             };
         }
 
-        const chunks = this.chunk(
+        const { responses, cancelledOrderCount, failedOrderCount } = await this.cancelAlgoOrders(
             matchedOrders.map((order) => ({ algoId: order.algoId, instId })),
-            20,
         );
-        const responses: any[] = [];
-        let cancelledOrderCount = 0;
-        let failedOrderCount = 0;
-
-        for (const ordersToCancel of chunks) {
-            const cancelPath = '/api/v5/trade/cancel-algos';
-            const bodyString = JSON.stringify(ordersToCancel);
-            const timestamp = new Date().toISOString();
-            const headers = this.buildHeaders(timestamp, 'POST', cancelPath, bodyString);
-            const response = await axios.post(
-                this.config.get<string>('okx.baseUrl') + cancelPath,
-                bodyString,
-                { headers },
-            );
-            const responseItems = response.data?.data ?? [];
-
-            cancelledOrderCount += responseItems.filter((item: any) => String(item.sCode) === '0').length;
-            failedOrderCount += responseItems.filter((item: any) => String(item.sCode) !== '0').length
-                + Math.max(ordersToCancel.length - responseItems.length, 0);
-            responses.push(response.data);
-        }
 
         const result = {
             status: failedOrderCount === 0 ? 'cancelled' : 'partially_cancelled',
@@ -595,27 +649,9 @@ export class OkxService {
             };
         }
 
-        const chunks = this.chunk(ordersToCancel, 20);
-        const responses: any[] = [];
-        let cancelledOrderCount = 0;
-        let failedOrderCount = 0;
-
-        for (const ordersChunk of chunks) {
-            const bodyString = JSON.stringify(ordersChunk);
-            const cancelPath = '/api/v5/trade/cancel-algos';
-            const tsCancel = new Date().toISOString();
-            const headersCancel = this.buildHeaders(tsCancel, 'POST', cancelPath, bodyString);
-            const cancelRes = await axios.post(
-                this.config.get<string>('okx.baseUrl') + cancelPath,
-                bodyString,
-                { headers: headersCancel }
-            );
-            const responseItems = cancelRes.data?.data ?? [];
-            cancelledOrderCount += responseItems.filter((item: any) => String(item.sCode) === '0').length;
-            failedOrderCount += responseItems.filter((item: any) => String(item.sCode) !== '0').length
-                + Math.max(ordersChunk.length - responseItems.length, 0);
-            responses.push(cancelRes.data);
-        }
+        const { responses, cancelledOrderCount, failedOrderCount } = await this.cancelAlgoOrders(
+            ordersToCancel,
+        );
 
         const result = {
             status: failedOrderCount === 0 ? 'cancelled' : 'partially_cancelled',
@@ -674,30 +710,9 @@ export class OkxService {
 
         this.logger.log(`Found ${ordersToCancel.length} pending algo orders. Cancelling...`);
 
-        // 3) OKX may accept at most N items per request—safe to chunk (use 20)
-        const chunks = this.chunk(ordersToCancel, 20);
-        const results: any[] = [];
-
-        for await (const chunk of chunks) {
-            const bodyArray = chunk; // array of objects
-            const bodyString = JSON.stringify(bodyArray);
-
-            // IMPORTANT: use the exact same bodyString both for signature and for the HTTP body.
-            const cancelPath = '/api/v5/trade/cancel-algos';
-            const tsCancel = new Date().toISOString();
-            const headersCancel = this.buildHeaders(tsCancel, 'POST', cancelPath, bodyString);
-
-            const cancelRes = await axios.post(
-                this.config.get<string>('okx.baseUrl') + cancelPath,
-                bodyString,
-                { headers: headersCancel }
-            );
-            this.logger.log(`Cancel response: ${JSON.stringify(cancelRes.data, null, 2)}`);
-            results.push(cancelRes.data);
-
-            // 3. Gửi request huỷ tất cả
-        }
-        return results;
+        const result = await this.cancelAlgoOrders(ordersToCancel);
+        this.logger.log(`Cancel response: ${JSON.stringify(result, null, 2)}`);
+        return result.responses;
     }
 
     async getAccountBalance(ccy?: string) {
@@ -1617,6 +1632,29 @@ export class OkxService {
             this.logger.log('Palce auto buy order:', JSON.stringify(res4, null, 2));
             results.push({ coin, action: 'place_auto_buy_order', result: res4 });
         }
+    }
+
+    async sellAtPriceAllCoins(options: SellAtPriceAllCoinsOptions) {
+        let coins = this.config.get<string[]>('coinsSpotForTakeProfit');
+        if (!coins) {
+            throw new Error(`No configuration found for coinsSpotForTakeProfit: ${JSON.stringify(coins)}`);
+        }
+        coins = _.uniq(coins);
+
+        const boughtCoins = await this.getAllSpotBoughtCoins();
+        const boughtCoinNames = new Set(
+            boughtCoins.coins.map(({ coin }) => coin.toUpperCase()),
+        );
+        coins = coins.filter((coin) => boughtCoinNames.has(coin.toUpperCase()));
+
+        this.logger.log(`Bought coins to process: ${JSON.stringify(coins)}`);
+        const results = [];
+        await Promise.all(coins.map(async (coin) => {
+            this.logger.log(`Processing coin: ${coin.toUpperCase()}`, null, coin);
+            await this.sellOneCoin({ coin, ...options, results });
+        }));
+
+        return results;
     }
 
     async sellOneCoin({ coin, isTesting, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder, results }: { isTesting: boolean, removeExistingSellOrders: string, coin: string, addSellStopLoss: string, addSellTakeProfit: string, onlyForDown: string, justOneOrder: string, results: any[] }) {

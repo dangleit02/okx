@@ -349,28 +349,14 @@ export class SpotController {
     const isTesting = testing !== 'false';
 
     this.logger.log(`Starting to place all orders for all coins, testing mode: ${testing}`);
-    let coins = this.config.get<any>(`coinsSpotForTakeProfit`);
-    if (!coins) {
-      throw new Error(`No configuration found for coins: ${JSON.stringify(coins)}`);
-    }
-    coins = _.uniq(coins);
-
-    const boughtCoins = await this.okxService.getAllSpotBoughtCoins();
-    const boughtCoinNames = new Set(
-      boughtCoins.coins.map(({ coin }) => coin.toUpperCase()),
-    );
-    coins = coins.filter((coin: string) =>
-      boughtCoinNames.has(coin.toUpperCase()),
-    );
-
-    this.logger.log(`Bought coins to process: ${JSON.stringify(coins)}`);
-    const results = [];
-    await Promise.all(coins.map(async (coin: string) => {
-      this.logger.log(`Processing coin: ${coin.toUpperCase()}`);
-      await this.okxService.sellOneCoin({ isTesting, coin, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder, results });
-    }));
-
-    return results;
+    return this.okxService.sellAtPriceAllCoins({
+      isTesting,
+      removeExistingSellOrders,
+      addSellStopLoss,
+      addSellTakeProfit,
+      onlyForDown,
+      justOneOrder,
+    });
   }
 
   @Post('cancel-all-orders')
