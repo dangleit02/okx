@@ -3,6 +3,25 @@ mua giá rẻ nhất tháng
 bán giá cao nhất tháng
 
 # autosell for all coin
+  # PREVIEW
+curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
+testing=true&\
+removeExistingSellOrders=false&\
+addSellTakeProfit=true&\
+onlyForDown=false&\
+justOneOrder=false" \
+-H "Content-Type: application/json"
+  
+  # WARNING
+curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
+testing=false&\
+removeExistingSellOrders=false&\
+addSellTakeProfit=true&\
+onlyForDown=false&\
+justOneOrder=false" \
+-H "Content-Type: application/json"
+
+# sell and cancel
   curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
   testing=false&\
   removeExistingSellOrders=true&\

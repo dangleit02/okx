@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import axios from 'axios';
@@ -9,6 +9,8 @@ import { EmailService } from '../email/email.service';
 interface BuyTriggerRangeOptions {
     numberOfOrders?: number;
     addStopLoss?: boolean;
+    direction?: 'up' | 'down';
+    currentPrice?: number;
 }
 
 export type PendingOrdersSide = 'buy' | 'sell';
@@ -48,6 +50,7 @@ export interface PendingBuyOrdersTotal {
     coin: string;
     instId: string;
     quoteCurrency: string;
+    currentPrice?: number;
     minPrice?: number;
     maxPrice?: number;
     orderCount: number;
@@ -394,7 +397,10 @@ export class OkxService {
         }
         this.validatePendingOrdersTotalOptions(options);
 
-        const orders = await this.getPendingTriggerSpotOrders();
+        const [orders, tickers] = await Promise.all([
+            this.getPendingTriggerSpotOrders(),
+            this.getSpotTickers(),
+        ]);
         const instIds = Array.from(new Set(
             orders
                 .filter((order: any) => order.side === side && String(order.instId).endsWith('-USDT'))
@@ -407,6 +413,7 @@ export class OkxService {
                     ? { ...options, ...inferredRange }
                     : { ...options };
                 const total = this.summarizePendingOrders(orders, instId, side, resolvedOptions);
+                total.currentPrice = tickers.get(instId);
 
                 if (resolvedOptions.step !== undefined && resolvedOptions.minPrice !== undefined && resolvedOptions.maxPrice !== undefined) {
                     total.ranges = this.summarizePendingOrdersByStep(
@@ -440,12 +447,16 @@ export class OkxService {
         };
     }
 
-    async cancelPendingBuyOrdersByPriceRange(
+    async cancelPendingOrdersByPriceRange(
         coin: string,
+        side: PendingOrdersSide,
         minPrice: number,
         maxPrice: number,
         testing: boolean = true,
     ) {
+        if (side !== 'buy' && side !== 'sell') {
+            throw new Error(`Invalid side: ${side}. side must be buy or sell`);
+        }
         if (!Number.isFinite(minPrice) || minPrice <= 0) {
             throw new Error(`Invalid minPrice: ${minPrice}`);
         }
@@ -462,7 +473,7 @@ export class OkxService {
         const matchedOrders = pendingOrders
             .filter((order: any) => {
                 const triggerPrice = Number(order.triggerPx);
-                return order.side === 'buy'
+                return order.side === side
                     && order.instId === instId
                     && Boolean(order.algoId)
                     && Number.isFinite(triggerPrice)
@@ -487,6 +498,7 @@ export class OkxService {
         const baseResult = {
             coin: normalizedCoin,
             instId,
+            side,
             minPrice,
             maxPrice,
             testing,
@@ -545,112 +557,78 @@ export class OkxService {
             failedOrderCount,
             responses,
         };
-        this.logger.log(JSON.stringify(result, null, 2), 'Cancel pending BUY orders by price range', normalizedCoin);
+        this.logger.log(JSON.stringify(result, null, 2), `Cancel pending ${side} orders by price range`, normalizedCoin);
         return result;
     }
 
-    async cancelOpenConditionSpotOrdersForOneCoin(coin: string, side: 'buy' | 'sell' | null = null, onlyForDown: boolean = false) {
-        const timestamp = new Date().toISOString();
-
-        // 1. Get open orders
-        const instId = `${coin.toUpperCase()}-USDT`; // coin cụ thể
-        const ordType = 'trigger';  // bắt buộc
-        const instType = 'SPOT';
-
-        const currentPrice = await this.getTicker(instId);
-        this.logger.log(`currentPrice ${currentPrice}`);
-        if (!currentPrice || currentPrice <= 0) {
-            throw new Error(`Invalid current price fetched for ${instId}: ${currentPrice}`);
+    async cancelOpenConditionSpotOrdersForOneCoin(coin: string, side: 'buy' | 'sell' | null = null, _onlyForDown: boolean = false) {
+        const normalizedCoin = coin.trim().toUpperCase();
+        if (!normalizedCoin || !/^[A-Z0-9]+$/.test(normalizedCoin)) {
+            throw new Error(`Invalid coin: ${coin}`);
         }
-        
-        const getPath = `/api/v5/trade/orders-algo-pending?instType=${instType}&ordType=${ordType}&instId=${instId}`;
-        const getSign = this.sign(timestamp, 'GET', getPath);
-        const getRes = await axios.get(
-            this.config.get<string>('okx.baseUrl') + getPath,
-            {
-                headers: {
-                    'OK-ACCESS-KEY': this.config.get<string>('okx.apiKey'),
-                    'OK-ACCESS-SIGN': getSign,
-                    'OK-ACCESS-TIMESTAMP': timestamp,
-                    'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphrase'),
-                },
-            }
-        );
-
-        const pendingOrders = getRes.data?.data || [];
-        if (pendingOrders.length === 0) {
-            this.logger.log(`No pending algo orders to cancel for ${instId}.`);
-            return { message: 'No pending algo orders' };
-        }
-        this.logger.log(`pendingOrders ${JSON.stringify(pendingOrders, null, 2)}`);
-        // 2. Filter theo side
-        let ordersBySide = side ? pendingOrders.filter((order: any) => order.side === side) : pendingOrders;
-        this.emailService.sendEmail(process.env.EMAIL_TO, `Number of existed ${side} orders of ${coin}`, ordersBySide.length);    
-        // 3. filter by price
-        ordersBySide = ordersBySide.filter((order: any) => {
-            if (order.side === 'buy') {
-                // if price higher than last price, skip
-                if (currentPrice > order.last) {
-                    return false;
-                }
-            }
-            if (order.side === 'sell') {
-                // if price lower than last price, skip
-                if (currentPrice < order.last) {
-                    return false;
-                }
-            }
-            return true;
-        });
-        this.logger.log(`ordersBySide ${JSON.stringify(ordersBySide, null, 2)}`);
-        // if (side === 'sell') {
-        //     if (onlyForDown) {
-        //         ordersBySide = ordersBySide.filter((order: any) => order.ordPx < currentPrice);
-        //     }
-        //     //  else {
-        //     //     ordersBySide = ordersBySide.filter((order: any) => order.ordPx > currentPrice);
-        //     // }
-        // }
-
-        if (ordersBySide.length === 0) {
-            this.logger.log(`No ${side.toUpperCase()} orders to cancel for ${instId}`);
-            return { cancelled: [] };
+        if (side !== null && side !== 'buy' && side !== 'sell') {
+            throw new Error(`Invalid side: ${side}. side must be buy or sell`);
         }
 
-        // 2. Chuẩn hoá orders để huỷ
+        const instId = `${normalizedCoin}-USDT`;
+        const pendingOrders = await this.getPendingTriggerSpotOrders(normalizedCoin);
+        const ordersBySide = pendingOrders.filter((order: any) => (
+            order.instId === instId
+            && (!side || order.side === side)
+            && Boolean(order.algoId)
+        ));
         const ordersToCancel = ordersBySide.map((o: any) => ({
             algoId: o.algoId,
             instId: o.instId,
         }));
 
-        this.emailService.sendEmail(process.env.EMAIL_TO, `Number of ${side} orders of ${coin} to cancel`, ordersToCancel.length);
+        if (ordersToCancel.length === 0) {
+            return {
+                status: 'no_matching_orders',
+                coin: normalizedCoin,
+                instId,
+                side,
+                matchedOrderCount: 0,
+                cancelledOrderCount: 0,
+                failedOrderCount: 0,
+                responses: [],
+            };
+        }
 
-        this.logger.log(`Found ${ordersToCancel.length} pending algo orders. Cancelling...`);
-
-        // 3) OKX may accept at most N items per request—safe to chunk (use 20)
         const chunks = this.chunk(ordersToCancel, 20);
-        const results: any[] = [];
+        const responses: any[] = [];
+        let cancelledOrderCount = 0;
+        let failedOrderCount = 0;
 
-        for await (const chunk of chunks) {
-            const bodyArray = chunk; // array of objects
-            const bodyString = JSON.stringify(bodyArray);
-
-            // IMPORTANT: use the exact same bodyString both for signature and for the HTTP body.
+        for (const ordersChunk of chunks) {
+            const bodyString = JSON.stringify(ordersChunk);
             const cancelPath = '/api/v5/trade/cancel-algos';
             const tsCancel = new Date().toISOString();
             const headersCancel = this.buildHeaders(tsCancel, 'POST', cancelPath, bodyString);
-
             const cancelRes = await axios.post(
                 this.config.get<string>('okx.baseUrl') + cancelPath,
                 bodyString,
                 { headers: headersCancel }
             );
-            this.logger.log(`Cancel response: ${JSON.stringify(cancelRes.data, null, 2)}`);
-            results.push(cancelRes.data);
-
-            // 3. Gửi request huỷ tất cả
+            const responseItems = cancelRes.data?.data ?? [];
+            cancelledOrderCount += responseItems.filter((item: any) => String(item.sCode) === '0').length;
+            failedOrderCount += responseItems.filter((item: any) => String(item.sCode) !== '0').length
+                + Math.max(ordersChunk.length - responseItems.length, 0);
+            responses.push(cancelRes.data);
         }
-        return results;
+
+        const result = {
+            status: failedOrderCount === 0 ? 'cancelled' : 'partially_cancelled',
+            coin: normalizedCoin,
+            instId,
+            side,
+            matchedOrderCount: ordersToCancel.length,
+            cancelledOrderCount,
+            failedOrderCount,
+            responses,
+        };
+        this.logger.log(JSON.stringify(result, null, 2), 'Cancel pending spot trigger orders', normalizedCoin);
+        return result;
     }
 
     async cancelAllOpenConditionSpotOrders(side: 'buy' | 'sell' | null = null) {
@@ -1135,16 +1113,14 @@ export class OkxService {
     ) {
         const data = [];
         const normalizedCoin = coin.toUpperCase();
+        const direction = options.direction ?? 'down';
         this.logger.log(`Starting trigger BUY range for ${normalizedCoin}, minPrice: ${minBuyPrice}, maxPrice: ${maxBuyPrice}, testing: ${testing}`, null, coin);
 
-        if (!Number.isFinite(minBuyPrice) || minBuyPrice <= 0) {
-            throw new Error(`Invalid minPrice: ${minBuyPrice}`);
-        }
-        if (!Number.isFinite(maxBuyPrice) || maxBuyPrice <= 0) {
-            throw new Error(`Invalid maxPrice: ${maxBuyPrice}`);
-        }
-        if (minBuyPrice >= maxBuyPrice) {
-            throw new Error(`Invalid price range: minPrice (${minBuyPrice}) must be less than maxPrice (${maxBuyPrice})`);
+        this.validateBuyTriggerRange(minBuyPrice, maxBuyPrice, direction);
+        if (direction === 'down') {
+            const currentPrice = options.currentPrice
+                ?? await this.validateBuyTriggerPriceDirection(coin, minBuyPrice, maxBuyPrice, direction);
+            this.ensureDownBuyRangeIsNotAboveCurrentPrice(minBuyPrice, maxBuyPrice, currentPrice);
         }
 
         const coinConfig = this.config.get<any>(`coin.${normalizedCoin}`);
@@ -1258,6 +1234,56 @@ export class OkxService {
         }
 
         return data;
+    }
+
+    private validateBuyTriggerRange(
+        minBuyPrice: number,
+        maxBuyPrice: number,
+        direction: string,
+    ) {
+        if (direction !== 'up' && direction !== 'down') {
+            throw new BadRequestException(`Invalid direction: ${direction}. direction must be up or down`);
+        }
+        if (!Number.isFinite(minBuyPrice) || minBuyPrice <= 0) {
+            throw new BadRequestException(`Invalid minPrice: ${minBuyPrice}`);
+        }
+        if (!Number.isFinite(maxBuyPrice) || maxBuyPrice <= 0) {
+            throw new BadRequestException(`Invalid maxPrice: ${maxBuyPrice}`);
+        }
+        if (minBuyPrice >= maxBuyPrice) {
+            throw new BadRequestException(`Invalid price range: minPrice (${minBuyPrice}) must be less than maxPrice (${maxBuyPrice})`);
+        }
+    }
+
+    private ensureDownBuyRangeIsNotAboveCurrentPrice(
+        minBuyPrice: number,
+        maxBuyPrice: number,
+        currentPrice: number,
+    ) {
+        if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+            throw new Error(`Invalid current price: ${currentPrice}`);
+        }
+        if (minBuyPrice > currentPrice || maxBuyPrice > currentPrice) {
+            throw new BadRequestException(
+                `Invalid down price range: minPrice (${minBuyPrice}) and maxPrice (${maxBuyPrice}) must not exceed currentPrice (${currentPrice})`,
+            );
+        }
+    }
+
+    async validateBuyTriggerPriceDirection(
+        coin: string,
+        minBuyPrice: number,
+        maxBuyPrice: number,
+        direction: 'up' | 'down' = 'down',
+    ): Promise<number | undefined> {
+        this.validateBuyTriggerRange(minBuyPrice, maxBuyPrice, direction);
+        if (direction === 'up') {
+            return undefined;
+        }
+
+        const currentPrice = await this.getTicker(`${coin.trim().toUpperCase()}-USDT`);
+        this.ensureDownBuyRangeIsNotAboveCurrentPrice(minBuyPrice, maxBuyPrice, currentPrice);
+        return currentPrice;
     }
 
     async autoSellFromMinPriceToStopLossPriceForDown(

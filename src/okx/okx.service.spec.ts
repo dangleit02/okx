@@ -269,6 +269,10 @@ describe('OkxService pending order totals', () => {
           sz: '1000',
         },
       ]);
+    jest.spyOn(service as any, 'getSpotTickers').mockResolvedValue(new Map([
+      ['ADA-USDT', 0.5],
+      ['BTC-USDT', 50000],
+    ]));
 
     const result = await service.getPendingOrdersTotalForAllCoins('buy');
 
@@ -278,12 +282,14 @@ describe('OkxService pending order totals', () => {
     expect(result.coins).toEqual([
       expect.objectContaining({
         coin: 'ADA',
+        currentPrice: 0.5,
         minPrice: 0.45,
         maxPrice: 0.45,
         totalAmount: 450,
       }),
       expect.objectContaining({
         coin: 'BTC',
+        currentPrice: 50000,
         minPrice: 40000,
         maxPrice: 45000,
         totalAmount: 1265,
@@ -339,6 +345,58 @@ describe('OkxService bought spot coins', () => {
   });
 });
 
+describe('OkxService cancel pending spot trigger orders for one coin', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('cancels every matching side without filtering by the current market price', async () => {
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'okx.baseUrl') return 'https://www.okx.test';
+        if (key === 'okx.secretKey') return 'secret';
+        return 'value';
+      }),
+    };
+    const service = new OkxService(config as any, { log: jest.fn() } as any, {} as any);
+    jest
+      .spyOn(service as any, 'getPendingTriggerSpotOrders')
+      .mockResolvedValue([
+        { algoId: '1', instId: 'XRP-USDT', side: 'buy', last: '0.1' },
+        { algoId: '2', instId: 'XRP-USDT', side: 'buy', last: '0.2' },
+        { algoId: '3', instId: 'XRP-USDT', side: 'sell', last: '10' },
+      ]);
+    const ticker = jest.spyOn(service as any, 'getTicker');
+    jest.spyOn(axios, 'post').mockResolvedValue({
+      data: {
+        code: '0',
+        data: [
+          { algoId: '1', sCode: '0' },
+          { algoId: '2', sCode: '0' },
+        ],
+      },
+    });
+
+    const result = await service.cancelOpenConditionSpotOrdersForOneCoin('xrp', 'buy');
+
+    expect(ticker).not.toHaveBeenCalled();
+    expect(axios.post).toHaveBeenCalledWith(
+      'https://www.okx.test/api/v5/trade/cancel-algos',
+      JSON.stringify([
+        { algoId: '1', instId: 'XRP-USDT' },
+        { algoId: '2', instId: 'XRP-USDT' },
+      ]),
+      expect.objectContaining({ headers: expect.any(Object) }),
+    );
+    expect(result).toEqual(expect.objectContaining({
+      status: 'cancelled',
+      matchedOrderCount: 2,
+      cancelledOrderCount: 2,
+      failedOrderCount: 0,
+    }));
+  });
+});
+
 describe('OkxService cancel pending buy orders by price range', () => {
   afterEach(() => {
     jest.restoreAllMocks();
@@ -384,8 +442,9 @@ describe('OkxService cancel pending buy orders by price range', () => {
       ]);
     const post = jest.spyOn(axios, 'post');
 
-    const result = await service.cancelPendingBuyOrdersByPriceRange(
+    const result = await service.cancelPendingOrdersByPriceRange(
       'btc',
+      'buy',
       40000,
       50000,
     );
@@ -401,6 +460,19 @@ describe('OkxService cancel pending buy orders by price range', () => {
     );
     expect(result.orders.map((order) => order.algoId)).toEqual(['1', '2']);
     expect(post).not.toHaveBeenCalled();
+
+    const sellResult = await service.cancelPendingOrdersByPriceRange(
+      'btc',
+      'sell',
+      40000,
+      50000,
+    );
+    expect(sellResult).toEqual(expect.objectContaining({
+      status: 'preview',
+      side: 'sell',
+      matchedOrderCount: 1,
+    }));
+    expect(sellResult.orders.map((order) => order.algoId)).toEqual(['4']);
   });
 
   it('cancels matching orders in batches of 20 when testing=false', async () => {
@@ -439,8 +511,9 @@ describe('OkxService cancel pending buy orders by price range', () => {
         } as any;
       });
 
-    const result = await service.cancelPendingBuyOrdersByPriceRange(
+    const result = await service.cancelPendingOrdersByPriceRange(
       'BTC',
+      'buy',
       40000,
       50000,
       false,
@@ -580,6 +653,33 @@ describe('OkxService sell all at current price', () => {
       'Invalid percentage',
     );
     expect(getBalance).not.toHaveBeenCalled();
+  });
+});
+
+describe('OkxService buy trigger range direction', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('rejects a down range when minPrice or maxPrice exceeds currentPrice', async () => {
+    const service = new OkxService({} as any, {} as any, {} as any);
+    jest.spyOn(service as any, 'getTicker').mockResolvedValue(43);
+
+    await expect(
+      service.validateBuyTriggerPriceDirection('LTC', 42, 44, 'down'),
+    ).rejects.toThrow(
+      'minPrice (42) and maxPrice (44) must not exceed currentPrice (43)',
+    );
+  });
+
+  it('allows an up range without requesting currentPrice', async () => {
+    const service = new OkxService({} as any, {} as any, {} as any);
+    const ticker = jest.spyOn(service as any, 'getTicker');
+
+    await expect(
+      service.validateBuyTriggerPriceDirection('LTC', 44, 45, 'up'),
+    ).resolves.toBeUndefined();
+    expect(ticker).not.toHaveBeenCalled();
   });
 });
 

@@ -165,34 +165,51 @@ export class SpotController {
     result: AllPendingOrdersTotal,
   ): string {
     const hasRanges = result.filter.step !== undefined;
-    const headers = hasRanges
-      ? ['COIN', 'FROM PRICE', 'TO PRICE', 'AMOUNT (USD)']
-      : ['COIN', 'MIN PRICE', 'MAX PRICE', 'AMOUNT (USD)'];
-    const rows = result.coins.flatMap((coin) => hasRanges
-      ? (coin.ranges ?? []).map((range) => [
+    const sortedCoins = [...result.coins].sort((left, right) =>
+      left.coin.localeCompare(right.coin),
+    );
+    const formatTable = (headers: string[], rows: string[][]) => {
+      const widths = headers.map((header, index) =>
+        Math.max(header.length, ...rows.map((row) => row[index].length)),
+      );
+      const formatRow = (row: string[]) =>
+        row.map((value, index) => value.padEnd(widths[index])).join(' | ');
+      const separator = widths.map((width) => '-'.repeat(width)).join('-+-');
+      return [formatRow(headers), separator, ...rows.map(formatRow)].join('\n');
+    };
+    const summaryHeaders = [
+      'COIN',
+      'CURENT PRICE',
+      'FROM PRICE',
+      'TO PRICE',
+      'TOTAL AMOUNT (USDT)',
+    ];
+    const summaryRows = sortedCoins.map((coin) => [
+      coin.coin,
+      coin.currentPrice === undefined ? '' : String(coin.currentPrice),
+      coin.minPrice === undefined ? '' : String(coin.minPrice),
+      coin.maxPrice === undefined ? '' : String(coin.maxPrice),
+      String(coin.totalAmount),
+    ]);
+    const tables = [
+      'TABLE SUMMARY',
+      formatTable(summaryHeaders, summaryRows),
+    ];
+
+    if (hasRanges) {
+      const detailHeaders = ['COIN', 'FROM PRICE', 'TO PRICE', 'AMOUNT (USDT)'];
+      const detailRows = sortedCoins.flatMap((coin) =>
+        (coin.ranges ?? []).map((range) => [
         coin.coin,
         String(range.fromPrice),
         String(range.toPrice),
         String(range.amount),
-      ])
-      : [[
-        coin.coin,
-        coin.minPrice === undefined ? '' : String(coin.minPrice),
-        coin.maxPrice === undefined ? '' : String(coin.maxPrice),
-        String(coin.totalAmount),
-      ]]);
-    const widths = headers.map((header, index) =>
-      Math.max(header.length, ...rows.map((row) => row[index].length)),
-    );
-    const formatRow = (row: string[]) =>
-      row.map((value, index) => value.padEnd(widths[index])).join(' | ');
-    const separator = widths.map((width) => '-'.repeat(width)).join('-+-');
+        ]),
+      );
+      tables.push('', 'TABLE DETAIL', formatTable(detailHeaders, detailRows));
+    }
 
-    return [
-      formatRow(headers),
-      separator,
-      ...rows.map(formatRow),
-    ].join('\n');
+    return tables.join('\n');
   }
 
   @Post('buy-at-price/:coin')
@@ -239,7 +256,19 @@ export class SpotController {
     const minPrice = Number(query.minPrice);
     const maxPrice = Number(query.maxPrice);
     const numberOfOrders = query.numberOfOrders ?? query.numberOfSteps;
+    const direction = query.direction ?? 'down';
     const results = [];
+
+    if (direction !== 'up' && direction !== 'down') {
+      throw new BadRequestException('direction must be up or down');
+    }
+
+    const currentPrice = await this.okxService.validateBuyTriggerPriceDirection(
+      coin,
+      minPrice,
+      maxPrice,
+      direction,
+    );
 
     if (!isTesting && parseBool(query.removeExistingBuyOrders)) {
       const res = await this.okxService.cancelOpenConditionSpotOrdersForOneCoin(coin, 'buy');
@@ -255,6 +284,8 @@ export class SpotController {
       {
         numberOfOrders: numberOfOrders ? Number(numberOfOrders) : undefined,
         addStopLoss: parseBool(query.addStopLoss),
+        direction,
+        currentPrice,
       },
     );
     this.logger.log('Place trigger buy orders from min to max:', JSON.stringify(res, null, 2), coin);
@@ -323,7 +354,16 @@ export class SpotController {
       throw new Error(`No configuration found for coins: ${JSON.stringify(coins)}`);
     }
     coins = _.uniq(coins);
-    this.logger.log(`Coins to process: ${JSON.stringify(coins)}`);
+
+    const boughtCoins = await this.okxService.getAllSpotBoughtCoins();
+    const boughtCoinNames = new Set(
+      boughtCoins.coins.map(({ coin }) => coin.toUpperCase()),
+    );
+    coins = coins.filter((coin: string) =>
+      boughtCoinNames.has(coin.toUpperCase()),
+    );
+
+    this.logger.log(`Bought coins to process: ${JSON.stringify(coins)}`);
     const results = [];
     await Promise.all(coins.map(async (coin: string) => {
       this.logger.log(`Processing coin: ${coin.toUpperCase()}`);
@@ -348,15 +388,21 @@ export class SpotController {
     return await this.okxService.cancelOpenConditionSpotOrdersForOneCoin(coin, side);
   }
 
-  @Delete('buy-orders/:coin')
-  async deleteBuyOrdersByPriceRange(
+  @Delete('cancel-orders-one-coin/:coin')
+  async cancelOrdersForOneCoinByPriceRange(
     @Param('coin') coin: string,
+    @Query('side') side?: string,
     @Query('minPrice') minPrice?: string,
     @Query('maxPrice') maxPrice?: string,
     @Query('testing') testing?: string,
   ) {
-    return this.okxService.cancelPendingBuyOrdersByPriceRange(
+    if (side !== 'buy' && side !== 'sell') {
+      throw new BadRequestException('side must be buy or sell');
+    }
+
+    return this.okxService.cancelPendingOrdersByPriceRange(
       coin,
+      side,
       Number(minPrice),
       Number(maxPrice),
       testing !== 'false',

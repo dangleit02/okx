@@ -45,6 +45,7 @@ describe('SpotController buy order total response format', () => {
         coin: 'ADA',
         instId: 'ADA-USDT',
         quoteCurrency: 'USDT',
+        currentPrice: 0.5,
         minPrice: 0.4,
         maxPrice: 0.45,
         orderCount: 2,
@@ -56,6 +57,7 @@ describe('SpotController buy order total response format', () => {
         coin: 'BTC',
         instId: 'BTC-USDT',
         quoteCurrency: 'USDT',
+        currentPrice: 51000,
         minPrice: 45000,
         maxPrice: 50000,
         orderCount: 1,
@@ -87,9 +89,13 @@ describe('SpotController buy order total response format', () => {
     getPendingOrdersTotalForCoin: jest.Mock;
     getPendingOrdersTotalForAllCoins: jest.Mock;
     getAllSpotBoughtCoins: jest.Mock;
-    cancelPendingBuyOrdersByPriceRange: jest.Mock;
+    validateBuyTriggerPriceDirection: jest.Mock;
+    buyTriggerFromMinPriceToMaxPrice: jest.Mock;
+    cancelOpenConditionSpotOrdersForOneCoin: jest.Mock;
+    cancelPendingOrdersByPriceRange: jest.Mock;
     sellAllAtCurrentPrice: jest.Mock;
     sellAtTriggerPrice: jest.Mock;
+    sellOneCoin: jest.Mock;
   };
 
   beforeEach(() => {
@@ -105,11 +111,15 @@ describe('SpotController buy order total response format', () => {
       ),
       getPendingOrdersTotalForAllCoins: jest.fn().mockResolvedValue(allCoinsResponse),
       getAllSpotBoughtCoins: jest.fn().mockResolvedValue(boughtCoinsResponse),
-      cancelPendingBuyOrdersByPriceRange: jest.fn().mockResolvedValue({
+      validateBuyTriggerPriceDirection: jest.fn().mockResolvedValue(50),
+      buyTriggerFromMinPriceToMaxPrice: jest.fn().mockResolvedValue([]),
+      cancelOpenConditionSpotOrdersForOneCoin: jest.fn().mockResolvedValue({ status: 'cancelled' }),
+      cancelPendingOrdersByPriceRange: jest.fn().mockResolvedValue({
         status: 'preview',
       }),
       sellAllAtCurrentPrice: jest.fn().mockResolvedValue({ status: 'preview' }),
       sellAtTriggerPrice: jest.fn().mockResolvedValue({ status: 'preview' }),
+      sellOneCoin: jest.fn().mockResolvedValue(undefined),
     };
     controller = new SpotController(
       okxService as any,
@@ -130,12 +140,44 @@ describe('SpotController buy order total response format', () => {
     expect(result).toContain('100');
   });
 
+  it('defaults buy trigger direction to down and passes the validated current price', async () => {
+    await controller.buyTriggerFromMinToMax('LTC', {
+      testing: 'true',
+      minPrice: '40',
+      maxPrice: '41',
+      numberOfOrders: '10',
+      addStopLoss: 'false',
+    });
+
+    expect(okxService.validateBuyTriggerPriceDirection).toHaveBeenCalledWith(
+      'LTC',
+      40,
+      41,
+      'down',
+    );
+    expect(okxService.buyTriggerFromMinPriceToMaxPrice).toHaveBeenCalledWith(
+      'LTC',
+      40,
+      41,
+      true,
+      {
+        numberOfOrders: 10,
+        addStopLoss: false,
+        direction: 'down',
+        currentPrice: 50,
+      },
+    );
+  });
+
   it('returns a compact all-coins table by default', async () => {
     const result = await controller.getOrdersTotalForAllCoins('buy');
 
-    expect(result).toContain('COIN | MIN PRICE | MAX PRICE | AMOUNT (USD)');
-    expect(result).toContain('ADA  | 0.4       | 0.45      | 425');
-    expect(result).toContain('BTC  | 45000     | 50000     | 910');
+    expect(result).toContain('TABLE SUMMARY');
+    expect(result).toContain(
+      'COIN | CURENT PRICE | FROM PRICE | TO PRICE | TOTAL AMOUNT (USDT)',
+    );
+    expect(result).toContain('ADA  | 0.5');
+    expect(result).toContain('BTC  | 51000');
     expect(result).not.toContain('Summary:');
     expect(okxService.getPendingOrdersTotalForAllCoins).toHaveBeenCalledWith(
       'buy',
@@ -161,6 +203,18 @@ describe('SpotController buy order total response format', () => {
       JSON.stringify(allCoinsResponse, null, 2),
       'Pending buy orders all coins JSON',
     );
+  });
+
+  it('sorts coins alphabetically in the all-coins table', async () => {
+    okxService.getPendingOrdersTotalForAllCoins.mockResolvedValueOnce({
+      ...allCoinsResponse,
+      coins: [...allCoinsResponse.coins].reverse(),
+    });
+
+    const result = await controller.getOrdersTotalForAllCoins('buy');
+    const table = result as string;
+
+    expect(table.indexOf('ADA')).toBeLessThan(table.indexOf('BTC'));
   });
 
   it('returns and logs an ASCII table when format=table', async () => {
@@ -227,15 +281,17 @@ describe('SpotController buy order total response format', () => {
   });
 
   it('defaults deletion to preview mode', async () => {
-    const result = await controller.deleteBuyOrdersByPriceRange(
+    const result = await controller.cancelOrdersForOneCoinByPriceRange(
       'BTC',
+      'buy',
       '40000',
       '50000',
     );
 
     expect(result).toEqual({ status: 'preview' });
-    expect(okxService.cancelPendingBuyOrdersByPriceRange).toHaveBeenCalledWith(
+    expect(okxService.cancelPendingOrdersByPriceRange).toHaveBeenCalledWith(
       'BTC',
+      'buy',
       40000,
       50000,
       true,
@@ -262,5 +318,71 @@ describe('SpotController buy order total response format', () => {
       25,
       true,
     );
+  });
+
+  it('only processes configured coins that have been bought', async () => {
+    controller = new SpotController(
+      okxService as any,
+      {
+        get: jest.fn().mockReturnValue(['btc', 'ETH']),
+      } as any,
+      logger as any,
+    );
+
+    await expect(
+      controller.sellAtPriceAllCoins(
+        'false',
+        'true',
+        'true',
+        'true',
+        'false',
+        'false',
+      ),
+    ).resolves.toEqual([]);
+
+    expect(okxService.getAllSpotBoughtCoins).toHaveBeenCalledTimes(1);
+    expect(okxService.sellOneCoin).toHaveBeenCalledTimes(1);
+    expect(okxService.sellOneCoin).toHaveBeenCalledWith({
+      isTesting: false,
+      coin: 'btc',
+      removeExistingSellOrders: 'true',
+      addSellStopLoss: 'true',
+      addSellTakeProfit: 'true',
+      onlyForDown: 'false',
+      justOneOrder: 'false',
+      results: [],
+    });
+    expect(okxService.sellOneCoin).not.toHaveBeenCalledWith(
+      expect.objectContaining({ coin: 'ETH' }),
+    );
+  });
+
+  it('does not cancel or place sell orders when no configured coin has been bought', async () => {
+    okxService.getAllSpotBoughtCoins.mockResolvedValueOnce({
+      quoteCurrency: 'USDT',
+      coinCount: 0,
+      totalProfitUsdt: 0,
+      coins: [],
+    });
+    controller = new SpotController(
+      okxService as any,
+      {
+        get: jest.fn().mockReturnValue(['BTC', 'ETH']),
+      } as any,
+      logger as any,
+    );
+
+    await expect(
+      controller.sellAtPriceAllCoins(
+        'false',
+        'true',
+        'true',
+        'true',
+        'false',
+        'false',
+      ),
+    ).resolves.toEqual([]);
+
+    expect(okxService.sellOneCoin).not.toHaveBeenCalled();
   });
 });

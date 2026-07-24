@@ -3,105 +3,54 @@ mua giá rẻ nhất tháng
 bán giá cao nhất tháng
 
 # buy trigger from min to max for one coin
+  # HOLD PRICE
+    curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/ETH?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=1000&maxPrice=1100&numberOfOrders=10&addStopLoss=false' \
+          -H 'Content-Type: application/json'
 
-  curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/ALGO?\
-  testing=false&\
-  removeExistingBuyOrders=false&\
-  minPrice=0.08&\
-  maxPrice=0.0813&\
-  numberOfOrders=10&\
-  addStopLoss=false" \
-    -H "Content-Type: application/json"
+    curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/DOT?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=0.5&maxPrice=0.6&numberOfOrders=10&addStopLoss=false' \
+          -H 'Content-Type: application/json'
 
-  curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/DOT?\
-  testing=false&\
-  removeExistingBuyOrders=false&\
-  minPrice=0.796&\
-  maxPrice=0.81&\
-  numberOfOrders=10&\
-  addStopLoss=false" \
-    -H "Content-Type: application/json"
+    curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/AVAX?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=4&maxPrice=5&numberOfOrders=10&addStopLoss=false' \
+          -H 'Content-Type: application/json'
 
-  curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/ETH?\
-  testing=false&\
-  removeExistingBuyOrders=false&\
-  minPrice=1700&\
-  maxPrice=1800&\
-  numberOfOrders=10&\
-  addStopLoss=false" \
-    -H "Content-Type: application/json"
+    curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/ALGO?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=0.0599&maxPrice=0.07&numberOfOrders=10&addStopLoss=false' \
+          -H 'Content-Type: application/json'
 
-  curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/DOGE?\
-  testing=false&\
-  removeExistingBuyOrders=false&\
-  minPrice=0.070&\
-  maxPrice=0.071&\
-  numberOfOrders=10&\
-  addStopLoss=false" \
-    -H "Content-Type: application/json"
+    curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/ETC?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=5.31&maxPrice=6.02&numberOfOrders=10&addStopLoss=false' \
+          -H 'Content-Type: application/json'
 
-  curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/ETC?\
-  testing=false&\
-  removeExistingBuyOrders=false&\
-  minPrice=6.7&\
-  maxPrice=6.8&\
-  numberOfOrders=10&\
-  addStopLoss=false" \
-    -H "Content-Type: application/json"
+    curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/DOGE?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=0.05&maxPrice=0.06&numberOfOrders=10&addStopLoss=false' \
+          -H 'Content-Type: application/json'
+  # LƯỚT SÓNG
+    curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/ALGO?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=0.073&maxPrice=0.077&numberOfOrders=10&addStopLoss=false' \
+        -H 'Content-Type: application/json'
 
-  curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/LTC?\
-  testing=false&\
-  removeExistingBuyOrders=false&\
-  minPrice=40&\
-  maxPrice=41&\
-  numberOfOrders=10&\
-  addStopLoss=false" \
-    -H "Content-Type: application/json"
+    curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/AVAX?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=5.7&maxPrice=6&numberOfOrders=10&addStopLoss=false' \
+        -H 'Content-Type: application/json'
 
-  curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/XLM?\
-  testing=false&\
-  removeExistingBuyOrders=false&\
-  minPrice=0.16&\
-  maxPrice=0.17&\
-  numberOfOrders=10&\
-  addStopLoss=false" \
-    -H "Content-Type: application/json"
+    curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/ADA?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=0.14&maxPrice=0.15&numberOfOrders=10&addStopLoss=false' \
+        -H 'Content-Type: application/json'
 
-  curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/XRP?\
-  testing=false&\
-  removeExistingBuyOrders=false&\
-  minPrice=0.9&\
-  maxPrice=1&\
-  numberOfOrders=10&\
-  addStopLoss=false" \
-    -H "Content-Type: application/json"
+    curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/AAVE?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=82&maxPrice=85&numberOfOrders=10&addStopLoss=false' \
+        -H 'Content-Type: application/json'
 
-  curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/NEAR?\
-  testing=false&\
-  removeExistingBuyOrders=false&\
-  minPrice=1.6&\
-  maxPrice=1.7&\
-  numberOfOrders=10&\
-  addStopLoss=false" \
-    -H "Content-Type: application/json"
+    curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/SUI?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=0.65&maxPrice=0.7&numberOfOrders=10&addStopLoss=false' \
+        -H 'Content-Type: application/json'
 
-  curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/UNI?\
-  testing=false&\
-  removeExistingBuyOrders=false&\
-  minPrice=3.2&\
-  maxPrice=3.39&\
-  numberOfOrders=10&\
-  addStopLoss=false" \
-    -H "Content-Type: application/json"
+    curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/SOL?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=70&maxPrice=73&numberOfOrders=10&addStopLoss=false' \
+        -H 'Content-Type: application/json'
 
-  curl -X POST "http://localhost:3030/buy-trigger-from-min-to-max/OKB?\
-  testing=false&\
-  removeExistingBuyOrders=false&\
-  minPrice=71.83&\
-  maxPrice=75&\
-  numberOfOrders=10&\
-  addStopLoss=false" \
-    -H "Content-Type: application/json"
+    curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/NEAR?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=1.7&maxPrice=1.8&numberOfOrders=10&addStopLoss=false' \
+        -H 'Content-Type: application/json'
+
+    curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/LINK?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=7.8&maxPrice=8&numberOfOrders=10&addStopLoss=false' \
+      -H 'Content-Type: application/json'
+
+    curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/XRP?testing=false&removeExistingBuyOrders=false&minPrice=1.04&maxPrice=1.07&numberOfOrders=10&addStopLoss=false' \
+      -H 'Content-Type: application/json'
+
+    curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/LTC?testing=false&removeExistingBuyOrders=false&minPrice=44&maxPrice=45&numberOfOrders=10&addStopLoss=false&direction=down' \
+    -H 'Content-Type: application/json'  
 
 # preview autobuy for one coin
   curl -X POST "http://localhost:3030/buy-at-price/ETH?\
@@ -116,3 +65,4 @@ bán giá cao nhất tháng
     removeExistingBuyOrders=true&\
     autobuy=true" \
       -H "Content-Type: application/json"
+
