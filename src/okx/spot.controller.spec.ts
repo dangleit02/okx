@@ -97,6 +97,8 @@ describe('SpotController buy order total response format', () => {
     sellAtTriggerPrice: jest.Mock;
     sellOneCoin: jest.Mock;
     sellAtPriceAllCoins: jest.Mock;
+    cleanSellOrdersForOneCoin: jest.Mock;
+    cleanSellOrdersForAllCoins: jest.Mock;
   };
 
   beforeEach(() => {
@@ -122,6 +124,8 @@ describe('SpotController buy order total response format', () => {
       sellAtTriggerPrice: jest.fn().mockResolvedValue({ status: 'preview' }),
       sellOneCoin: jest.fn().mockResolvedValue(undefined),
       sellAtPriceAllCoins: jest.fn().mockResolvedValue([]),
+      cleanSellOrdersForOneCoin: jest.fn().mockResolvedValue({ status: 'preview' }),
+      cleanSellOrdersForAllCoins: jest.fn().mockResolvedValue([]),
     };
     controller = new SpotController(
       okxService as any,
@@ -176,10 +180,12 @@ describe('SpotController buy order total response format', () => {
 
     expect(result).toContain('TABLE SUMMARY');
     expect(result).toContain(
-      'COIN | CURENT PRICE | FROM PRICE | TO PRICE | TOTAL AMOUNT (USDT)',
+      'COIN | CURENT PRICE | FROM PRICE | TO PRICE | TOTAL AMOUNT (USDT) | TOTAL BOUGHT (USDT)',
     );
     expect(result).toContain('ADA  | 0.5');
     expect(result).toContain('BTC  | 51000');
+    expect(result).toMatch(/ADA\s+\|[^\n]+\| 0\s*$/m);
+    expect(result).toMatch(/BTC\s+\|[^\n]+\| 5100\s*$/m);
     expect(result).not.toContain('Summary:');
     expect(okxService.getPendingOrdersTotalForAllCoins).toHaveBeenCalledWith(
       'buy',
@@ -201,6 +207,7 @@ describe('SpotController buy order total response format', () => {
     );
 
     expect(result).toBe(allCoinsResponse);
+    expect(okxService.getAllSpotBoughtCoins).not.toHaveBeenCalled();
     expect(logger.log).toHaveBeenCalledWith(
       JSON.stringify(allCoinsResponse, null, 2),
       'Pending buy orders all coins JSON',
@@ -342,5 +349,29 @@ describe('SpotController buy order total response format', () => {
       onlyForDown: 'false',
       justOneOrder: 'false',
     });
+  });
+
+  it('previews sell-order cleanup unless testing=false is provided', async () => {
+    await expect(controller.cleanSellOrdersForOneCoin('ETC')).resolves.toEqual({
+      status: 'preview',
+    });
+    expect(okxService.cleanSellOrdersForOneCoin).toHaveBeenLastCalledWith(
+      'ETC',
+      true,
+    );
+
+    await controller.cleanSellOrdersForOneCoin('ETC', 'false');
+    expect(okxService.cleanSellOrdersForOneCoin).toHaveBeenLastCalledWith(
+      'ETC',
+      false,
+    );
+  });
+
+  it('uses the shared daily-task flow to clean all coins', async () => {
+    await expect(controller.cleanSellOrdersForAllCoins()).resolves.toEqual([]);
+    expect(okxService.cleanSellOrdersForAllCoins).toHaveBeenLastCalledWith(true);
+
+    await controller.cleanSellOrdersForAllCoins('false');
+    expect(okxService.cleanSellOrdersForAllCoins).toHaveBeenLastCalledWith(false);
   });
 });

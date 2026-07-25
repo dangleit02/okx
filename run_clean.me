@@ -1,0 +1,15 @@
+# Preview the sell orders that would be cancelled.
+curl -X POST 'http://localhost:3030/clean-sell-orders/ETC?testing=true' \
+  -H 'Content-Type: application/json'
+
+# WARNING: cancel excess sell orders on OKX.
+curl -X POST 'http://localhost:3030/clean-sell-orders/ETC?testing=false' \
+  -H 'Content-Type: application/json'
+
+# Preview cleanup for all configured bought coins.
+curl -X POST 'http://localhost:3030/clean-sell-orders-all-coins?testing=true' \
+  -H 'Content-Type: application/json'
+
+# WARNING: clean all configured bought coins on OKX.
+curl -X POST 'http://localhost:3030/clean-sell-orders-all-coins?testing=false' \
+  -H 'Content-Type: application/json'

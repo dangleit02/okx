@@ -37,4 +37,28 @@ describe('TasksService autoSellSpotForDown', () => {
       justOneOrder: 'false',
     });
   });
+
+  it('runs the shared sell-order cleanup flow in live mode', async () => {
+    const config = {
+      get: jest.fn((key: string) => key === 'runSpotTaskForClean'),
+    };
+    const logger = { log: jest.fn() };
+    const okxService = {
+      cleanSellOrdersForAllCoins: jest.fn().mockResolvedValue([
+        { coin: 'BTC', result: { status: 'clean' } },
+      ]),
+      sellAtPriceAllCoins: jest.fn(),
+    };
+    const service = new TasksService(
+      config as any,
+      logger as any,
+      okxService as any,
+      {} as any,
+    );
+
+    await service.cleanSellOrdersDaily();
+
+    expect(okxService.cleanSellOrdersForAllCoins).toHaveBeenCalledWith(false);
+    expect(okxService.sellAtPriceAllCoins).not.toHaveBeenCalled();
+  });
 });

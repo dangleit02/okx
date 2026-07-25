@@ -142,6 +142,9 @@ export class SpotController {
       throw new BadRequestException('side must be buy or sell');
     }
 
+    const boughtCoinsPromise = format.toLowerCase() === 'json'
+      ? undefined
+      : this.okxService.getAllSpotBoughtCoins();
     const result = await this.okxService.getPendingOrdersTotalForAllCoins(side, {
       minPrice: minPrice ? Number(minPrice) : undefined,
       maxPrice: maxPrice ? Number(maxPrice) : undefined,
@@ -156,13 +159,24 @@ export class SpotController {
       return result;
     }
 
-    const table = this.formatAllPendingOrdersAsTable(result);
+    const boughtCoins = await boughtCoinsPromise;
+    const totalBoughtUsdtByCoin = new Map(
+      (boughtCoins?.coins ?? []).map((coin) => [
+        coin.coin.toUpperCase(),
+        coin.amountUsdt,
+      ]),
+    );
+    const table = this.formatAllPendingOrdersAsTable(
+      result,
+      totalBoughtUsdtByCoin,
+    );
     this.logger.log(table, `Pending ${side} orders all coins table`);
     return table;
   }
 
   private formatAllPendingOrdersAsTable(
     result: AllPendingOrdersTotal,
+    totalBoughtUsdtByCoin: Map<string, number>,
   ): string {
     const hasRanges = result.filter.step !== undefined;
     const sortedCoins = [...result.coins].sort((left, right) =>
@@ -183,6 +197,7 @@ export class SpotController {
       'FROM PRICE',
       'TO PRICE',
       'TOTAL AMOUNT (USDT)',
+      'TOTAL BOUGHT (USDT)',
     ];
     const summaryRows = sortedCoins.map((coin) => [
       coin.coin,
@@ -190,6 +205,7 @@ export class SpotController {
       coin.minPrice === undefined ? '' : String(coin.minPrice),
       coin.maxPrice === undefined ? '' : String(coin.maxPrice),
       String(coin.totalAmount),
+      String(totalBoughtUsdtByCoin.get(coin.coin.toUpperCase()) ?? 0),
     ]);
     const tables = [
       'TABLE SUMMARY',
@@ -372,6 +388,26 @@ export class SpotController {
     @Query('side') side?: 'buy' | 'sell' | null,
   ) {
     return await this.okxService.cancelOpenConditionSpotOrdersForOneCoin(coin, side);
+  }
+
+  @Post('clean-sell-orders/:coin')
+  async cleanSellOrdersForOneCoin(
+    @Param('coin') coin: string,
+    @Query('testing') testing?: string,
+  ) {
+    return this.okxService.cleanSellOrdersForOneCoin(
+      coin,
+      testing !== 'false',
+    );
+  }
+
+  @Post('clean-sell-orders-all-coins')
+  async cleanSellOrdersForAllCoins(
+    @Query('testing') testing?: string,
+  ) {
+    return this.okxService.cleanSellOrdersForAllCoins(
+      testing !== 'false',
+    );
   }
 
   @Delete('cancel-orders-one-coin/:coin')

@@ -7,11 +7,11 @@ bán giá cao nhất tháng
     -H "Content-Type: application/json"
 
   # cancel buy orders for one coin
-    curl -X POST 'http://localhost:3030/cancel-orders/AVAX?side=buy' \
+    curl -X POST 'http://localhost:3030/cancel-orders/AAVE?side=buy' \
       -H "Content-Type: application/json"
 
   # cancel sell orders for one coin
-    curl -X POST 'http://localhost:3030/cancel-orders/BTC?side=sell' \
+    curl -X POST 'http://localhost:3030/cancel-orders/ETC?side=sell' \
       -H "Content-Type: application/json"
 
 # preview cancel pending buy orders in price range (does not cancel)
@@ -25,10 +25,10 @@ bán giá cao nhất tháng
     curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/UNI?side=buy&minPrice=3.194&maxPrice=3.383&testing=false' \
       -H "Content-Type: application/json"
 
-  # preview cancel pending sell orders in price range (does not cancel)
-    curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/BTC?side=sell&minPrice=60000&maxPrice=70000&testing=true' \
-      -H "Content-Type: application/json"
-    
-    # WARNING cancel sell orders in price range
-    curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/ETC?side=sell&minPrice=7.2434&maxPrice=7.45&testing=false' \
-      -H "Content-Type: application/json"
+# preview cancel pending sell orders in price range (does not cancel)
+  curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/BTC?side=sell&minPrice=60000&maxPrice=70000&testing=true' \
+    -H "Content-Type: application/json"
+  
+  # WARNING cancel sell orders in price range
+  curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/DOT?side=sell&minPrice=0.87362&maxPrice=0.9&testing=false' \
+    -H "Content-Type: application/json"

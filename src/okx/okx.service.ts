@@ -667,6 +667,113 @@ export class OkxService {
         return result;
     }
 
+    async cleanSellOrdersForOneCoin(coin: string, testing: boolean = true) {
+        const normalizedCoin = coin.trim().toUpperCase();
+        if (!normalizedCoin || !/^[A-Z0-9]+$/.test(normalizedCoin)) {
+            throw new Error(`Invalid coin: ${coin}`);
+        }
+
+        const instId = `${normalizedCoin}-USDT`;
+        const [currentPrice, pendingOrders, balanceData] = await Promise.all([
+            this.getTicker(instId),
+            this.getPendingTriggerSpotOrders(normalizedCoin),
+            this.getAccountBalance(normalizedCoin),
+        ]);
+        if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+            throw new Error(`Invalid current price fetched for ${instId}: ${currentPrice}`);
+        }
+
+        const balance = (balanceData?.data?.[0]?.details ?? []).find(
+            (detail: any) => String(detail.ccy).toUpperCase() === normalizedCoin,
+        );
+        const boughtCoinAmount = Number(balance?.cashBal ?? balance?.eq ?? balance?.availBal ?? 0);
+        if (!Number.isFinite(boughtCoinAmount) || boughtCoinAmount < 0) {
+            throw new Error(`Invalid bought coin amount for ${normalizedCoin}: ${boughtCoinAmount}`);
+        }
+
+        const eligibleOrders = pendingOrders
+            .filter((order: any) => {
+                const triggerPrice = Number(order.triggerPx);
+                const size = Number(order.sz);
+                return order.instId === instId
+                    && order.side === 'sell'
+                    && Boolean(order.algoId)
+                    && Number.isFinite(triggerPrice)
+                    && triggerPrice < currentPrice
+                    && Number.isFinite(size)
+                    && size > 0;
+            })
+            .map((order: any) => ({
+                algoId: String(order.algoId),
+                instId,
+                triggerPrice: Number(order.triggerPx),
+                orderPrice: Number(order.ordPx),
+                size: Number(order.sz),
+            }))
+            .sort((left, right) => right.triggerPrice - left.triggerPrice);
+
+        const keptOrders: typeof eligibleOrders = [];
+        const ordersToCancel: typeof eligibleOrders = [];
+        let keptSize = 0;
+        let balanceExceeded = false;
+
+        for (const order of eligibleOrders) {
+            if (!balanceExceeded && keptSize + order.size <= boughtCoinAmount) {
+                keptOrders.push(order);
+                keptSize += order.size;
+            } else {
+                balanceExceeded = true;
+                ordersToCancel.push(order);
+            }
+        }
+
+        const baseResult = {
+            coin: normalizedCoin,
+            instId,
+            testing,
+            currentPrice,
+            boughtCoinAmount,
+            eligibleOrderCount: eligibleOrders.length,
+            keptOrderCount: keptOrders.length,
+            keptSize: Number(keptSize.toFixed(8)),
+            cancelOrderCount: ordersToCancel.length,
+            cancelSize: Number(
+                ordersToCancel.reduce((total, order) => total + order.size, 0).toFixed(8),
+            ),
+            keptOrders,
+            ordersToCancel,
+        };
+
+        if (testing) {
+            return { status: 'preview', ...baseResult };
+        }
+        if (ordersToCancel.length === 0) {
+            return {
+                status: 'clean',
+                ...baseResult,
+                cancelledOrderCount: 0,
+                failedOrderCount: 0,
+                responses: [],
+            };
+        }
+
+        const { responses, cancelledOrderCount, failedOrderCount } = await this.cancelAlgoOrders(
+            ordersToCancel.map(({ algoId, instId: orderInstId }) => ({
+                algoId,
+                instId: orderInstId,
+            })),
+        );
+        const result = {
+            status: failedOrderCount === 0 ? 'cleaned' : 'partially_cleaned',
+            ...baseResult,
+            cancelledOrderCount,
+            failedOrderCount,
+            responses,
+        };
+        this.logger.log(JSON.stringify(result, null, 2), 'Clean excess sell orders', normalizedCoin);
+        return result;
+    }
+
     async cancelAllOpenConditionSpotOrders(side: 'buy' | 'sell' | null = null) {
         const timestamp = new Date().toISOString();
 
@@ -834,7 +941,10 @@ export class OkxService {
         const sizeToSell = size * percentage / 100;
         const sizeFactor = 10 ** szToFixed;
         const formattedSize = (Math.floor(sizeToSell * sizeFactor) / sizeFactor).toFixed(szToFixed);
-        const formattedPrice = currentPrice.toFixed(priceToFixed);
+        const triggerPrice = currentPrice / 1.002;
+        const orderPrice = triggerPrice / 1.002;
+        const formattedOrderPrice = orderPrice.toFixed(priceToFixed);
+        const formattedTriggerPrice = triggerPrice.toFixed(priceToFixed);
         if (Number(formattedSize) <= 0) {
             throw new Error(`Available balance ${availableBalance} is below the order size precision for ${normalizedCoin}`);
         }
@@ -843,8 +953,8 @@ export class OkxService {
             normalizedCoin,
             'sell',
             formattedSize,
-            formattedPrice,
-            formattedPrice,
+            formattedTriggerPrice,
+            formattedOrderPrice,
             testing,
         );
         const result = {
@@ -856,6 +966,8 @@ export class OkxService {
             availableBalance,
             sizeToSell: formattedSize,
             currentPrice,
+            triggerPrice: Number(formattedTriggerPrice),
+            orderPrice: Number(formattedOrderPrice),
             estimatedValueUsdt: Number((Number(formattedSize) * currentPrice).toFixed(8)),
             order,
         };
@@ -1634,7 +1746,7 @@ export class OkxService {
         }
     }
 
-    async sellAtPriceAllCoins(options: SellAtPriceAllCoinsOptions) {
+    private async getBoughtCoinsForTakeProfit(): Promise<string[]> {
         let coins = this.config.get<string[]>('coinsSpotForTakeProfit');
         if (!coins) {
             throw new Error(`No configuration found for coinsSpotForTakeProfit: ${JSON.stringify(coins)}`);
@@ -1648,11 +1760,29 @@ export class OkxService {
         coins = coins.filter((coin) => boughtCoinNames.has(coin.toUpperCase()));
 
         this.logger.log(`Bought coins to process: ${JSON.stringify(coins)}`);
+        return coins;
+    }
+
+    async sellAtPriceAllCoins(options: SellAtPriceAllCoinsOptions) {
+        const coins = await this.getBoughtCoinsForTakeProfit();
         const results = [];
         await Promise.all(coins.map(async (coin) => {
             this.logger.log(`Processing coin: ${coin.toUpperCase()}`, null, coin);
             await this.sellOneCoin({ coin, ...options, results });
         }));
+
+        return results;
+    }
+
+    async cleanSellOrdersForAllCoins(testing: boolean = true) {
+        const coins = await this.getBoughtCoinsForTakeProfit();
+        const results = [];
+
+        for (const coin of coins) {
+            this.logger.log(`Cleaning sell orders for coin: ${coin.toUpperCase()}`, null, coin);
+            const result = await this.cleanSellOrdersForOneCoin(coin, testing);
+            results.push({ coin, result });
+        }
 
         return results;
     }

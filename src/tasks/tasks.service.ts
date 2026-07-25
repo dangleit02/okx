@@ -86,6 +86,24 @@ export class TasksService {
         }
     }
 
+    @Cron('0 0 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+    async cleanSellOrdersDaily() {
+        this.logger.log(`Cron clean sell orders ${moment().format('YY/MM/DD HH:mm:ss')}`);
+        try {
+            if (!this.config.get<boolean>('runSpotTaskForClean')) {
+                this.logger.log('Clean sell orders task is disabled in configuration.');
+                return;
+            }
+
+            const results = await this.okxService.cleanSellOrdersForAllCoins(false);
+            this.logger.log(`Clean sell orders results: ${JSON.stringify(results, null, 2)}`);
+            this.logger.log(`✅ Successfully cleaned sell orders ${moment().format('YYYY/MM/DD HH:mm:ss')}`);
+        } catch (error) {
+            this.logger.log(`⚠️ Error cleaning sell orders ${moment().format('YYYY/MM/DD HH:mm:ss')}, ${error.message}`);
+            throw error;
+        }
+    }
+
     // run every hour at minute 15
     // @Cron('28 * * * *')
     async autoCloseShortPartialPositionForSwapOnRetrace() {

@@ -587,6 +587,81 @@ describe('OkxService cancel pending buy orders by price range', () => {
   });
 });
 
+describe('OkxService clean excess sell orders', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  const createService = () => {
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'okx.baseUrl') return 'https://www.okx.test';
+        if (key === 'okx.secretKey') return 'secret';
+        return 'value';
+      }),
+    };
+    const logger = { log: jest.fn() };
+    const service = new OkxService(config as any, logger as any, {} as any);
+    jest.spyOn(service as any, 'getTicker').mockResolvedValue(100);
+    jest.spyOn(service as any, 'getPendingTriggerSpotOrders').mockResolvedValue([
+      { algoId: 'low', instId: 'ETC-USDT', side: 'sell', triggerPx: '70', ordPx: '69', sz: '1' },
+      { algoId: 'above', instId: 'ETC-USDT', side: 'sell', triggerPx: '110', ordPx: '109', sz: '10' },
+      { algoId: 'high', instId: 'ETC-USDT', side: 'sell', triggerPx: '90', ordPx: '89', sz: '2' },
+      { algoId: 'buy', instId: 'ETC-USDT', side: 'buy', triggerPx: '60', ordPx: '59', sz: '10' },
+      { algoId: 'middle', instId: 'ETC-USDT', side: 'sell', triggerPx: '80', ordPx: '79', sz: '3' },
+    ]);
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [{ details: [{ ccy: 'ETC', cashBal: '4', availBal: '1' }] }],
+    });
+    return { service, logger };
+  };
+
+  it('keeps highest-priced sell orders within the bought amount in preview mode', async () => {
+    const { service } = createService();
+    const cancelAlgoOrders = jest.spyOn(service as any, 'cancelAlgoOrders');
+
+    const result = await service.cleanSellOrdersForOneCoin('etc');
+
+    expect(result).toEqual(expect.objectContaining({
+      status: 'preview',
+      currentPrice: 100,
+      boughtCoinAmount: 4,
+      eligibleOrderCount: 3,
+      keptOrderCount: 1,
+      keptSize: 2,
+      cancelOrderCount: 2,
+      cancelSize: 4,
+    }));
+    expect(result.keptOrders.map((order) => order.algoId)).toEqual(['high']);
+    expect(result.ordersToCancel.map((order) => order.algoId)).toEqual([
+      'middle',
+      'low',
+    ]);
+    expect(cancelAlgoOrders).not.toHaveBeenCalled();
+  });
+
+  it('cancels the overflowing order and all lower-priced orders', async () => {
+    const { service } = createService();
+    const cancelAlgoOrders = jest.spyOn(service as any, 'cancelAlgoOrders').mockResolvedValue({
+      responses: [{ code: '0' }],
+      cancelledOrderCount: 2,
+      failedOrderCount: 0,
+    });
+
+    const result = await service.cleanSellOrdersForOneCoin('ETC', false);
+
+    expect(cancelAlgoOrders).toHaveBeenCalledWith([
+      { algoId: 'middle', instId: 'ETC-USDT' },
+      { algoId: 'low', instId: 'ETC-USDT' },
+    ]);
+    expect(result).toEqual(expect.objectContaining({
+      status: 'cleaned',
+      cancelledOrderCount: 2,
+      failedOrderCount: 0,
+    }));
+  });
+});
+
 describe('OkxService sell all at current price', () => {
   afterEach(() => {
     jest.restoreAllMocks();
@@ -628,6 +703,8 @@ describe('OkxService sell all at current price', () => {
         availableBalance: '0.01234567',
         sizeToSell: '0.00308641',
         currentPrice: 60000,
+        triggerPrice: 59880.24,
+        orderPrice: 59760.72,
         estimatedValueUsdt: 185.1846,
         order: {
           data: undefined,
@@ -637,8 +714,8 @@ describe('OkxService sell all at current price', () => {
             side: 'sell',
             ordType: 'trigger',
             sz: '0.00308641',
-            triggerPx: '60000.00',
-            orderPx: '60000.00',
+            triggerPx: '59880.24',
+            orderPx: '59760.72',
           },
         },
       }),
@@ -647,8 +724,8 @@ describe('OkxService sell all at current price', () => {
       'BTC',
       'sell',
       '0.00308641',
-      '60000.00',
-      '60000.00',
+      '59880.24',
+      '59760.72',
       true,
     );
   });
@@ -671,8 +748,8 @@ describe('OkxService sell all at current price', () => {
       'ETH',
       'sell',
       '1.25000000',
-      '3000.00',
-      '3000.00',
+      '2994.01',
+      '2988.04',
       false,
     );
     expect(logger.log).toHaveBeenCalled();
@@ -895,5 +972,44 @@ describe('OkxService sell all configured bought coins', () => {
     await expect(service.sellAtPriceAllCoins(options)).resolves.toEqual([]);
 
     expect(sellOneCoin).not.toHaveBeenCalled();
+  });
+
+  it('cleans every configured bought coin through the one-coin cleanup flow', async () => {
+    const { service } = createService();
+    jest.spyOn(service, 'getAllSpotBoughtCoins').mockResolvedValue({
+      quoteCurrency: 'USDT',
+      coinCount: 2,
+      totalProfitUsdt: 100,
+      coins: [
+        {
+          coin: 'BTC',
+          amountUsdt: 5100,
+          averageCost: 50000,
+          currentPrice: 51000,
+          profitPercentage: 2,
+          profitUsdt: 100,
+        },
+        {
+          coin: 'ETH',
+          amountUsdt: 3000,
+          averageCost: 2900,
+          currentPrice: 3000,
+          profitPercentage: 3.45,
+          profitUsdt: 100,
+        },
+      ],
+    });
+    const cleanOneCoin = jest
+      .spyOn(service, 'cleanSellOrdersForOneCoin')
+      .mockImplementation(async (coin) => ({ status: 'clean', coin }) as any);
+
+    await expect(service.cleanSellOrdersForAllCoins(false)).resolves.toEqual([
+      { coin: 'btc', result: { status: 'clean', coin: 'btc' } },
+      { coin: 'ETH', result: { status: 'clean', coin: 'ETH' } },
+    ]);
+    expect(cleanOneCoin.mock.calls).toEqual([
+      ['btc', false],
+      ['ETH', false],
+    ]);
   });
 });
