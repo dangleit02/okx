@@ -86,7 +86,8 @@ export class TasksService {
         }
     }
 
-    @Cron('0 0 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+    // Run every 2 hours at minute 23, away from spot buy (04) and sell (42).
+    @Cron('23 */2 * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
     async cleanSellOrdersDaily() {
         this.logger.log(`Cron clean sell orders ${moment().format('YY/MM/DD HH:mm:ss')}`);
         try {
