@@ -230,7 +230,7 @@ describe('SpotController buy order total response format', () => {
     expect(table.indexOf('ADA')).toBeLessThan(table.indexOf('BTC'));
   });
 
-  it('shows actual min and max prices for each order-count step in the detail table', async () => {
+  it('shows buy detail profit relative to current price for each order-count step', async () => {
     okxService.getPendingOrdersTotalForAllCoins.mockResolvedValueOnce({
       ...allCoinsResponse,
       filter: { step: 2 },
@@ -254,8 +254,8 @@ describe('SpotController buy order total response format', () => {
     expect(result).toContain(
       'COIN | FROM PRICE | FROM PROFIT (%) | TO PRICE | TO PROFIT (%) | AMOUNT (USDT)',
     );
-    expect(result).toMatch(/BTC\s+\| 40000\s+\| -20\s+\| 41000\s+\| -18\s+\| 810/);
-    expect(result).toMatch(/BTC\s+\| 49000\s+\| -2\s+\| 50000\s+\| 0\s+\| 990/);
+    expect(result).toMatch(/BTC\s+\| 40000\s+\| -21\.57\s+\| 41000\s+\| -19\.61\s+\| 810/);
+    expect(result).toMatch(/BTC\s+\| 49000\s+\| -3\.92\s+\| 50000\s+\| -1\.96\s+\| 990/);
   });
 
   it('returns and logs an ASCII table when format=table', async () => {

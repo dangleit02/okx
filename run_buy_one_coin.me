@@ -28,6 +28,12 @@ bán giá cao nhất tháng
     curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/DOGE?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=0.05&maxPrice=0.06&numberOfOrders=10&addStopLoss=false' \
           -H 'Content-Type: application/json'
   # LƯỚT SÓNG
+    curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/ETC?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=6.64&maxPrice=6.7&numberOfOrders=10&addStopLoss=false' \
+        -H 'Content-Type: application/json'
+
+    curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/DOGE?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=0.0683&maxPrice=0.07&numberOfOrders=10&addStopLoss=false' \
+        -H 'Content-Type: application/json'
+
     curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/ALGO?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=0.073&maxPrice=0.077&numberOfOrders=10&addStopLoss=false' \
         -H 'Content-Type: application/json'
 

@@ -211,19 +211,19 @@ export class SpotController {
     };
     const formatProfitPercentage = (
       price: number | undefined,
-      averageCost: number | undefined,
+      referencePrice: number | undefined,
     ) => {
       if (
         price === undefined
-        || averageCost === undefined
+        || referencePrice === undefined
         || !Number.isFinite(price)
-        || !Number.isFinite(averageCost)
-        || averageCost <= 0
+        || !Number.isFinite(referencePrice)
+        || referencePrice <= 0
       ) {
         return '';
       }
 
-      return String(Number((((price - averageCost) / averageCost) * 100).toFixed(2)));
+      return String(Number((((price - referencePrice) / referencePrice) * 100).toFixed(2)));
     };
     const summaryHeaders = [
       'COIN',
@@ -274,20 +274,20 @@ export class SpotController {
         'AMOUNT (USDT)',
       ];
       const detailRows = sortedCoins.flatMap((coin) =>
-        (coin.ranges ?? []).map((range) => [
-        coin.coin,
-        String(range.fromPrice),
-        formatProfitPercentage(
-          range.fromPrice,
-          averageCostByCoin.get(coin.coin.toUpperCase()),
-        ),
-        String(range.toPrice),
-        formatProfitPercentage(
-          range.toPrice,
-          averageCostByCoin.get(coin.coin.toUpperCase()),
-        ),
-        String(range.amount),
-        ]),
+        (coin.ranges ?? []).map((range) => {
+          const profitReferencePrice = result.side === 'buy'
+            ? coin.currentPrice
+            : averageCostByCoin.get(coin.coin.toUpperCase());
+
+          return [
+            coin.coin,
+            String(range.fromPrice),
+            formatProfitPercentage(range.fromPrice, profitReferencePrice),
+            String(range.toPrice),
+            formatProfitPercentage(range.toPrice, profitReferencePrice),
+            String(range.amount),
+          ];
+        }),
       );
       tables.push('', 'TABLE DETAIL', formatTable(detailHeaders, detailRows));
     }

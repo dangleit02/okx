@@ -4,11 +4,11 @@ bán giá cao nhất tháng
 
 # trigger sell of 25% available balance at the current price
   # preview 
-    curl -X POST 'http://localhost:3030/sell-all-at-price/ETH?percentage=25&testing=true' \
+    curl -X POST 'http://localhost:3030/sell-all-at-price/DOGE?percentage=50&testing=true' \
       -H "Content-Type: application/json"
 
   # WARNING: actually place the trigger order to sell 25% at the current price
-    curl -X POST 'http://localhost:3030/sell-all-at-price/ETH?percentage=25&testing=false' \
+    curl -X POST 'http://localhost:3030/sell-all-at-price/NEAR?percentage=50&testing=false' \
       -H "Content-Type: application/json"
 
 # selling 25% BTC when price falls to 50000 (orderPx is 0.2% below triggerPx)
