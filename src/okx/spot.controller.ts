@@ -38,6 +38,7 @@ export class SpotController {
   private formatAllSpotBoughtCoinsAsTable(result: AllSpotBoughtCoins): string {
     const headers = [
       'COIN',
+      'NUMBER OF COIN',
       'AMOUNT (USDT)',
       'AVARAGE COST',
       'CURRENT PRICE',
@@ -46,6 +47,7 @@ export class SpotController {
     ];
     const rows = result.coins.map((coin) => [
       coin.coin,
+      String(coin.numberOfCoins),
       String(coin.amountUsdt),
       String(coin.averageCost),
       String(coin.currentPrice),
@@ -166,9 +168,23 @@ export class SpotController {
         coin.amountUsdt,
       ]),
     );
+    const currentProfitPercentageByCoin = new Map(
+      (boughtCoins?.coins ?? []).map((coin) => [
+        coin.coin.toUpperCase(),
+        coin.profitPercentage,
+      ]),
+    );
+    const averageCostByCoin = new Map(
+      (boughtCoins?.coins ?? []).map((coin) => [
+        coin.coin.toUpperCase(),
+        coin.averageCost,
+      ]),
+    );
     const table = this.formatAllPendingOrdersAsTable(
       result,
       totalBoughtUsdtByCoin,
+      currentProfitPercentageByCoin,
+      averageCostByCoin,
     );
     this.logger.log(table, `Pending ${side} orders all coins table`);
     return table;
@@ -177,6 +193,8 @@ export class SpotController {
   private formatAllPendingOrdersAsTable(
     result: AllPendingOrdersTotal,
     totalBoughtUsdtByCoin: Map<string, number>,
+    currentProfitPercentageByCoin: Map<string, number>,
+    averageCostByCoin: Map<string, number>,
   ): string {
     const hasRanges = result.filter.step !== undefined;
     const sortedCoins = [...result.coins].sort((left, right) =>
@@ -191,19 +209,53 @@ export class SpotController {
       const separator = widths.map((width) => '-'.repeat(width)).join('-+-');
       return [formatRow(headers), separator, ...rows.map(formatRow)].join('\n');
     };
+    const formatProfitPercentage = (
+      price: number | undefined,
+      averageCost: number | undefined,
+    ) => {
+      if (
+        price === undefined
+        || averageCost === undefined
+        || !Number.isFinite(price)
+        || !Number.isFinite(averageCost)
+        || averageCost <= 0
+      ) {
+        return '';
+      }
+
+      return String(Number((((price - averageCost) / averageCost) * 100).toFixed(2)));
+    };
     const summaryHeaders = [
       'COIN',
       'CURENT PRICE',
+      'CURRENT PROFIT (%)',
+      'AVERAGE COST',
       'FROM PRICE',
+      'FROM PROFIT (%)',
       'TO PRICE',
+      'TO PROFIT (%)',
       'TOTAL AMOUNT (USDT)',
       'TOTAL BOUGHT (USDT)',
     ];
     const summaryRows = sortedCoins.map((coin) => [
       coin.coin,
       coin.currentPrice === undefined ? '' : String(coin.currentPrice),
+      currentProfitPercentageByCoin.has(coin.coin.toUpperCase())
+        ? String(currentProfitPercentageByCoin.get(coin.coin.toUpperCase()))
+        : '',
+      averageCostByCoin.has(coin.coin.toUpperCase())
+        ? String(averageCostByCoin.get(coin.coin.toUpperCase()))
+        : '',
       coin.minPrice === undefined ? '' : String(coin.minPrice),
+      formatProfitPercentage(
+        coin.minPrice,
+        averageCostByCoin.get(coin.coin.toUpperCase()),
+      ),
       coin.maxPrice === undefined ? '' : String(coin.maxPrice),
+      formatProfitPercentage(
+        coin.maxPrice,
+        averageCostByCoin.get(coin.coin.toUpperCase()),
+      ),
       String(coin.totalAmount),
       String(totalBoughtUsdtByCoin.get(coin.coin.toUpperCase()) ?? 0),
     ]);
@@ -213,12 +265,27 @@ export class SpotController {
     ];
 
     if (hasRanges) {
-      const detailHeaders = ['COIN', 'FROM PRICE', 'TO PRICE', 'AMOUNT (USDT)'];
+      const detailHeaders = [
+        'COIN',
+        'FROM PRICE',
+        'FROM PROFIT (%)',
+        'TO PRICE',
+        'TO PROFIT (%)',
+        'AMOUNT (USDT)',
+      ];
       const detailRows = sortedCoins.flatMap((coin) =>
         (coin.ranges ?? []).map((range) => [
         coin.coin,
         String(range.fromPrice),
+        formatProfitPercentage(
+          range.fromPrice,
+          averageCostByCoin.get(coin.coin.toUpperCase()),
+        ),
         String(range.toPrice),
+        formatProfitPercentage(
+          range.toPrice,
+          averageCostByCoin.get(coin.coin.toUpperCase()),
+        ),
         String(range.amount),
         ]),
       );

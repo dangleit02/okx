@@ -74,6 +74,7 @@ export interface AllPendingOrdersTotal {
 
 export interface SpotBoughtCoin {
     coin: string;
+    numberOfCoins: number;
     amountUsdt: number;
     averageCost: number;
     currentPrice: number;
@@ -346,7 +347,7 @@ export class OkxService {
             throw new Error(`Invalid step: ${options.step}. step must be a positive integer`);
         }
         if (options.step !== undefined && options.step > 10000) {
-            throw new Error('step must not exceed 10000 price ranges');
+            throw new Error('step must not exceed 10000');
         }
     }
 
@@ -413,6 +414,48 @@ export class OkxService {
                 amount: Number(totalAmount.toFixed(8)),
             };
         });
+    }
+
+    private summarizePendingOrdersByOrderCount(
+        orders: any[],
+        instId: string,
+        side: PendingOrdersSide,
+        options: PendingOrdersTotalOptions,
+        ordersPerStep: number,
+    ): PendingBuyOrdersRangeTotal[] {
+        const matchingOrders = orders
+            .filter((order: any) => (
+                order.side === side
+                && order.instId === instId
+                && this.isOrderWithinPriceRange(order, options)
+                && Number.isFinite(Number(order.triggerPx))
+                && Number(order.triggerPx) > 0
+            ))
+            .sort((left: any, right: any) => Number(left.triggerPx) - Number(right.triggerPx));
+        const ranges: PendingBuyOrdersRangeTotal[] = [];
+
+        for (let index = 0; index < matchingOrders.length; index += ordersPerStep) {
+            const rangeOrders = matchingOrders.slice(index, index + ordersPerStep);
+            const triggerPrices = rangeOrders.map((order: any) => Number(order.triggerPx));
+            const totalAmount = rangeOrders.reduce((total: number, order: any) => {
+                const orderPrice = Number(order.ordPx);
+                const size = Number(order.sz);
+
+                if (!Number.isFinite(orderPrice) || orderPrice <= 0 || !Number.isFinite(size) || size <= 0) {
+                    return total;
+                }
+
+                return total + orderPrice * size;
+            }, 0);
+
+            ranges.push({
+                fromPrice: Math.min(...triggerPrices),
+                toPrice: Math.max(...triggerPrices),
+                amount: Number(totalAmount.toFixed(8)),
+            });
+        }
+
+        return ranges;
     }
 
     async getPendingOrdersTotalForCoin(
@@ -491,17 +534,14 @@ export class OkxService {
                 const total = this.summarizePendingOrders(orders, instId, side, resolvedOptions);
                 total.currentPrice = tickers.get(instId);
 
-                if (resolvedOptions.step !== undefined && resolvedOptions.minPrice !== undefined && resolvedOptions.maxPrice !== undefined) {
-                    total.ranges = this.summarizePendingOrdersByStep(
+                if (resolvedOptions.step !== undefined) {
+                    total.ranges = this.summarizePendingOrdersByOrderCount(
                         orders,
                         instId,
                         side,
-                        resolvedOptions.minPrice,
-                        resolvedOptions.maxPrice,
+                        resolvedOptions,
                         resolvedOptions.step,
                     );
-                } else if (resolvedOptions.step !== undefined) {
-                    total.ranges = [];
                 }
 
                 return total;
@@ -690,6 +730,13 @@ export class OkxService {
         if (!Number.isFinite(boughtCoinAmount) || boughtCoinAmount < 0) {
             throw new Error(`Invalid bought coin amount for ${normalizedCoin}: ${boughtCoinAmount}`);
         }
+        const configuredSizeDecimals = Number(
+            this.config.get<any>(`coin.${normalizedCoin}`)?.szToFixed,
+        );
+        const sizeDecimals = Number.isInteger(configuredSizeDecimals) && configuredSizeDecimals >= 0
+            ? configuredSizeDecimals
+            : 8;
+        const sizeTolerance = 0.5 * 10 ** -sizeDecimals;
 
         const eligibleOrders = pendingOrders
             .filter((order: any) => {
@@ -712,20 +759,25 @@ export class OkxService {
             }))
             .sort((left, right) => right.triggerPrice - left.triggerPrice);
 
-        const keptOrders: typeof eligibleOrders = [];
         const ordersToCancel: typeof eligibleOrders = [];
-        let keptSize = 0;
-        let balanceExceeded = false;
+        let remainingSize = eligibleOrders.reduce(
+            (total, order) => total + order.size,
+            0,
+        );
 
-        for (const order of eligibleOrders) {
-            if (!balanceExceeded && keptSize + order.size <= boughtCoinAmount) {
-                keptOrders.push(order);
-                keptSize += order.size;
-            } else {
-                balanceExceeded = true;
-                ordersToCancel.push(order);
+        for (const order of [...eligibleOrders].reverse()) {
+            if (remainingSize <= boughtCoinAmount + sizeTolerance) {
+                break;
             }
+
+            ordersToCancel.push(order);
+            remainingSize -= order.size;
         }
+        const cancelledOrderIds = new Set(ordersToCancel.map(({ algoId }) => algoId));
+        const keptOrders = eligibleOrders.filter(
+            ({ algoId }) => !cancelledOrderIds.has(algoId),
+        );
+        const keptSize = keptOrders.reduce((total, order) => total + order.size, 0);
 
         const baseResult = {
             coin: normalizedCoin,
@@ -877,6 +929,7 @@ export class OkxService {
 
                 return {
                     coin,
+                    numberOfCoins: Number(amount.toFixed(8)),
                     amountUsdt: Number((amount * currentPrice).toFixed(8)),
                     averageCost: hasAverageCost ? Number(averageCost.toFixed(8)) : 0,
                     currentPrice: Number(currentPrice.toFixed(8)),

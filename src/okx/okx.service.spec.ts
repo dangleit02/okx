@@ -296,6 +296,30 @@ describe('OkxService pending order totals', () => {
       }),
     ]);
   });
+
+  it('groups all-coins detail by number of orders and uses each group actual min and max prices', async () => {
+    jest
+      .spyOn(service as any, 'getPendingTriggerSpotOrders')
+      .mockResolvedValue([
+        { instId: 'BTC-USDT', side: 'buy', triggerPx: '50000', ordPx: '50000', sz: '0.01' },
+        { instId: 'BTC-USDT', side: 'buy', triggerPx: '40000', ordPx: '40000', sz: '0.01' },
+        { instId: 'BTC-USDT', side: 'buy', triggerPx: '41000', ordPx: '41000', sz: '0.01' },
+        { instId: 'BTC-USDT', side: 'buy', triggerPx: '49000', ordPx: '49000', sz: '0.01' },
+        { instId: 'BTC-USDT', side: 'buy', triggerPx: '60000', ordPx: '60000', sz: '0.01' },
+        { instId: 'BTC-USDT', side: 'sell', triggerPx: '45000', ordPx: '45000', sz: '1' },
+      ]);
+    jest.spyOn(service as any, 'getSpotTickers').mockResolvedValue(new Map([
+      ['BTC-USDT', 51000],
+    ]));
+
+    const result = await service.getPendingOrdersTotalForAllCoins('buy', { step: 2 });
+
+    expect(result.coins[0].ranges).toEqual([
+      { fromPrice: 40000, toPrice: 41000, amount: 810 },
+      { fromPrice: 49000, toPrice: 50000, amount: 990 },
+      { fromPrice: 60000, toPrice: 60000, amount: 600 },
+    ]);
+  });
 });
 
 describe('OkxService bought spot coins', () => {
@@ -326,6 +350,7 @@ describe('OkxService bought spot coins', () => {
       coins: [
         {
           coin: 'BTC',
+          numberOfCoins: 0.1,
           amountUsdt: 5100,
           averageCost: 50000,
           currentPrice: 51000,
@@ -334,6 +359,7 @@ describe('OkxService bought spot coins', () => {
         },
         {
           coin: 'ETH',
+          numberOfCoins: 2,
           amountUsdt: 5400,
           averageCost: 3000,
           currentPrice: 2700,
@@ -605,6 +631,7 @@ describe('OkxService clean excess sell orders', () => {
     jest.spyOn(service as any, 'getTicker').mockResolvedValue(100);
     jest.spyOn(service as any, 'getPendingTriggerSpotOrders').mockResolvedValue([
       { algoId: 'low', instId: 'ETC-USDT', side: 'sell', triggerPx: '70', ordPx: '69', sz: '1' },
+      { algoId: 'equal', instId: 'ETC-USDT', side: 'sell', triggerPx: '100', ordPx: '99', sz: '10' },
       { algoId: 'above', instId: 'ETC-USDT', side: 'sell', triggerPx: '110', ordPx: '109', sz: '10' },
       { algoId: 'high', instId: 'ETC-USDT', side: 'sell', triggerPx: '90', ordPx: '89', sz: '2' },
       { algoId: 'buy', instId: 'ETC-USDT', side: 'buy', triggerPx: '60', ordPx: '59', sz: '10' },
@@ -634,13 +661,17 @@ describe('OkxService clean excess sell orders', () => {
     }));
     expect(result.keptOrders.map((order) => order.algoId)).toEqual(['high']);
     expect(result.ordersToCancel.map((order) => order.algoId)).toEqual([
-      'middle',
       'low',
+      'middle',
     ]);
+    expect(result.keptOrders.map((order) => order.algoId)).not.toContain('equal');
+    expect(result.keptOrders.map((order) => order.algoId)).not.toContain('above');
+    expect(result.ordersToCancel.map((order) => order.algoId)).not.toContain('equal');
+    expect(result.ordersToCancel.map((order) => order.algoId)).not.toContain('above');
     expect(cancelAlgoOrders).not.toHaveBeenCalled();
   });
 
-  it('cancels the overflowing order and all lower-priced orders', async () => {
+  it('cancels sell orders from the lowest trigger price first', async () => {
     const { service } = createService();
     const cancelAlgoOrders = jest.spyOn(service as any, 'cancelAlgoOrders').mockResolvedValue({
       responses: [{ code: '0' }],
@@ -651,14 +682,50 @@ describe('OkxService clean excess sell orders', () => {
     const result = await service.cleanSellOrdersForOneCoin('ETC', false);
 
     expect(cancelAlgoOrders).toHaveBeenCalledWith([
-      { algoId: 'middle', instId: 'ETC-USDT' },
       { algoId: 'low', instId: 'ETC-USDT' },
+      { algoId: 'middle', instId: 'ETC-USDT' },
     ]);
     expect(result).toEqual(expect.objectContaining({
       status: 'cleaned',
       cancelledOrderCount: 2,
       failedOrderCount: 0,
     }));
+  });
+
+  it('keeps an order whose rounded size is within half a coin size unit of the balance', async () => {
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'coin.NEAR') return { szToFixed: 8 };
+        return 'value';
+      }),
+    };
+    const service = new OkxService(config as any, { log: jest.fn() } as any, {} as any);
+    jest.spyOn(service as any, 'getTicker').mockResolvedValue(1.661);
+    jest.spyOn(service as any, 'getPendingTriggerSpotOrders').mockResolvedValue([
+      {
+        algoId: 'near-rounded-size',
+        instId: 'NEAR-USDT',
+        side: 'sell',
+        triggerPx: '1.565',
+        ordPx: '1.562',
+        sz: '6.68068324',
+      },
+    ]);
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [{ details: [{ ccy: 'NEAR', cashBal: '6.6806832388' }] }],
+    });
+
+    const result = await service.cleanSellOrdersForOneCoin('near');
+
+    expect(result).toEqual(expect.objectContaining({
+      status: 'preview',
+      boughtCoinAmount: 6.6806832388,
+      keptOrderCount: 1,
+      cancelOrderCount: 0,
+    }));
+    expect(result.keptOrders.map((order) => order.algoId)).toEqual([
+      'near-rounded-size',
+    ]);
   });
 });
 
@@ -940,6 +1007,7 @@ describe('OkxService sell all configured bought coins', () => {
       totalProfitUsdt: 100,
       coins: [{
         coin: 'BTC',
+        numberOfCoins: 0.1,
         amountUsdt: 5100,
         averageCost: 50000,
         currentPrice: 51000,
@@ -983,6 +1051,7 @@ describe('OkxService sell all configured bought coins', () => {
       coins: [
         {
           coin: 'BTC',
+          numberOfCoins: 0.1,
           amountUsdt: 5100,
           averageCost: 50000,
           currentPrice: 51000,
@@ -991,6 +1060,7 @@ describe('OkxService sell all configured bought coins', () => {
         },
         {
           coin: 'ETH',
+          numberOfCoins: 1,
           amountUsdt: 3000,
           averageCost: 2900,
           currentPrice: 3000,
