@@ -724,15 +724,23 @@ export class OkxService {
         successfullyCleanedOrderIds: Set<string>,
         cleanedAt: string,
         currentPrice: number,
+        averageCost: number,
     ): string {
+        const formatProfitPercentage = (price: number) => (
+            Number.isFinite(averageCost) && averageCost > 0
+                ? String(Number((((price - averageCost) / averageCost) * 100).toFixed(2)))
+                : ''
+        );
         const headers = [
             'STATUS',
             'ALGO ID',
             'CURRENT PRICE',
+            'CURRENT PROFIT (%)',
             'CREATED AT',
             'CLEANED AT',
             'TRIGGER PRICE',
             'ORDER PRICE',
+            'ORDER PROFIT (%)',
         ];
         const cleanedRows = ordersToCancel.map((order) => {
             const cleaned = successfullyCleanedOrderIds.has(order.algoId);
@@ -740,20 +748,24 @@ export class OkxService {
                 cleaned ? 'CLEANED' : 'CLEAN_FAILED',
                 order.algoId,
                 String(currentPrice),
+                formatProfitPercentage(currentPrice),
                 order.createdAt,
                 cleaned ? cleanedAt : '',
                 String(order.triggerPrice),
                 String(order.orderPrice),
+                formatProfitPercentage(order.orderPrice),
             ];
         });
         const keptRows = keptOrders.map((order) => [
             'KEPT',
             order.algoId,
             String(currentPrice),
+            formatProfitPercentage(currentPrice),
             order.createdAt,
             '',
             String(order.triggerPrice),
             String(order.orderPrice),
+            formatProfitPercentage(order.orderPrice),
         ]);
         const rows = [...cleanedRows, ...keptRows];
         const widths = headers.map((header, index) =>
@@ -789,6 +801,7 @@ export class OkxService {
         if (!Number.isFinite(boughtCoinAmount) || boughtCoinAmount < 0) {
             throw new Error(`Invalid bought coin amount for ${normalizedCoin}: ${boughtCoinAmount}`);
         }
+        const averageCost = Number(balance?.openAvgPx ?? 0);
         const configuredSizeDecimals = Number(
             this.config.get<any>(`coin.${normalizedCoin}`)?.szToFixed,
         );
@@ -868,6 +881,7 @@ export class OkxService {
                 new Set(),
                 moment().format('YYYY-MM-DD HH:mm:ss'),
                 currentPrice,
+                averageCost,
             );
             this.logger.log(table, 'Sell order cleanup table', `${normalizedCoin}_clean`);
             return {
@@ -905,6 +919,7 @@ export class OkxService {
             successfullyCleanedOrderIds,
             moment().format('YYYY-MM-DD HH:mm:ss'),
             currentPrice,
+            averageCost,
         );
         this.logger.log(table, 'Sell order cleanup table', `${normalizedCoin}_clean`);
         this.logger.log(JSON.stringify(result, null, 2), 'Clean excess sell orders', normalizedCoin);

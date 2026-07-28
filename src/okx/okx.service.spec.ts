@@ -638,7 +638,7 @@ describe('OkxService clean excess sell orders', () => {
       { algoId: 'middle', instId: 'ETC-USDT', side: 'sell', triggerPx: '80', ordPx: '79', sz: '3', cTime: '1785241800000' },
     ]);
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
-      data: [{ details: [{ ccy: 'ETC', cashBal: '4', availBal: '1' }] }],
+      data: [{ details: [{ ccy: 'ETC', cashBal: '4', availBal: '1', openAvgPx: '80' }] }],
     });
     return { service, logger };
   };
@@ -701,11 +701,11 @@ describe('OkxService clean excess sell orders', () => {
     );
     expect(cleanupTableCall).toBeDefined();
     expect(cleanupTableCall[0]).toContain(
-      '\nSTATUS  | ALGO ID | CURRENT PRICE | CREATED AT          | CLEANED AT          | TRIGGER PRICE | ORDER PRICE',
+      '\nSTATUS  | ALGO ID | CURRENT PRICE | CURRENT PROFIT (%) | CREATED AT          | CLEANED AT          | TRIGGER PRICE | ORDER PRICE | ORDER PROFIT (%)',
     );
-    expect(cleanupTableCall[0]).toMatch(/CLEANED\s+\| low\s+\| 100\s+\| 2026-07-28 19:00:00\s+\| \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\s+\| 70\s+\| 69/);
-    expect(cleanupTableCall[0]).toMatch(/CLEANED\s+\| middle\s+\| 100\s+\| 2026-07-28 19:30:00\s+\| \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\s+\| 80\s+\| 79/);
-    expect(cleanupTableCall[0]).toMatch(/KEPT\s+\| high\s+\| 100\s+\| 2026-07-28 20:00:00\s+\|\s+\| 90\s+\| 89/);
+    expect(cleanupTableCall[0]).toMatch(/CLEANED\s+\| low\s+\| 100\s+\| 25\s+\| 2026-07-28 19:00:00\s+\| \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\s+\| 70\s+\| 69\s+\| -13\.75/);
+    expect(cleanupTableCall[0]).toMatch(/CLEANED\s+\| middle\s+\| 100\s+\| 25\s+\| 2026-07-28 19:30:00\s+\| \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\s+\| 80\s+\| 79\s+\| -1\.25/);
+    expect(cleanupTableCall[0]).toMatch(/KEPT\s+\| high\s+\| 100\s+\| 25\s+\| 2026-07-28 20:00:00\s+\|\s+\| 90\s+\| 89\s+\| 11\.25/);
   });
 
   it('keeps an order whose rounded size is within half a coin size unit of the balance', async () => {
