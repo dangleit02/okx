@@ -5,6 +5,7 @@ import axios from 'axios';
 import { AppLogger } from '../logger/logger.service';
 import * as _ from 'lodash';
 import { EmailService } from '../email/email.service';
+import * as moment from 'moment';
 
 interface BuyTriggerRangeOptions {
     numberOfOrders?: number;
@@ -707,6 +708,64 @@ export class OkxService {
         return result;
     }
 
+    private formatSellOrderCleanupTable(
+        keptOrders: Array<{
+            algoId: string;
+            createdAt: string;
+            triggerPrice: number;
+            orderPrice: number;
+        }>,
+        ordersToCancel: Array<{
+            algoId: string;
+            createdAt: string;
+            triggerPrice: number;
+            orderPrice: number;
+        }>,
+        successfullyCleanedOrderIds: Set<string>,
+        cleanedAt: string,
+        currentPrice: number,
+    ): string {
+        const headers = [
+            'STATUS',
+            'ALGO ID',
+            'CURRENT PRICE',
+            'CREATED AT',
+            'CLEANED AT',
+            'TRIGGER PRICE',
+            'ORDER PRICE',
+        ];
+        const cleanedRows = ordersToCancel.map((order) => {
+            const cleaned = successfullyCleanedOrderIds.has(order.algoId);
+            return [
+                cleaned ? 'CLEANED' : 'CLEAN_FAILED',
+                order.algoId,
+                String(currentPrice),
+                order.createdAt,
+                cleaned ? cleanedAt : '',
+                String(order.triggerPrice),
+                String(order.orderPrice),
+            ];
+        });
+        const keptRows = keptOrders.map((order) => [
+            'KEPT',
+            order.algoId,
+            String(currentPrice),
+            order.createdAt,
+            '',
+            String(order.triggerPrice),
+            String(order.orderPrice),
+        ]);
+        const rows = [...cleanedRows, ...keptRows];
+        const widths = headers.map((header, index) =>
+            Math.max(header.length, ...rows.map((row) => row[index].length)),
+        );
+        const formatRow = (row: string[]) =>
+            row.map((value, index) => value.padEnd(widths[index])).join(' | ');
+        const separator = widths.map((width) => '-'.repeat(width)).join('-+-');
+
+        return ['', formatRow(headers), separator, ...rows.map(formatRow)].join('\n');
+    }
+
     async cleanSellOrdersForOneCoin(coin: string, testing: boolean = true) {
         const normalizedCoin = coin.trim().toUpperCase();
         if (!normalizedCoin || !/^[A-Z0-9]+$/.test(normalizedCoin)) {
@@ -753,6 +812,9 @@ export class OkxService {
             .map((order: any) => ({
                 algoId: String(order.algoId),
                 instId,
+                createdAt: Number.isFinite(Number(order.cTime))
+                    ? moment(Number(order.cTime)).format('YYYY-MM-DD HH:mm:ss')
+                    : '',
                 triggerPrice: Number(order.triggerPx),
                 orderPrice: Number(order.ordPx),
                 size: Number(order.sz),
@@ -800,6 +862,14 @@ export class OkxService {
             return { status: 'preview', ...baseResult };
         }
         if (ordersToCancel.length === 0) {
+            const table = this.formatSellOrderCleanupTable(
+                keptOrders,
+                ordersToCancel,
+                new Set(),
+                moment().format('YYYY-MM-DD HH:mm:ss'),
+                currentPrice,
+            );
+            this.logger.log(table, 'Sell order cleanup table', `${normalizedCoin}_clean`);
             return {
                 status: 'clean',
                 ...baseResult,
@@ -822,6 +892,21 @@ export class OkxService {
             failedOrderCount,
             responses,
         };
+        const successfullyCleanedOrderIds = new Set<string>(
+            responses.flatMap((response: any) =>
+                (response?.data ?? [])
+                    .filter((item: any) => String(item.sCode) === '0')
+                    .map((item: any) => String(item.algoId)),
+            ),
+        );
+        const table = this.formatSellOrderCleanupTable(
+            keptOrders,
+            ordersToCancel,
+            successfullyCleanedOrderIds,
+            moment().format('YYYY-MM-DD HH:mm:ss'),
+            currentPrice,
+        );
+        this.logger.log(table, 'Sell order cleanup table', `${normalizedCoin}_clean`);
         this.logger.log(JSON.stringify(result, null, 2), 'Clean excess sell orders', normalizedCoin);
         return result;
     }

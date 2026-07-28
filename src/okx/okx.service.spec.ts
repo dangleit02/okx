@@ -630,12 +630,12 @@ describe('OkxService clean excess sell orders', () => {
     const service = new OkxService(config as any, logger as any, {} as any);
     jest.spyOn(service as any, 'getTicker').mockResolvedValue(100);
     jest.spyOn(service as any, 'getPendingTriggerSpotOrders').mockResolvedValue([
-      { algoId: 'low', instId: 'ETC-USDT', side: 'sell', triggerPx: '70', ordPx: '69', sz: '1' },
+      { algoId: 'low', instId: 'ETC-USDT', side: 'sell', triggerPx: '70', ordPx: '69', sz: '1', cTime: '1785240000000' },
       { algoId: 'equal', instId: 'ETC-USDT', side: 'sell', triggerPx: '100', ordPx: '99', sz: '10' },
       { algoId: 'above', instId: 'ETC-USDT', side: 'sell', triggerPx: '110', ordPx: '109', sz: '10' },
-      { algoId: 'high', instId: 'ETC-USDT', side: 'sell', triggerPx: '90', ordPx: '89', sz: '2' },
+      { algoId: 'high', instId: 'ETC-USDT', side: 'sell', triggerPx: '90', ordPx: '89', sz: '2', cTime: '1785243600000' },
       { algoId: 'buy', instId: 'ETC-USDT', side: 'buy', triggerPx: '60', ordPx: '59', sz: '10' },
-      { algoId: 'middle', instId: 'ETC-USDT', side: 'sell', triggerPx: '80', ordPx: '79', sz: '3' },
+      { algoId: 'middle', instId: 'ETC-USDT', side: 'sell', triggerPx: '80', ordPx: '79', sz: '3', cTime: '1785241800000' },
     ]);
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
       data: [{ details: [{ ccy: 'ETC', cashBal: '4', availBal: '1' }] }],
@@ -672,9 +672,15 @@ describe('OkxService clean excess sell orders', () => {
   });
 
   it('cancels sell orders from the lowest trigger price first', async () => {
-    const { service } = createService();
+    const { service, logger } = createService();
     const cancelAlgoOrders = jest.spyOn(service as any, 'cancelAlgoOrders').mockResolvedValue({
-      responses: [{ code: '0' }],
+      responses: [{
+        code: '0',
+        data: [
+          { algoId: 'low', sCode: '0' },
+          { algoId: 'middle', sCode: '0' },
+        ],
+      }],
       cancelledOrderCount: 2,
       failedOrderCount: 0,
     });
@@ -690,6 +696,16 @@ describe('OkxService clean excess sell orders', () => {
       cancelledOrderCount: 2,
       failedOrderCount: 0,
     }));
+    const cleanupTableCall = logger.log.mock.calls.find(
+      ([, context, coin]) => context === 'Sell order cleanup table' && coin === 'ETC_clean',
+    );
+    expect(cleanupTableCall).toBeDefined();
+    expect(cleanupTableCall[0]).toContain(
+      '\nSTATUS  | ALGO ID | CURRENT PRICE | CREATED AT          | CLEANED AT          | TRIGGER PRICE | ORDER PRICE',
+    );
+    expect(cleanupTableCall[0]).toMatch(/CLEANED\s+\| low\s+\| 100\s+\| 2026-07-28 19:00:00\s+\| \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\s+\| 70\s+\| 69/);
+    expect(cleanupTableCall[0]).toMatch(/CLEANED\s+\| middle\s+\| 100\s+\| 2026-07-28 19:30:00\s+\| \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\s+\| 80\s+\| 79/);
+    expect(cleanupTableCall[0]).toMatch(/KEPT\s+\| high\s+\| 100\s+\| 2026-07-28 20:00:00\s+\|\s+\| 90\s+\| 89/);
   });
 
   it('keeps an order whose rounded size is within half a coin size unit of the balance', async () => {
