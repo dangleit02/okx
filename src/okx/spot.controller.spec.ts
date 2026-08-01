@@ -171,9 +171,27 @@ describe('SpotController buy order total response format', () => {
       {
         numberOfOrders: 10,
         addStopLoss: false,
+        buyWithoutCheckAvarageCost: true,
         direction: 'down',
         currentPrice: 50,
       },
+    );
+  });
+
+  it('passes buyWithoutCheckAvarageCost from the buy trigger range query', async () => {
+    await controller.buyTriggerFromMinToMax('LTC', {
+      testing: 'true',
+      minPrice: '40',
+      maxPrice: '41',
+      buyWithoutCheckAvarageCost: 'false',
+    });
+
+    expect(okxService.buyTriggerFromMinPriceToMaxPrice).toHaveBeenCalledWith(
+      'LTC',
+      40,
+      41,
+      true,
+      expect.objectContaining({ buyWithoutCheckAvarageCost: false }),
     );
   });
 

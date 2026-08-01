@@ -10,6 +10,7 @@ import * as moment from 'moment';
 interface BuyTriggerRangeOptions {
     numberOfOrders?: number;
     addStopLoss?: boolean;
+    buyWithoutCheckAvarageCost?: boolean;
     direction?: 'up' | 'down';
     currentPrice?: number;
 }
@@ -1413,7 +1414,7 @@ export class OkxService {
         const maxUsdt = this.config.get<number>('maxUsdt');
         const riskPerTrade = coinConfig?.riskPerTrade ?? this.config.get<number>('riskPerTrade');
         const stopLossBuyPriceRatio = this.config.get<number>('stopLossBuyPriceRatio');
-        const buyWithoutCheckAvarageCost = this.config.get<boolean>('buyWithoutCheckAvarageCost');
+        const buyWithoutCheckAvarageCost = options.buyWithoutCheckAvarageCost ?? true;
         const { szToFixed, priceToFixed } = coinConfig;
 
         if (amountOfUsdtPerStep <= 10) {

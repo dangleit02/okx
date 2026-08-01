@@ -367,6 +367,9 @@ export class SpotController {
       {
         numberOfOrders: numberOfOrders ? Number(numberOfOrders) : undefined,
         addStopLoss: parseBool(query.addStopLoss),
+        buyWithoutCheckAvarageCost: query.buyWithoutCheckAvarageCost === undefined
+          ? true
+          : parseBool(query.buyWithoutCheckAvarageCost),
         direction,
         currentPrice,
       },

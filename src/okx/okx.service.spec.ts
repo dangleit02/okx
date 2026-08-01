@@ -894,6 +894,35 @@ describe('OkxService buy trigger range direction', () => {
     ).resolves.toBeUndefined();
     expect(ticker).not.toHaveBeenCalled();
   });
+
+  it('uses the API buyWithoutCheckAvarageCost option instead of the default', async () => {
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'coin.LTC') {
+          return { amountOfUsdtPerStep: 12, priceToFixed: 2, szToFixed: 4 };
+        }
+        const values = {
+          maxUsdt: 4000,
+          riskPerTrade: 0.02,
+          stopLossBuyPriceRatio: 0.1,
+        };
+        return values[key];
+      }),
+    };
+    const service = new OkxService(config as any, { log: jest.fn() } as any, {} as any);
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [{ details: [{ availBal: '1', openAvgPx: '50' }] }],
+    });
+    const placeOneOrder = jest.spyOn(service, 'placeOneOrder');
+
+    await service.buyTriggerFromMinPriceToMaxPrice('LTC', 100, 110, true, {
+      numberOfOrders: 1,
+      direction: 'up',
+      buyWithoutCheckAvarageCost: false,
+    });
+
+    expect(placeOneOrder).not.toHaveBeenCalled();
+  });
 });
 
 describe('OkxService sell percentage at a requested trigger price', () => {
