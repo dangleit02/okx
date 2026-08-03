@@ -445,14 +445,14 @@ export class SpotController {
     });
   }
 
-  @Post('cancel-all-orders')
+  @Delete('cancel-all-orders')
   async cancelAllOrders(
     @Query('side') side?: 'buy' | 'sell' | null,
   ) {
     return await this.okxService.cancelAllOpenConditionSpotOrders(side);
   }
 
-  @Post('cancel-orders/:coin')
+  @Delete('cancel-orders/:coin')
   async cancelOrdersForOneCoin(
     @Param('coin') coin: string,
     @Query('side') side?: 'buy' | 'sell' | null,

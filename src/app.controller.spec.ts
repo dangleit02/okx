@@ -1,22 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { SpotController } from './okx/spot.controller';
 import { AppService } from './app.service';
 
-describe('AppController', () => {
-  let appController: SpotController;
+describe('AppService', () => {
+  let appService: AppService;
 
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
-      controllers: [SpotController],
       providers: [AppService],
     }).compile();
 
-    appController = app.get<SpotController>(SpotController);
+    appService = app.get<AppService>(AppService);
   });
 
   describe('root', () => {
     it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+      expect(appService.getHello()).toBe('Hello World!');
     });
   });
 });

@@ -3,17 +3,13 @@ mua giá rẻ nhất tháng
 bán giá cao nhất tháng
 
 # cancel BUY orders for one coin
-  curl -X POST 'http://localhost:3030/cancel-orders/NEAR?side=buy' \
+  curl -X DELETE 'http://localhost:3030/cancel-orders/NEAR?side=buy' \
     -H "Content-Type: application/json"
 
   
-# preview cancel pending buy orders in price range (does not cancel)
-  curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/BTC?side=buy&minPrice=40000&maxPrice=50000&testing=true' \
+# WARNING cancel buy orders in price range
+  curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/ETH?side=buy&minPrice=1696&maxPrice=1797&testing=false' \
     -H "Content-Type: application/json"
 
-  # WARNING cancel buy orders in price range
-    curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/ETH?side=buy&minPrice=1696&maxPrice=1797&testing=false' \
-      -H "Content-Type: application/json"
-
-    curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/AAVE?side=buy&minPrice=71.86&maxPrice=81.84&testing=false' \
-      -H "Content-Type: application/json"
+  curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/AAVE?side=buy&minPrice=71.86&maxPrice=81.84&testing=false' \
+    -H "Content-Type: application/json"

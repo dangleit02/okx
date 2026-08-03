@@ -1,35 +1,52 @@
-# remove all trigger long orders (orders were tiggered for take profit or stop loss)
-curl -X POST "http://localhost:3030/future-hedge/long-at-price-all-coins?\
-testing=true&\
-removeExistingOrders=true&\
--H "Content-Type: application/json"
+# FUTURE HEDGE - LONG
+# Dùng testing=true để preview trước khi đổi sang testing=false.
 
-# auto trade long for one coin
-curl -X POST "http://localhost:3030/future-hedge/long-at-price/LINK?\
-testing=false&\
-removeExistingOrders=true&\
-autoTrade=true" \
--H "Content-Type: application/json"
+# 1. Đặt sẵn ladder mở LONG. Mỗi entry luôn có attached stop-loss.
+curl -X POST 'http://localhost:3030/future-hedge/buy-trigger-from-min-to-max/BTC?direction=long&testing=true&minPrice=60000&maxPrice=62000&numberOfOrders=5&stopLossPrice=57000' \
+  -H 'Content-Type: application/json'
 
+# 2. Xem tất cả vị thế LONG đang mở.
+curl -X GET 'http://localhost:3030/future-hedge/spot-bought-coins?direction=long' \
+  -H 'Content-Type: application/json'
 
-# close partial long when up for one coin (to take profit, existed long position)
-curl -X POST "http://localhost:3030/future-hedge/long-at-price/ETH?\
-testing=true&\
-removeExistingOrders=true&\
-enableTakeProfit=true" \
--H "Content-Type: application/json"
+# 3. Xem entry orders LONG của một coin.
+curl -X GET 'http://localhost:3030/future-hedge/orders-one-coin/BTC?direction=long&intent=open' \
+  -H 'Content-Type: application/json'
 
+# 4. Xem close orders LONG của tất cả coin.
+curl -X GET 'http://localhost:3030/future-hedge/orders-all-coins?direction=long&intent=close' \
+  -H 'Content-Type: application/json'
 
-# close partial long when down for one coin
-curl -X POST "http://localhost:3030/future-hedge/long-at-price/STRK?\
-testing=true&\
-removeExistingOrders=true&\
-enableTakeProfit=true&\
-partialCloseOnRetrace=true" \
--H "Content-Type: application/json"
+# 5. Đặt sẵn TAKE PROFIT LONG tại giá cao hơn currentPrice: limit khi trigger.
+curl -X POST 'http://localhost:3030/future-hedge/sell-at-trigger-price/BTC?direction=long&testing=true&price=65000&percentage=25' \
+  -H 'Content-Type: application/json'
 
-# cancel all long trigger 
-curl -X POST 'http://localhost:3030/future-hedge/cancel-all-orders?direction='long' \
--H "Content-Type: application/json"
+# 6. Đặt sẵn STOP LOSS LONG tại giá thấp hơn currentPrice: market khi trigger.
+curl -X POST 'http://localhost:3030/future-hedge/sell-at-trigger-price/BTC?direction=long&testing=true&price=58000&percentage=100' \
+  -H 'Content-Type: application/json'
 
-  
+# 7. Đặt trigger market đóng LONG quanh currentPrice.
+curl -X POST 'http://localhost:3030/future-hedge/sell-all-at-price/BTC?direction=long&testing=true&percentage=100' \
+  -H 'Content-Type: application/json'
+
+# 8. Đặt ladder đóng LONG. Retrace/stop-loss sẽ dùng market khi trigger.
+curl -X POST 'http://localhost:3030/future-hedge/sell-at-price/BTC?direction=long&testing=true&partialCloseOnRetrace=true&justOneOrder=false' \
+  -H 'Content-Type: application/json'
+
+# 9. Đặt ladder đóng LONG cho coinsForLong.
+curl -X POST 'http://localhost:3030/future-hedge/sell-at-price-all-coins?direction=long&testing=true&partialCloseOnRetrace=true&justOneOrder=false' \
+  -H 'Content-Type: application/json'
+
+# WARNING: các DELETE dưới đây hủy lệnh thật, không có testing mode.
+
+# 10. Hủy entry orders LONG của BTC.
+curl -X DELETE 'http://localhost:3030/future-hedge/cancel-orders/BTC?direction=long&intent=open' \
+  -H 'Content-Type: application/json'
+
+# 11. Alias hủy close orders LONG của BTC.
+curl -X DELETE 'http://localhost:3030/future-hedge/cancel-orders-one-coin/BTC?direction=long&intent=close' \
+  -H 'Content-Type: application/json'
+
+# 12. Hủy tất cả trigger orders LONG.
+curl -X DELETE 'http://localhost:3030/future-hedge/cancel-all-orders?direction=long&intent=all' \
+  -H 'Content-Type: application/json'

@@ -105,74 +105,84 @@ export class TasksService {
         }
     }
 
-    // run every hour at minute 15
-    // @Cron('28 * * * *')
-    async autoCloseShortPartialPositionForSwapOnRetrace() {
-        this.logger.log(`Cron auto close short partial position for swap on retrace ${moment().format('YY/MM/DD HH:mm:ss')}`);
+    // Run every hour at minute 28, gated by runSwapTaskForShort.
+    @Cron('28 * * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+    async refreshShortFutureOrders() {
+        this.logger.log(`Cron refresh short entry, stop-loss and close orders ${moment().format('YY/MM/DD HH:mm:ss')}`, null, 'ALL_short_hedge');
         try {
             if (!this.config.get<boolean>('runSwapTaskForShort')) {
-                this.logger.log('Swap Short task is disabled in config');
+                this.logger.log('Swap Short task is disabled in config', null, 'ALL_short_hedge');
                 return;
             }
-            this.logger.log(`Starting to place all orders for all coins ${moment().format('YY/MM/DD HH:mm:ss')}`);
+            this.logger.log(`Starting to place all orders for all coins ${moment().format('YY/MM/DD HH:mm:ss')}`, null, 'ALL_short_hedge');
             let coins = this.config.get<any>(`coinsForShort`);
             if (!coins) {
                 throw new Error(`No configuration found for coinsForShort: ${JSON.stringify(coins)}`);
             }
             coins = _.uniq(coins);
-            this.logger.log(`Coins to process: ${JSON.stringify(coins)}`);
+            this.logger.log(`Coins to process: ${JSON.stringify(coins)}`, null, 'ALL_short_hedge');
             const results = [];
             const isTesting = false,
-                removeExistingOrders = true,
+                removeExistingOrders = false,
                 enableTakeProfit = true,
-                partialCloseOnRetrace = true;
+                partialCloseOnRetrace = true,
+                autoTrade = true;
 
             for await (const coin of coins) {
-                this.logger.log(`Processing coin: ${coin.toUpperCase()}`, null, coin);
-                const result = await this.okxFutureHedgeService.tradeOneCoin({ coin, direction: 'short', isTesting, removeExistingOrders, enableTakeProfit, partialCloseOnRetrace });
+                this.logger.log(`Processing coin: ${coin.toUpperCase()}`, null, `${coin.toUpperCase()}_short_hedge`);
+                const cancelled = await this.okxFutureHedgeService.cancelFutureOrdersForOneCoin(coin, 'short', 'all');
+                results.push({ coin, direction: 'short', action: 'cancel_existing_trigger_orders', result: cancelled });
+                const stopLoss = await this.okxFutureHedgeService.ensurePositionStopLoss(coin, 'short', isTesting);
+                results.push({ coin, direction: 'short', action: 'ensure_position_stop_loss', result: stopLoss });
+                const result = await this.okxFutureHedgeService.tradeOneCoin({ coin, direction: 'short', isTesting, removeExistingOrders, enableTakeProfit, partialCloseOnRetrace, autoTrade });
                 results.push(...result);
             }
-            this.logger.log(`Auto close short partial position results: ${JSON.stringify(results, null, 2)}`);
+            this.logger.log(`Refresh short future orders results: ${JSON.stringify(results, null, 2)}`, null, 'ALL_short_hedge');
 
-            this.logger.log(`✅ Successfully auto close short partial position for swap on retrace ${moment().format('YYYY/MM/DD HH:mm:ss')}`)
+            this.logger.log(`✅ Successfully refreshed short future orders ${moment().format('YYYY/MM/DD HH:mm:ss')}`, null, 'ALL_short_hedge')
         } catch (error) {
-            this.logger.log(`⚠️ Error close short partial position for swap on retrace ${moment().format('YYYY/MM/DD HH:mm:ss')}, ${error.message}`)
+            this.logger.log(`⚠️ Error refreshing short future orders ${moment().format('YYYY/MM/DD HH:mm:ss')}, ${error.message}`, null, 'ALL_short_hedge')
             throw error;
         }
     }
 
-    // run every hour at minute 30
-    // @Cron('45 * * * *')
-    async autoCloseLongPartialPositionForSwapOnRetrace() {
-        this.logger.log(`Cron auto close long partial position for swap on retrace ${moment().format('YY/MM/DD HH:mm:ss')}`);
+    // Run every hour at minute 45, gated by runSwapTaskForLong.
+    @Cron('45 * * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+    async refreshLongFutureOrders() {
+        this.logger.log(`Cron refresh long entry, stop-loss and close orders ${moment().format('YY/MM/DD HH:mm:ss')}`, null, 'ALL_long_hedge');
         try {
             if (!this.config.get<boolean>('runSwapTaskForLong')) {
-                this.logger.log('Swap Long task is disabled in config');
+                this.logger.log('Swap Long task is disabled in config', null, 'ALL_long_hedge');
                 return;
             }
-            this.logger.log(`Starting to place all orders for all coins ${moment().format('YY/MM/DD HH:mm:ss')}`);
+            this.logger.log(`Starting to place all orders for all coins ${moment().format('YY/MM/DD HH:mm:ss')}`, null, 'ALL_long_hedge');
             let coins = this.config.get<any>(`coinsForLong`);
             if (!coins) {
                 throw new Error(`No configuration found for coinsForLong: ${JSON.stringify(coins)}`);
             }
             coins = _.uniq(coins);
-            this.logger.log(`Coins to process: ${JSON.stringify(coins)}`);
+            this.logger.log(`Coins to process: ${JSON.stringify(coins)}`, null, 'ALL_long_hedge');
             const results = [];
             const isTesting = false,
-                removeExistingOrders = true,
+                removeExistingOrders = false,
                 enableTakeProfit = true,
-                partialCloseOnRetrace = true;
+                partialCloseOnRetrace = true,
+                autoTrade = true;
 
             for await (const coin of coins) {
-                this.logger.log(`Processing coin: ${coin.toUpperCase()}`);
-                const result = await this.okxFutureHedgeService.tradeOneCoin({ coin, direction: 'long', isTesting, removeExistingOrders, enableTakeProfit, partialCloseOnRetrace });
+                this.logger.log(`Processing coin: ${coin.toUpperCase()}`, null, `${coin.toUpperCase()}_long_hedge`);
+                const cancelled = await this.okxFutureHedgeService.cancelFutureOrdersForOneCoin(coin, 'long', 'all');
+                results.push({ coin, direction: 'long', action: 'cancel_existing_trigger_orders', result: cancelled });
+                const stopLoss = await this.okxFutureHedgeService.ensurePositionStopLoss(coin, 'long', isTesting);
+                results.push({ coin, direction: 'long', action: 'ensure_position_stop_loss', result: stopLoss });
+                const result = await this.okxFutureHedgeService.tradeOneCoin({ coin, direction: 'long', isTesting, removeExistingOrders, enableTakeProfit, partialCloseOnRetrace, autoTrade });
                 results.push(...result);
             }
-            this.logger.log(`Auto close long partial position results: ${JSON.stringify(results, null, 2)}`);
+            this.logger.log(`Refresh long future orders results: ${JSON.stringify(results, null, 2)}`, null, 'ALL_long_hedge');
 
-            this.logger.log(`✅ Successfully auto close long partial position for swap on retrace ${moment().format('YYYY/MM/DD HH:mm:ss')}`)
+            this.logger.log(`✅ Successfully refreshed long future orders ${moment().format('YYYY/MM/DD HH:mm:ss')}`, null, 'ALL_long_hedge')
         } catch (error) {
-            this.logger.log(`⚠️ Error close long partial position for swap on retrace ${moment().format('YYYY/MM/DD HH:mm:ss')}, ${error.message}`)
+            this.logger.log(`⚠️ Error refreshing long future orders ${moment().format('YYYY/MM/DD HH:mm:ss')}, ${error.message}`, null, 'ALL_long_hedge')
             throw error;
         }
     }

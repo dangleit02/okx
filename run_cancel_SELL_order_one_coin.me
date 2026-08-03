@@ -3,7 +3,7 @@ mua giá rẻ nhất tháng
 bán giá cao nhất tháng
 
 # cancel SELL orders for one coin
-  curl -X POST 'http://localhost:3030/cancel-orders/XLM?side=sell' \
+  curl -X DELETE 'http://localhost:3030/cancel-orders/XLM?side=sell' \
     -H "Content-Type: application/json"
 
 # preview cancel pending sell orders in price range (does not cancel)

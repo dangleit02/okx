@@ -3,19 +3,18 @@ mua giá rẻ nhất tháng
 bán giá cao nhất tháng
 
 # cancel all orders for one coin
-  curl -X POST 'http://localhost:3030/cancel-orders/BTC' \
+  curl -X DELETE 'http://localhost:3030/cancel-orders/BTC' \
     -H "Content-Type: application/json"
 
 
 # cancel all orders for all coins
-  curl -X POST 'http://localhost:3030/cancel-all-orders' \
+  curl -X DELETE 'http://localhost:3030/cancel-all-orders' \
     -H "Content-Type: application/json"    
 
   # cancel BUY orders for all coins
-    curl -X POST 'http://localhost:3030/cancel-all-orders?side=buy' \
+    curl -X DELETE 'http://localhost:3030/cancel-all-orders?side=buy' \
       -H "Content-Type: application/json"    
 
   # cancel SELL orders for all coins
-    curl -X POST 'http://localhost:3030/cancel-all-orders?side=sell' \
+    curl -X DELETE 'http://localhost:3030/cancel-all-orders?side=sell' \
       -H "Content-Type: application/json"    
-

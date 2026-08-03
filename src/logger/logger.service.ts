@@ -25,7 +25,8 @@ export class AppLogger implements LoggerService {
 
   private writeToFile(level: string, message: any, context?: string, trace?: string, coin?: string) {
     const today = this.getDateString();
-    const logFilePath = path.join(this.logDir, `${today}_${coin ?? ''}.log`);
+    const safeFileKey = String(coin ?? '').replace(/[^A-Za-z0-9_-]/g, '_');
+    const logFilePath = path.join(this.logDir, `${today}_${safeFileKey}.log`);
     console.log('logFilePath', coin, logFilePath);
     let msgStr: string;
 
@@ -49,15 +50,15 @@ export class AppLogger implements LoggerService {
     this.writeToFile('LOG', message, context, null, coin);
   }
 
-  error(message: any, trace?: string, context?: string) {
+  error(message: any, trace?: string, context?: string, coin?: string) {
     console.error(`[${this.getTimestamp()}] [ERROR]${context ? ' [' + context + ']' : ''} -`, message);
     if (trace) console.error(trace);
-    this.writeToFile('ERROR', message, context, trace);
+    this.writeToFile('ERROR', message, context, trace, coin);
   }
 
-  warn(message: any, context?: string) {
+  warn(message: any, context?: string, coin?: string) {
     console.warn(`[${this.getTimestamp()}] [WARN]${context ? ' [' + context + ']' : ''} -`, message);
-    this.writeToFile('WARN', message, context);
+    this.writeToFile('WARN', message, context, null, coin);
   }
 
   debug(message: any, context?: string) {

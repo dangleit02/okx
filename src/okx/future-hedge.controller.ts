@@ -1,5 +1,6 @@
-import { Controller, Param, Post, Query } from '@nestjs/common';
+import { BadRequestException, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { OkxFutureHedgeService } from './okx.future.hedge.service';
+import { FutureDirection, FutureOrderIntent } from './okx.future.base.service';
 import { ConfigService } from '@nestjs/config';
 import * as _ from 'lodash';
 import { TradeOneCoinParams } from 'src/interfaces/interface';
@@ -26,6 +27,28 @@ export class FutureHedgeController {
     };
   }
 
+  private parseDirection(value?: string): FutureDirection {
+    if (value !== 'long' && value !== 'short') {
+      throw new BadRequestException('direction must be long or short');
+    }
+    return value;
+  }
+
+  private parseIntent(value?: string): FutureOrderIntent {
+    const intent = value ?? 'all';
+    if (intent !== 'open' && intent !== 'close' && intent !== 'all') {
+      throw new BadRequestException('intent must be open, close or all');
+    }
+    return intent;
+  }
+
+  private configuredCoins(direction: FutureDirection) {
+    const key = direction === 'long' ? 'coinsForLong' : 'coinsForShort';
+    const coins = _.uniq(this.config.get<string[]>(key) || []);
+    if (!coins.length) throw new Error(`No coins configured in ${key}`);
+    return coins;
+  }
+
   @Post('long-at-price/:coin')
   async longAtPrice(@Param('coin') coin: string, @Query() query: Record<string, string>) {
     return this.okx.tradeOneCoin({ ...this.parseParams('long', query), coin });
@@ -47,10 +70,9 @@ export class FutureHedgeController {
   }
 
   private async processAllCoins(params: TradeOneCoinParams) {
-    this.logger.log(`Starting batch orders in Hedge mode, testing: ${params.isTesting}`);
+    this.logger.log(`Starting batch orders in Hedge mode, testing: ${params.isTesting}`, null, `ALL_${params.direction}_hedge`);
 
-    let coins = _.uniq(this.config.get<any>('coinsForBuy') || []);
-    if (!coins.length) throw new Error('No coins configured');
+    const coins = this.configuredCoins(params.direction);
 
     const results = [];
     for await (const coin of coins) {
@@ -60,8 +82,119 @@ export class FutureHedgeController {
     return results;
   }
 
-  @Post('cancel-all-orders')
-  async cancelAll(@Query('direction') direction: 'long' | 'short') {
-    return this.okx.cancelAllTypeOfOpenSwapOrders(direction);
+  @Post('buy-trigger-from-min-to-max/:coin')
+  async openTriggerRange(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.okx.openTriggerRangeWithStopLoss(
+      coin,
+      this.parseDirection(query.direction),
+      Number(query.minPrice),
+      Number(query.maxPrice),
+      {
+        numberOfOrders: query.numberOfOrders ? Number(query.numberOfOrders) : undefined,
+        stopLossPrice: query.stopLossPrice ? Number(query.stopLossPrice) : undefined,
+        testing: query.testing !== 'false',
+      },
+    );
+  }
+
+  @Delete('cancel-orders/:coin')
+  async cancelOneCoin(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.okx.cancelFutureOrdersForOneCoin(
+      coin,
+      this.parseDirection(query.direction),
+      this.parseIntent(query.intent),
+    );
+  }
+
+  @Delete('cancel-orders-one-coin/:coin')
+  async cancelOneCoinAlias(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.cancelOneCoin(coin, query);
+  }
+
+  @Delete('cancel-all-orders')
+  async cancelAll(@Query() query: Record<string, string>) {
+    return this.okx.cancelFutureOrdersForAllCoins(
+      this.parseDirection(query.direction),
+      this.parseIntent(query.intent),
+    );
+  }
+
+  @Get('orders-all-coins')
+  async ordersAllCoins(@Query() query: Record<string, string>) {
+    return this.okx.getFutureOrdersForAllCoins(
+      this.parseDirection(query.direction),
+      this.parseIntent(query.intent),
+    );
+  }
+
+  @Get('orders-one-coin/:coin')
+  async ordersOneCoin(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.okx.getFutureOrdersForOneCoin(
+      coin,
+      this.parseDirection(query.direction),
+      this.parseIntent(query.intent),
+    );
+  }
+
+  @Get('spot-bought-coins')
+  async openPositions(@Query('direction') direction?: string) {
+    return this.okx.getOpenFuturePositions(
+      direction === undefined ? undefined : this.parseDirection(direction),
+    );
+  }
+
+  @Post('sell-at-trigger-price/:coin')
+  async closeAtTriggerPrice(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.okx.closePositionAtTriggerPrice(
+      coin,
+      this.parseDirection(query.direction),
+      Number(query.price),
+      query.percentage ? Number(query.percentage) : 100,
+      query.testing !== 'false',
+    );
+  }
+
+  @Post('sell-all-at-price/:coin')
+  async closeAtCurrentPrice(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.okx.closePositionAtCurrentPrice(
+      coin,
+      this.parseDirection(query.direction),
+      query.percentage ? Number(query.percentage) : 100,
+      query.testing !== 'false',
+    );
+  }
+
+  @Post('sell-at-price/:coin')
+  async closeAtPriceLadder(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.okx.placeTakeProfitByClosePartialPosition(
+      coin,
+      this.parseDirection(query.direction),
+      parseBool(query.partialCloseOnRetrace),
+      parseBool(query.justOneOrder),
+      query.testing !== 'false',
+    );
+  }
+
+  @Post('sell-at-price-all-coins')
+  async closeAtPriceAllCoins(@Query() query: Record<string, string>) {
+    const direction = this.parseDirection(query.direction);
+    const testing = query.testing !== 'false';
+    this.logger.log(`FUTURE hedge close ladder all coins start: direction=${direction}, testing=${testing}`, null, `ALL_${direction}_hedge`);
+    const results = [];
+    for (const coin of this.configuredCoins(direction)) {
+      results.push({
+        coin,
+        direction,
+        result: await this.okx.placeTakeProfitByClosePartialPosition(
+          coin,
+          direction,
+          parseBool(query.partialCloseOnRetrace),
+          parseBool(query.justOneOrder),
+          testing,
+        ),
+      });
+    }
+    this.logger.log(`FUTURE hedge close ladder all coins complete: direction=${direction}, testing=${testing}, coins=${results.length}`, null, `ALL_${direction}_hedge`);
+    return results;
   }
 }

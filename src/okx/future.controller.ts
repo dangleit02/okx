@@ -1,4 +1,4 @@
-import { Controller, Param, Post, Query } from '@nestjs/common';
+import { Controller, Delete, Param, Post, Query } from '@nestjs/common';
 import { OkxFutureService } from './okx-future.service';
 import { ConfigService } from '@nestjs/config';
 import { AppLogger } from 'src/logger/logger.service';
@@ -47,7 +47,7 @@ export class FutureController {
       autoTrade: parseBool(query.autoTrade),
     };
     this.logger.log(`Starting to place all orders for all coins, testing mode: ${params.isTesting}`);
-    let coins = this.config.get<any>(`coinsForBuy`);
+    let coins = this.config.get<any>(`coinsForLong`);
     if (!coins) {
       throw new Error(`No configuration found for coins: ${JSON.stringify(coins)}`);
     }
@@ -95,7 +95,7 @@ export class FutureController {
       autoTrade: parseBool(query.autoTrade),
     };
     this.logger.log(`Starting to place all orders for all coins, testing mode: ${params.isTesting}`);
-    let coins = this.config.get<any>(`coinsForBuy`);
+    let coins = this.config.get<any>(`coinsForShort`);
     if (!coins) {
       throw new Error(`No configuration found for coins: ${JSON.stringify(coins)}`);
     }
@@ -110,7 +110,7 @@ export class FutureController {
     return results;
   }
 
-  @Post('cancel-all-orders')
+  @Delete('cancel-all-orders')
   async cancelAllOrders(
     @Query('direction') direction: 'long' | 'short',
   ) {

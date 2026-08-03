@@ -279,7 +279,8 @@ export class OkxFutureService {
                 sz.toFixed(szToFixed),
                 triggerPx.toFixed(priceToFixed),
                 orderPx.toFixed(priceToFixed),
-                isTesting
+                isTesting,
+                stopLossPrice.toFixed(priceToFixed),
             );
 
             data.push({ step, data: res.data, body: res.body });
@@ -393,6 +394,7 @@ export class OkxFutureService {
         triggerPx?: string,           // giá kích hoạt (optional)
         orderPx: string = '-1',       // '-1' = market
         testing: boolean = true,
+        stopLossPx?: string,
     ) {
         const timestamp = new Date().toISOString();
         const instId = `${coin.toUpperCase()}-USDT-SWAP`;
@@ -402,6 +404,19 @@ export class OkxFutureService {
         // mở long  -> buy
         // mở short -> sell
         const side = posSide === 'long' ? 'buy' : 'sell';
+        const parsedStopLoss = Number(stopLossPx);
+        if (!stopLossPx || !Number.isFinite(parsedStopLoss) || parsedStopLoss <= 0) {
+            throw new Error(`A valid stopLossPx is required for every ${posSide} entry order`);
+        }
+        const referenceEntryPrice = Number(orderPx !== '-1' ? orderPx : triggerPx);
+        if (Number.isFinite(referenceEntryPrice)) {
+            const invalidStopLoss = posSide === 'long'
+                ? parsedStopLoss >= referenceEntryPrice
+                : parsedStopLoss <= referenceEntryPrice;
+            if (invalidStopLoss) {
+                throw new Error(`Invalid ${posSide} stopLossPx ${parsedStopLoss} for entry price ${referenceEntryPrice}`);
+            }
+        }
 
         let requestPath = '';
         let body: any = {};
@@ -439,6 +454,11 @@ export class OkxFutureService {
                 sz,
             };
         }
+        body.attachAlgoOrds = [{
+            slTriggerPx: stopLossPx,
+            slTriggerPxType: 'last',
+            slOrdPx: '-1',
+        }];
 
         const prehash = timestamp + 'POST' + requestPath + JSON.stringify(body);
         const sign = this.signRequest(this.config.get<string>('okx.secretKey')!, prehash);
