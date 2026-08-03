@@ -3,25 +3,19 @@ mua giá rẻ nhất tháng
 bán giá cao nhất tháng
 
 # trigger sell of 25% available balance at the current price
-  # preview 
-    curl -X POST 'http://localhost:3030/sell-all-at-price/DOGE?percentage=50&testing=true' \
-      -H "Content-Type: application/json"
-
   # WARNING: actually place the trigger order to sell 25% at the current price
-    curl -X POST 'http://localhost:3030/sell-all-at-price/ALGO?percentage=50&testing=false' \
+    curl -X POST 'http://localhost:3030/sell-all-at-price/ALGO?percentage=100&testing=false' \
       -H "Content-Type: application/json"
 
 # selling 25% BTC when price falls to 50000 (orderPx is 0.2% below triggerPx)
-  # preview 
-    curl -X POST 'http://localhost:3030/sell-at-trigger-price/ETH?price=2000&percentage=50&testing=true' \
-      -H "Content-Type: application/json"
-    curl -X POST 'http://localhost:3030/sell-at-trigger-price/ADA?price=0.1900&percentage=50&testing=true' \
-      -H "Content-Type: application/json"
-
   # WARNING: sell 25% BTC above current price (orderPx is 0.2% above triggerPx)
+    curl -X POST 'http://localhost:3030/sell-at-trigger-price/XRP?price=1.1758&percentage=80&testing=false' \
+        -H "Content-Type: application/json"
+    curl -X POST 'http://localhost:3030/sell-at-trigger-price/SUI?price=0.7502&percentage=80&testing=false' \
+        -H "Content-Type: application/json"
     curl -X POST 'http://localhost:3030/sell-at-trigger-price/XLM?price=0.2181&percentage=80&testing=false' \
         -H "Content-Type: application/json"
-    curl -X POST 'http://localhost:3030/sell-at-trigger-price/NEAR?price=1.932&percentage=80&testing=false' \
+    curl -X POST 'http://localhost:3030/sell-at-trigger-price/NEAR?price=1.932&percentage=30&testing=false' \
         -H "Content-Type: application/json"
     curl -X POST 'http://localhost:3030/sell-at-trigger-price/ALGO?price=0.087&percentage=80&testing=false' \
         -H "Content-Type: application/json"
@@ -35,7 +29,7 @@ bán giá cao nhất tháng
       -H "Content-Type: application/json"
     curl -X POST 'http://localhost:3030/sell-at-trigger-price/ETC?price=7.04&percentage=80&testing=false' \
       -H "Content-Type: application/json"
-    curl -X POST 'http://localhost:3030/sell-at-trigger-price/LTC?price=7.45&percentage=50&testing=false' \
+    curl -X POST 'http://localhost:3030/sell-at-trigger-price/LTC?price=47.72&percentage=80&testing=false' \
       -H "Content-Type: application/json"
 
 

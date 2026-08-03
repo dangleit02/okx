@@ -20,7 +20,7 @@ export default () => ({
     stopLossSellPriceRatio: 0.1,//0.06, // 6%//0.1, // 10%    0.3, // 30%    
     futureLeverage: 3,
     coinsSpotForTakeProfit: [
-        'BTC',
+        // 'BTC',
         'ETH',
         'DOGE',
         'ETC',

@@ -1650,9 +1650,10 @@ export class OkxService {
                         amountOfUsdtPerStep / orderPx,
                         remainingCoin
                     );
+                    const formattedSize = sz.toFixed(szToFixed);
 
-                    if (sz <= 0) {
-                        this.logger.log(`SELL ${coin} sz ${sz} <= 0, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`, null, coin);
+                    if (sz <= 0 || Number(formattedSize) <= 0) {
+                        this.logger.log(`SELL ${coin} size ${formattedSize} is zero after rounding, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}`, null, coin);
                         break;
                     }
                     if (triggerPx > maxSellPrice) {
@@ -1669,14 +1670,17 @@ export class OkxService {
                         continue;
                     }
 
+                    const profit = avarageCost > 0
+                        ? `${((orderPx - avarageCost) / avarageCost * 100).toFixed(2)}%`
+                        : 'N/A';
                     this.logger.log(
-                        `SELL ${coin}  step ${step} | orderPx ${orderPx.toFixed(priceToFixed)} | triggerPx ${triggerPx.toFixed(priceToFixed)} | sz ${sz.toFixed(szToFixed)} | profit: ${(orderPx - avarageCost)/avarageCost*100}%`, null, coin
+                        `SELL ${coin}  step ${step} | orderPx ${orderPx.toFixed(priceToFixed)} | triggerPx ${triggerPx.toFixed(priceToFixed)} | sz ${formattedSize} | profit: ${profit}`, null, coin
                     );
 
                     const res = await this.placeOneOrder(
                         coin,
                         'sell',
-                        sz.toFixed(szToFixed),
+                        formattedSize,
                         triggerPx.toFixed(priceToFixed),
                         orderPx.toFixed(priceToFixed),
                         testing
@@ -1696,7 +1700,10 @@ export class OkxService {
             if (!testing && data.length > 0) {
                 this.emailService.sendEmail(process.env.EMAIL_TO, `SELL ${coin}`, data.map((item => {
                     const triggerPx = Number(item.body?.triggerPx);
-                    return `${triggerPx.toFixed(priceToFixed)}:${((triggerPx - avarageCost) / avarageCost * 100).toFixed(2)}%`;
+                    const profit = avarageCost > 0
+                        ? `${((triggerPx - avarageCost) / avarageCost * 100).toFixed(2)}%`
+                        : 'N/A';
+                    return `${triggerPx.toFixed(priceToFixed)}:${profit}`;
                 })));
             }
             await this.sleep(5000 * 60);

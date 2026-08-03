@@ -43,15 +43,22 @@ bán giá cao nhất tháng
         curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/SOL?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=66&maxPrice=70&numberOfOrders=10&addStopLoss=false' \
             -H 'Content-Type: application/json'
 
+        # DOWN NEAR
         curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/NEAR?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=1.5&maxPrice=1.6&numberOfOrders=10&addStopLoss=false' \
+            -H 'Content-Type: application/json'
+
+        # UP NEAR
+        curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/NEAR?testing=false&direction=up&removeExistingBuyOrders=false&minPrice=1.621&maxPrice=1.735&numberOfOrders=10&addStopLoss=false' \
             -H 'Content-Type: application/json'
 
         curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/LINK?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=7&maxPrice=7.8&numberOfOrders=10&addStopLoss=false' \
         -H 'Content-Type: application/json'
 
+        # DOWN XRP
         curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/XRP?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=1.0485&maxPrice=1.0648&numberOfOrders=10&addStopLoss=false' \
         -H 'Content-Type: application/json'
 
+        # UP XRP
         curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/XRP?testing=false&direction=up&removeExistingBuyOrders=false&minPrice=1.0485&maxPrice=1.0648&numberOfOrders=10&addStopLoss=false' \
         -H 'Content-Type: application/json'
 

@@ -925,6 +925,81 @@ describe('OkxService buy trigger range direction', () => {
   });
 });
 
+describe('OkxService auto sell size and profit logging', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  const createService = () => {
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'coin.ALGO') {
+          return {
+            szToFixed: 4,
+            priceToFixed: 5,
+            minSellPriceRatio: 0.05,
+            maxSellPriceRatio: 0.06,
+          };
+        }
+        const values = {
+          maxUsdt: 4000,
+          riskPerTrade: 0.02,
+          amountOfUsdtPerStep: 12,
+          minSellPriceRatio: 0.05,
+          maxSellPriceRatio: 0.06,
+          stopLossSellPriceRatio: 0.1,
+          minTakeProfitRatio: -0.3,
+          sellWithoutCheckAvarageCost: true,
+        };
+        return values[key];
+      }),
+    };
+    const logger = { log: jest.fn(), error: jest.fn() };
+    const service = new OkxService(config as any, logger as any, {} as any);
+    jest.spyOn(service as any, 'getTicker').mockResolvedValue(0.08641);
+    jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+    return { service, logger };
+  };
+
+  it('does not submit a sell order whose size rounds to zero', async () => {
+    const { service, logger } = createService();
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [{ details: [{ availBal: '0.00001', openAvgPx: '0' }] }],
+    });
+    const placeOneOrder = jest.spyOn(service, 'placeOneOrder');
+
+    await expect(
+      service.autoSellFromMinPriceToStopLossPriceForDown('ALGO', true),
+    ).resolves.toEqual([]);
+
+    expect(placeOneOrder).not.toHaveBeenCalled();
+    expect(logger.log).toHaveBeenCalledWith(
+      expect.stringContaining('size 0.0000 is zero after rounding'),
+      null,
+      'ALGO',
+    );
+  });
+
+  it('logs N/A profit when the average cost is unavailable', async () => {
+    const { service, logger } = createService();
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [{ details: [{ availBal: '1', openAvgPx: '0' }] }],
+    });
+    jest.spyOn(service, 'placeOneOrder').mockResolvedValue({
+      body: { triggerPx: '0.08053', orderPx: '0.08037' },
+    } as any);
+
+    await service.autoSellFromMinPriceToStopLossPriceForDown('ALGO', true);
+
+    expect(logger.log).toHaveBeenCalledWith(
+      expect.stringContaining('profit: N/A'),
+      null,
+      'ALGO',
+    );
+    expect(logger.log.mock.calls.flat().join(' ')).not.toContain('Infinity');
+  });
+});
+
 describe('OkxService sell percentage at a requested trigger price', () => {
   afterEach(() => {
     jest.restoreAllMocks();

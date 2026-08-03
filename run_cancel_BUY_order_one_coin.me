@@ -3,7 +3,7 @@ mua giá rẻ nhất tháng
 bán giá cao nhất tháng
 
 # cancel BUY orders for one coin
-  curl -X POST 'http://localhost:3030/cancel-orders/XRP?side=buy' \
+  curl -X POST 'http://localhost:3030/cancel-orders/NEAR?side=buy' \
     -H "Content-Type: application/json"
 
   
@@ -15,5 +15,5 @@ bán giá cao nhất tháng
     curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/ETH?side=buy&minPrice=1696&maxPrice=1797&testing=false' \
       -H "Content-Type: application/json"
 
-    curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/DOT?side=buy&minPrice=0.6687&maxPrice=0.7285&testing=false' \
+    curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/AAVE?side=buy&minPrice=71.86&maxPrice=81.84&testing=false' \
       -H "Content-Type: application/json"
