@@ -307,10 +307,14 @@ export class OkxFutureService {
         const coinConfig = this.config.get<any>(`coin.${coin.toUpperCase()}`);
         if (!coinConfig) throw new Error(`No configuration found for coin: ${coin.toUpperCase()}`);
         const { priceToFixed, szToFixed } = coinConfig;
+        const minClosePriceRatio = coinConfig.minClosePriceRatio
+            ?? this.config.get<number>('minClosePriceRatio');
+        const maxClosePriceRatio = coinConfig.maxClosePriceRatio
+            ?? this.config.get<number>('maxClosePriceRatio');
 
         this.logger.log(`Placing take profit orders for ${coin.toUpperCase()}, posSide=${posSide}, testing=${testing}`);
 
-        const takeProfitPercentages = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05];
+        const numberOfCloseOrders = 10;
         const percentageOfPositionToClosePerStep = 0.05; // 5% position per step
 
         const instId = `${coin.toUpperCase()}-USDT-SWAP`;
@@ -322,26 +326,27 @@ export class OkxFutureService {
         const currentSize = Number(pos?.pos ?? 0);
         const avgPrice = Number(pos?.avgPx ?? 0);
 
-        if (!currentSize || currentSize <= 0 || avgPrice <= 0) return data;
+        if (!currentSize || currentSize <= 0) return data;
 
-        this.logger.log(`Current position: size=${currentSize}, avgPrice=${avgPrice}`);
+        const minClosePrice = posSide === 'long'
+            ? currentPrice * (1 - maxClosePriceRatio)
+            : currentPrice * (1 + minClosePriceRatio);
+        const maxClosePrice = posSide === 'long'
+            ? currentPrice * (1 - minClosePriceRatio)
+            : currentPrice * (1 + maxClosePriceRatio);
+        const closePriceDistance = (maxClosePrice - minClosePrice) / (numberOfCloseOrders - 1);
+
+        this.logger.log(`Current position: size=${currentSize}, avgPrice=${avgPrice} for reporting only, minClosePrice=${minClosePrice}, maxClosePrice=${maxClosePrice}`);
 
         let totalSizeClosed = 0;
 
-        for (const percentage of takeProfitPercentages) {
+        for (let stepIndex = 0; stepIndex < numberOfCloseOrders; stepIndex++) {
             if (totalSizeClosed >= currentSize) {
                 this.logger.log(`totaSizeWillBeClosed: ${totalSizeClosed} > currentSize: ${currentSize}, break the loop`);
                 break;
             }
 
-            let orderPrice: number;
-            if (posSide === 'long') {
-                // long: take profit khi giá tăng
-                orderPrice = avgPrice * (1 + percentage);
-            } else {
-                // short: take profit khi giá giảm
-                orderPrice = avgPrice * (1 - percentage);
-            }
+            const orderPrice = minClosePrice + stepIndex * closePriceDistance;
 
             // Trigger price ±0.2% để tránh không khớp ngay
             const triggerPx = orderPrice > currentPrice ? orderPrice - orderPrice * 0.002 : orderPrice + orderPrice * 0.002;
@@ -351,7 +356,7 @@ export class OkxFutureService {
                 : (orderPrice > currentPrice || triggerPx > currentPrice); // short nhưng giá tăng → ngược chiều
 
             if (onlyPartialCloseOnRetrace && !isRetraceOrder) {
-                this.logger.log(`Skipping percentage=${(percentage * 100).toFixed(1)}% as enablePartialCloseOnRetrace=true and order not in retrace direction`);
+                this.logger.log(`Skipping step=${stepIndex} as enablePartialCloseOnRetrace=true and order not in retrace direction`);
                 continue;
             }
 
@@ -368,18 +373,18 @@ export class OkxFutureService {
 
             totalSizeClosed += sz;
 
-            this.logger.log(`Step percentage=${(percentage * 100).toFixed(1)}%, sz=${sz.toFixed(szToFixed)}, orderPrice=${orderPrice.toFixed(priceToFixed)}, triggerPx=${triggerPx.toFixed(priceToFixed)}, testing=${testing}`);
+            this.logger.log(`Step index=${stepIndex}, sz=${sz.toFixed(szToFixed)}, orderPrice=-1, triggerPx=${triggerPx.toFixed(priceToFixed)}, testing=${testing}`);
 
             const res = await this.closePartialPosition(
                 coin,
                 posSide,
                 sz.toFixed(szToFixed),
                 triggerPx.toFixed(priceToFixed),
-                orderPrice.toFixed(priceToFixed),
+                '-1',
                 testing
             );
 
-            data.push({ data: res.data, step: `take_profit_${(percentage * 100).toFixed(1)}%`, body: res.body });
+            data.push({ data: res.data, step: `current_price_close_${stepIndex}`, body: res.body });
 
             if (justOneOrder) break;
         }

@@ -383,6 +383,140 @@ export abstract class OkxFutureBaseService {
         return result;
     }
 
+    async cleanProtectiveCloseByPriceStepsOrdersForOneCoin(
+        coin: string,
+        direction: FutureDirection,
+        testing: boolean = true,
+    ) {
+        const normalizedCoin = coin.trim().toUpperCase();
+        if (!normalizedCoin || !/^[A-Z0-9]+$/.test(normalizedCoin)) {
+            throw new Error(`Invalid coin: ${coin}`);
+        }
+        const instId = `${normalizedCoin}-USDT-SWAP`;
+        const logFileKey = this.getFutureLogFileKey(direction, normalizedCoin);
+        const [currentPrice, positionResponse, pendingTriggerOrders, inst] = await Promise.all([
+            this.getTicker(instId),
+            this.getOpenPosition(instId),
+            this.getPendingTriggerOrdersForCoin(normalizedCoin, 'SWAP'),
+            this.fetchInstrument(instId),
+        ]);
+        if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+            throw new Error(`Invalid current price for ${instId}: ${currentPrice}`);
+        }
+        if (positionResponse?.code !== undefined && String(positionResponse.code) !== '0') {
+            throw new Error(`OKX rejected position request for ${instId}: ${JSON.stringify(positionResponse)}`);
+        }
+        if (!inst) throw new Error(`Instrument info not available for ${instId}`);
+
+        const position = this.selectPositionForDirection(positionResponse?.data ?? [], direction);
+        const positionSize = Math.abs(Number(position?.pos ?? 0));
+        const normalizedPositionSize = Number.isFinite(positionSize) ? positionSize : 0;
+        const protectiveCloseOrders = this.filterOrdersByDirectionAndIntent(
+            pendingTriggerOrders,
+            direction,
+            'close',
+        )
+            .filter((order: any) => {
+                const triggerPrice = Number(order.triggerPx);
+                const size = Number(order.sz);
+                const isProtectiveCloseSide = direction === 'long'
+                    ? triggerPrice < currentPrice
+                    : triggerPrice > currentPrice;
+                return order.instId === instId
+                    && Boolean(order.algoId)
+                    && Number.isFinite(triggerPrice)
+                    && isProtectiveCloseSide
+                    && Number.isFinite(size)
+                    && size > 0;
+            })
+            .map((order: any) => ({
+                algoId: String(order.algoId),
+                instId,
+                triggerPrice: Number(order.triggerPx),
+                orderPrice: Number(order.ordPx ?? order.orderPx),
+                size: Number(order.sz),
+                raw: order,
+            }))
+            .sort((left, right) => direction === 'long'
+                ? right.triggerPrice - left.triggerPrice
+                : left.triggerPrice - right.triggerPrice,
+            );
+
+        const totalProtectiveCloseSize = protectiveCloseOrders.reduce((total, order) => total + order.size, 0);
+        const sizeTolerance = Number(inst.lotSz || inst.minSz || 1) * 0.5;
+        const ordersToCancel: typeof protectiveCloseOrders = [];
+        let remainingProtectiveCloseSize = totalProtectiveCloseSize;
+        for (const order of [...protectiveCloseOrders].reverse()) {
+            if (remainingProtectiveCloseSize <= normalizedPositionSize + sizeTolerance) break;
+            ordersToCancel.push(order);
+            remainingProtectiveCloseSize -= order.size;
+        }
+        const cancelledIds = new Set(ordersToCancel.map(({ algoId }) => algoId));
+        const keptOrders = protectiveCloseOrders.filter(({ algoId }) => !cancelledIds.has(algoId));
+        const baseResult = {
+            coin: normalizedCoin,
+            instId,
+            direction,
+            testing,
+            currentPrice,
+            positionSize: normalizedPositionSize,
+            protectiveCloseByPriceStepsOrderCount: protectiveCloseOrders.length,
+            totalProtectiveCloseByPriceStepsSize: totalProtectiveCloseSize,
+            keptOrderCount: keptOrders.length,
+            keptSize: keptOrders.reduce((total, order) => total + order.size, 0),
+            cancelOrderCount: ordersToCancel.length,
+            cancelSize: ordersToCancel.reduce((total, order) => total + order.size, 0),
+            keptOrders: keptOrders.map(({ raw, ...order }) => order),
+            ordersToCancel: ordersToCancel.map(({ raw, ...order }) => order),
+        };
+
+        if (testing) return { status: 'preview', ...baseResult };
+        if (ordersToCancel.length === 0) {
+            const result = { status: 'clean', ...baseResult, cancelledOrderCount: 0, failedOrderCount: 0, responses: [] };
+            this.logger.log(JSON.stringify(result, null, 2), 'Clean future protective close by price steps orders', logFileKey);
+            return result;
+        }
+
+        const responses = await this.cancelOrdersFromList({
+            orders: ordersToCancel.map(({ raw }) => raw),
+        });
+        const responseList = Array.isArray(responses) ? responses : [];
+        const responseItems = responseList.flatMap((response: any) => response?.data ?? []);
+        const cancelledOrderCount = responseItems.filter((item: any) => String(item.sCode) === '0').length;
+        const failedOrderCount = ordersToCancel.length - cancelledOrderCount;
+        const result = {
+            status: failedOrderCount === 0 ? 'cleaned' : 'partially_cleaned',
+            ...baseResult,
+            cancelledOrderCount,
+            failedOrderCount,
+            responses,
+        };
+        this.logger.log(JSON.stringify(result, null, 2), 'Clean future protective close by price steps orders', logFileKey);
+        await this.sendFutureEmail(`Clean ${direction} protective close by price steps orders ${normalizedCoin}`, {
+            mode: this.getPositionMode(),
+            ...result,
+        });
+        return result;
+    }
+
+    // Backward-compatible service alias.
+    async cleanProtectiveCloseOrdersForOneCoin(
+        coin: string,
+        direction: FutureDirection,
+        testing: boolean = true,
+    ) {
+        return this.cleanProtectiveCloseByPriceStepsOrdersForOneCoin(coin, direction, testing);
+    }
+
+    // Backward-compatible service alias.
+    async cleanCloseOrdersForOneCoin(
+        coin: string,
+        direction: FutureDirection,
+        testing: boolean = true,
+    ) {
+        return this.cleanProtectiveCloseByPriceStepsOrdersForOneCoin(coin, direction, testing);
+    }
+
     // ---------- cancel helper that takes a list of orders and cancels them (supports filtering) ----------
     async cancelOrdersFromList(
         {
@@ -1095,6 +1229,44 @@ export abstract class OkxFutureBaseService {
         return { instId, position, size };
     }
 
+    private shouldExecuteCloseAtMarket(
+        direction: FutureDirection,
+        orderPrice: number,
+        currentPrice: number,
+    ) {
+        return direction === 'long'
+            ? orderPrice <= currentPrice
+            : orderPrice >= currentPrice;
+    }
+
+    private getTriggeredCloseType(executeAtMarket: boolean) {
+        return executeAtMarket ? 'market_on_trigger' : 'limit_on_trigger';
+    }
+
+    private getClosePriceRatios(coin: string) {
+        const coinConfig = this.config.get<any>(`coin.${coin.toUpperCase()}`);
+        const minClosePriceRatio = Number(
+            coinConfig?.minClosePriceRatio
+            ?? this.config.get<number>('minClosePriceRatio'),
+        );
+        const maxClosePriceRatio = Number(
+            coinConfig?.maxClosePriceRatio
+            ?? this.config.get<number>('maxClosePriceRatio'),
+        );
+        if (
+            !Number.isFinite(minClosePriceRatio)
+            || !Number.isFinite(maxClosePriceRatio)
+            || minClosePriceRatio <= 0
+            || maxClosePriceRatio <= minClosePriceRatio
+            || maxClosePriceRatio >= 1
+        ) {
+            throw new Error(
+                `Invalid close price ratios for ${coin.toUpperCase()}: min=${minClosePriceRatio}, max=${maxClosePriceRatio}`,
+            );
+        }
+        return { minClosePriceRatio, maxClosePriceRatio };
+    }
+
     async closePositionAtTriggerPrice(
         coin: string,
         direction: FutureDirection,
@@ -1131,33 +1303,40 @@ export abstract class OkxFutureBaseService {
             throw new Error(`Invalid current price: ${currentPrice}`);
         }
         const size = snapshot.size * percentage / 100;
-        const isStopLoss = direction === 'long'
-            ? triggerPrice < currentPrice
-            : triggerPrice > currentPrice;
-        const orderPrice = isStopLoss
-            ? '-1'
-            : (direction === 'long'
-                ? triggerPrice * (1 - 0.002)
-                : triggerPrice * (1 + 0.002)).toString();
-        const result = await this.closePartialPosition(
-            coin,
+        const executeAtMarket = this.shouldExecuteCloseAtMarket(
             direction,
-            size.toString(),
-            triggerPrice.toString(),
-            orderPrice,
-            testing,
+            triggerPrice,
+            currentPrice,
         );
+        const result = executeAtMarket
+            ? await this.placePositionStopLoss(
+                coin,
+                direction,
+                size,
+                triggerPrice,
+                testing,
+            )
+            : await this.closePartialPosition(
+                coin,
+                direction,
+                size.toString(),
+                triggerPrice.toString(),
+                (direction === 'long'
+                    ? triggerPrice * (1 - 0.002)
+                    : triggerPrice * (1 + 0.002)).toString(),
+                testing,
+            );
         const response = {
             status: testing ? 'preview' : 'submitted',
             coin: normalizedCoin,
             direction,
             percentage,
-            closeType: isStopLoss ? 'stop_loss' : 'take_profit',
-            executionType: isStopLoss ? 'market' : 'limit',
+            closeType: this.getTriggeredCloseType(executeAtMarket),
+            executionType: executeAtMarket ? 'market' : 'limit',
             ...result,
         };
         this.logger.log(
-            `FUTURE ${this.getPositionMode()} close trigger complete: coin=${normalizedCoin}, direction=${direction}, testing=${testing}, closeType=${response.closeType}, executionType=${response.executionType}, triggerPx=${result.body.triggerPx}, orderPx=${result.body.orderPx}, size=${result.body.sz}`,
+            `FUTURE ${this.getPositionMode()} close trigger complete: coin=${normalizedCoin}, direction=${direction}, testing=${testing}, closeType=${response.closeType}, executionType=${response.executionType}, ordType=${result.body.ordType}, triggerPx=${result.body.triggerPx ?? result.body.slTriggerPx}, orderPx=${result.body.orderPx ?? result.body.slOrdPx}, size=${result.body.sz}`,
             null,
             this.getFutureLogFileKey(direction, normalizedCoin),
         );
@@ -1170,14 +1349,47 @@ export abstract class OkxFutureBaseService {
                 currentPrice,
                 closeType: response.closeType,
                 executionType: response.executionType,
-                triggerPx: result.body.triggerPx,
-                orderPx: result.body.orderPx,
+                ordType: result.body.ordType,
+                triggerPx: result.body.triggerPx ?? result.body.slTriggerPx,
+                orderPx: result.body.orderPx ?? result.body.slOrdPx,
                 size: result.body.sz,
                 reduceOnly: result.body.reduceOnly,
                 response: result.data,
             });
         }
         return response;
+    }
+
+    async placePositionStopLossAtTriggerPrice(
+        coin: string,
+        direction: FutureDirection,
+        triggerPrice: number,
+        percentage: number = 100,
+        testing: boolean = true,
+    ) {
+        if (!Number.isFinite(triggerPrice) || triggerPrice <= 0) {
+            throw new Error(`Invalid stop-loss trigger price: ${triggerPrice}`);
+        }
+        const currentPrice = await this.getTicker(`${coin.toUpperCase()}-USDT-SWAP`);
+        if (!currentPrice || currentPrice <= 0) {
+            throw new Error(`Invalid current price: ${currentPrice}`);
+        }
+        const isValidStopLoss = direction === 'long'
+            ? triggerPrice < currentPrice
+            : triggerPrice > currentPrice;
+        if (!isValidStopLoss) {
+            throw new Error(
+                `${direction} stop-loss trigger price ${triggerPrice} must be ${direction === 'long' ? 'below' : 'above'} current price ${currentPrice}`,
+            );
+        }
+        return this.closePositionAtTriggerPrice(
+            coin,
+            direction,
+            triggerPrice,
+            percentage,
+            testing,
+            currentPrice,
+        );
     }
 
     async closePositionAtCurrentPrice(
@@ -1328,11 +1540,11 @@ export abstract class OkxFutureBaseService {
         return data;
     }
 
-    // ---------- take profit partial close ladder ----------
-    async placeTakeProfitByClosePartialPosition(
+    // ---------- protective close by price steps ----------
+    async placeProtectiveCloseByPriceSteps(
         coin: string,
         direction: 'long' | 'short',
-        enablePartialCloseOnRetrace: boolean = true,
+        protectiveCloseOnly: boolean = true,
         justOneOrder: boolean = false,
         testing: boolean = true
     ) {
@@ -1341,9 +1553,10 @@ export abstract class OkxFutureBaseService {
 
         const normalizedCoin = coin.toUpperCase();
         const logFileKey = this.getFutureLogFileKey(direction, normalizedCoin);
-        this.logger.log(`FUTURE ${this.getPositionMode()} close ladder start: coin=${normalizedCoin}, direction=${direction}, testing=${testing}, retraceOnly=${enablePartialCloseOnRetrace}, justOneOrder=${justOneOrder}`, null, logFileKey);
+        this.logger.log(`FUTURE ${this.getPositionMode()} protective close by price steps start: coin=${normalizedCoin}, direction=${direction}, testing=${testing}, protectiveCloseOnly=${protectiveCloseOnly}, justOneOrder=${justOneOrder}`, null, logFileKey);
 
-        const takeProfitPercentages = [0.5, 0.45, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05];
+        const { minClosePriceRatio, maxClosePriceRatio } = this.getClosePriceRatios(normalizedCoin);
+        const numberOfCloseOrders = 10;
         const percentageOfPositionToClosePerStep = 0.05; // 5% position per step
 
         const instId = `${coin.toUpperCase()}-USDT-SWAP`;
@@ -1357,39 +1570,49 @@ export abstract class OkxFutureBaseService {
         const currentSize = Math.abs(Number(pos?.pos ?? 0));
         const avgPrice = Number(pos?.avgPx ?? 0);
 
-        if (!currentSize || currentSize <= 0 || avgPrice <= 0) {
-            this.logger.log(`FUTURE ${this.getPositionMode()} close ladder skipped: coin=${normalizedCoin}, direction=${direction}, reason=no_open_position_or_average_price`, null, logFileKey);
+        if (!currentSize || currentSize <= 0) {
+            this.logger.log(`FUTURE ${this.getPositionMode()} protective close by price steps skipped: coin=${normalizedCoin}, direction=${direction}, reason=no_open_position`, null, logFileKey);
             return data;
         }
 
-        this.logger.log(`Current position: size=${currentSize}, avgPrice=${avgPrice}`, null, logFileKey);
+        const minClosePrice = direction === 'long'
+            ? currentPrice * (1 - maxClosePriceRatio)
+            : currentPrice * (1 + minClosePriceRatio);
+        const maxClosePrice = direction === 'long'
+            ? currentPrice * (1 - minClosePriceRatio)
+            : currentPrice * (1 + maxClosePriceRatio);
+        const closePriceDistance = (maxClosePrice - minClosePrice) / (numberOfCloseOrders - 1);
+
+        this.logger.log(
+            `Current position: size=${currentSize}, avgPrice=${avgPrice}, minClosePrice=${minClosePrice}, maxClosePrice=${maxClosePrice}, minClosePriceRatio=${minClosePriceRatio}, maxClosePriceRatio=${maxClosePriceRatio}`,
+            null,
+            logFileKey,
+        );
 
         let totalSizeClosed = 0;
 
-        for (const percentage of takeProfitPercentages) {
+        for (let stepIndex = 0; stepIndex < numberOfCloseOrders; stepIndex++) {
             if (totalSizeClosed >= currentSize) {
                 this.logger.log(`totaSizeWillBeClosed: ${totalSizeClosed} >= currentSize: ${currentSize}, break the loop`, null, logFileKey);
                 break;
             }
 
-            let orderPrice: number;
-            if (direction === 'long') {
-                // long: take profit khi giá tăng
-                orderPrice = avgPrice * (1 + percentage);
-            } else {
-                // short: take profit khi giá giảm
-                orderPrice = avgPrice * (1 - percentage);
-            }
+            const orderPrice = minClosePrice + stepIndex * closePriceDistance;
+            const closePriceRatio = direction === 'long'
+                ? 1 - orderPrice / currentPrice
+                : orderPrice / currentPrice - 1;
 
             // trigger pricing rule (we use relation to currentPrice so trigger is placed to 'catch' price movement)
             const triggerPx = orderPrice > currentPrice ? orderPrice - orderPrice * 0.002 : orderPrice + orderPrice * 0.002;
 
-            const isRetraceOrder = direction === 'long'
-                ? triggerPx < currentPrice
-                : triggerPx > currentPrice;
+            const executeAtMarket = this.shouldExecuteCloseAtMarket(
+                direction,
+                orderPrice,
+                currentPrice,
+            );
 
-            if (enablePartialCloseOnRetrace && !isRetraceOrder) {
-                this.logger.log(`Skipping percentage=${(percentage * 100).toFixed(1)}% as enablePartialCloseOnRetrace=true and order not in retrace direction`, null, logFileKey);
+            if (protectiveCloseOnly && !executeAtMarket) {
+                this.logger.log(`Skipping closePriceRatio=${(closePriceRatio * 100).toFixed(2)}% because protectiveCloseOnly=true and order is not on the protective side`, null, logFileKey);
                 continue;
             }
 
@@ -1406,18 +1629,18 @@ export abstract class OkxFutureBaseService {
 
             totalSizeClosed += sz;
 
-            const closeType = isRetraceOrder ? 'stop_loss' : 'take_profit';
-            const executionOrderPrice = isRetraceOrder ? '-1' : orderPrice.toString();
-            this.logger.log(`Step percentage=${(percentage * 100).toFixed(1)}%, type=${closeType}, raw sz=${sz}, orderPrice=${executionOrderPrice}, triggerPx=${triggerPx.toString()}, testing=${testing}`, null, logFileKey);
+            const closeType = this.getTriggeredCloseType(executeAtMarket);
+            const executionOrderPrice = executeAtMarket ? '-1' : orderPrice.toString();
+            this.logger.log(`Step closePriceRatio=${(closePriceRatio * 100).toFixed(2)}%, type=${closeType}, raw sz=${sz}, orderPrice=${executionOrderPrice}, triggerPx=${triggerPx.toString()}, testing=${testing}`, null, logFileKey);
 
             // closePartialPosition will format the size & prices
             const res = await this.closePartialPosition(coin, direction, sz.toString(), triggerPx.toString(), executionOrderPrice, testing);
 
             data.push({
                 data: res.data,
-                step: `${closeType}_${(percentage * 100).toFixed(1)}%`,
+                step: `${closeType}_${(closePriceRatio * 100).toFixed(2)}%`,
                 closeType,
-                executionType: isRetraceOrder ? 'market' : 'limit',
+                executionType: executeAtMarket ? 'market' : 'limit',
                 body: res.body,
             });
 
@@ -1425,12 +1648,12 @@ export abstract class OkxFutureBaseService {
         }
 
         this.logger.log(
-            `FUTURE ${this.getPositionMode()} close ladder complete: coin=${normalizedCoin}, direction=${direction}, testing=${testing}, placed=${data.length}`,
+            `FUTURE ${this.getPositionMode()} protective close by price steps complete: coin=${normalizedCoin}, direction=${direction}, testing=${testing}, placed=${data.length}`,
             null,
             logFileKey,
         );
         if (!testing && data.length > 0) {
-            await this.sendFutureEmail(`Close ${direction} ladder ${normalizedCoin}`, {
+            await this.sendFutureEmail(`Protective close ${direction} by price steps ${normalizedCoin}`, {
                 mode: this.getPositionMode(),
                 coin: normalizedCoin,
                 direction,
@@ -1451,6 +1674,57 @@ export abstract class OkxFutureBaseService {
             });
         }
         return data;
+    }
+
+    // Backward-compatible service alias.
+    async placeProtectiveCloseLadder(
+        coin: string,
+        direction: 'long' | 'short',
+        protectiveCloseOnly: boolean = true,
+        justOneOrder: boolean = false,
+        testing: boolean = true,
+    ) {
+        return this.placeProtectiveCloseByPriceSteps(
+            coin,
+            direction,
+            protectiveCloseOnly,
+            justOneOrder,
+            testing,
+        );
+    }
+
+    // Backward-compatible service alias.
+    async placeCloseLadder(
+        coin: string,
+        direction: 'long' | 'short',
+        protectiveCloseOnly: boolean = true,
+        justOneOrder: boolean = false,
+        testing: boolean = true,
+    ) {
+        return this.placeProtectiveCloseByPriceSteps(
+            coin,
+            direction,
+            protectiveCloseOnly,
+            justOneOrder,
+            testing,
+        );
+    }
+
+    // Backward-compatible service alias.
+    async placeTakeProfitByClosePartialPosition(
+        coin: string,
+        direction: 'long' | 'short',
+        protectiveCloseOnly: boolean = true,
+        justOneOrder: boolean = false,
+        testing: boolean = true,
+    ) {
+        return this.placeProtectiveCloseByPriceSteps(
+            coin,
+            direction,
+            protectiveCloseOnly,
+            justOneOrder,
+            testing,
+        );
     }
 
     // ---------- cancel helpers that call cancelOrdersFromList using pending orders for a coin ----------
@@ -1484,31 +1758,35 @@ export abstract class OkxFutureBaseService {
         direction, // 'long' | 'short'
         isTesting = true,
         removeExistingOrders = false,
+        enableProtectiveClose,
         enableTakeProfit = false,
+        protectiveCloseOnly,
         partialCloseOnRetrace = false,
         justOnePartialOrder = false,
         autoTrade = false
     }: TradeOneCoinParams) {
         const results: any[] = [];
+        const shouldPlaceProtectiveClose = enableProtectiveClose ?? enableTakeProfit;
+        const useProtectiveCloseOnly = protectiveCloseOnly ?? partialCloseOnRetrace;
 
         // 1️⃣ cancel existing take profit orders if requested
         if (!isTesting && removeExistingOrders) {
-            const cancelRes = await this.cancelAllTypeOfOpenOrdersForOneCoin({ coin, direction, enableTakeProfit, partialCloseOnRetrace, autoTrade });
+            const cancelRes = await this.cancelAllTypeOfOpenOrdersForOneCoin({ coin, direction, enableTakeProfit: shouldPlaceProtectiveClose, partialCloseOnRetrace: useProtectiveCloseOnly, autoTrade });
             this.logger.log(`Cancel existing ${direction} orders: ${JSON.stringify(cancelRes, null, 2)}`, null, this.getFutureLogFileKey(direction, coin));
             results.push({ coin, action: 'cancel_existing_orders', direction, result: cancelRes });
         }
 
         // 2️⃣ place take profit partial close
-        if (enableTakeProfit) {
-            const partialRes = await this.placeTakeProfitByClosePartialPosition(
+        if (shouldPlaceProtectiveClose) {
+            const partialRes = await this.placeProtectiveCloseByPriceSteps(
                 coin,
                 direction,
-                partialCloseOnRetrace,
+                useProtectiveCloseOnly,
                 justOnePartialOrder,
                 isTesting
             );
-            this.logger.log(`Place partial close orders for ${direction}: ${JSON.stringify(partialRes, null, 2)}`, null, this.getFutureLogFileKey(direction, coin));
-            results.push({ coin, action: 'place_partial_close_orders', direction, result: partialRes });
+            this.logger.log(`Place protective close by price steps orders for ${direction}: ${JSON.stringify(partialRes, null, 2)}`, null, this.getFutureLogFileKey(direction, coin));
+            results.push({ coin, action: 'place_protective_close_by_price_steps_orders', direction, result: partialRes });
         }
 
         // 3️⃣ auto open

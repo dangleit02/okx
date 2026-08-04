@@ -646,6 +646,7 @@ describe('OkxService clean excess sell orders', () => {
   it('keeps highest-priced sell orders within the bought amount in preview mode', async () => {
     const { service } = createService();
     const cancelAlgoOrders = jest.spyOn(service as any, 'cancelAlgoOrders');
+    const conditionalStopLossOrders = jest.spyOn(service as any, 'getPendingConditionalSpotOrders');
 
     const result = await service.cleanSellOrdersForOneCoin('etc');
 
@@ -669,6 +670,7 @@ describe('OkxService clean excess sell orders', () => {
     expect(result.ordersToCancel.map((order) => order.algoId)).not.toContain('equal');
     expect(result.ordersToCancel.map((order) => order.algoId)).not.toContain('above');
     expect(cancelAlgoOrders).not.toHaveBeenCalled();
+    expect(conditionalStopLossOrders).not.toHaveBeenCalled();
   });
 
   it('cancels sell orders from the lowest trigger price first', async () => {
@@ -768,13 +770,13 @@ describe('OkxService sell all at current price', () => {
     };
   };
 
-  it('previews a trigger sell using the requested percentage of available balance', async () => {
+  it('previews a near-current conditional stop-loss using the requested balance percentage', async () => {
     const { service } = createService();
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
       data: [{ details: [{ ccy: 'BTC', availBal: '0.01234567' }] }],
     });
     jest.spyOn(service as any, 'getTicker').mockResolvedValue(60000);
-    const placeOneOrder = jest.spyOn(service, 'placeOneOrder');
+    const placeStopLoss = jest.spyOn(service, 'placeSpotConditionalStopLoss');
 
     const result = await service.sellAllAtCurrentPrice(' btc ', 25);
 
@@ -786,8 +788,9 @@ describe('OkxService sell all at current price', () => {
         availableBalance: '0.01234567',
         sizeToSell: '0.00308641',
         currentPrice: 60000,
-        triggerPrice: 59880.24,
-        orderPrice: 59760.72,
+        triggerPrice: 59880,
+        orderPrice: -1,
+        ordType: 'conditional',
         estimatedValueUsdt: 185.1846,
         order: {
           data: undefined,
@@ -795,44 +798,41 @@ describe('OkxService sell all at current price', () => {
             instId: 'BTC-USDT',
             tdMode: 'cash',
             side: 'sell',
-            ordType: 'trigger',
+            ordType: 'conditional',
             sz: '0.00308641',
-            triggerPx: '59880.24',
-            orderPx: '59760.72',
+            slTriggerPx: '59880.00',
+            slTriggerPxType: 'last',
+            slOrdPx: '-1',
           },
         },
       }),
     );
-    expect(placeOneOrder).toHaveBeenCalledWith(
+    expect(placeStopLoss).toHaveBeenCalledWith(
       'BTC',
-      'sell',
       '0.00308641',
-      '59880.24',
-      '59760.72',
+      '59880.00',
       true,
     );
   });
 
-  it('submits the trigger order only when testing is false', async () => {
+  it('submits the conditional stop-loss only when testing is false', async () => {
     const { service, logger } = createService();
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
       data: [{ details: [{ ccy: 'ETH', availBal: '1.25' }] }],
     });
     jest.spyOn(service as any, 'getTicker').mockResolvedValue(3000);
-    const placeOneOrder = jest.spyOn(service, 'placeOneOrder').mockResolvedValue({
+    const placeStopLoss = jest.spyOn(service, 'placeSpotConditionalStopLoss').mockResolvedValue({
       data: { code: '0', data: [{ algoId: '123' }] },
-      body: { ordType: 'trigger' },
+      body: { ordType: 'conditional' },
     } as any);
 
     const result = await service.sellAllAtCurrentPrice('ETH', 100, false);
 
     expect(result.status).toBe('submitted');
-    expect(placeOneOrder).toHaveBeenCalledWith(
+    expect(placeStopLoss).toHaveBeenCalledWith(
       'ETH',
-      'sell',
       '1.25000000',
-      '2994.01',
-      '2988.04',
+      '2994.00',
       false,
     );
     expect(logger.log).toHaveBeenCalled();
@@ -923,6 +923,41 @@ describe('OkxService buy trigger range direction', () => {
 
     expect(placeOneOrder).not.toHaveBeenCalled();
   });
+
+  it('does not create a stop-loss from the buy trigger range flow', async () => {
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'coin.LTC') {
+          return { amountOfUsdtPerStep: 12, priceToFixed: 2, szToFixed: 4 };
+        }
+        const values = {
+          maxUsdt: 4000,
+          riskPerTrade: 0.02,
+          stopLossBuyPriceRatio: 0.1,
+        };
+        return values[key];
+      }),
+    };
+    const service = new OkxService(config as any, { log: jest.fn() } as any, {} as any);
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [{ details: [{ availBal: '0', openAvgPx: '0' }] }],
+    });
+    const placeBuy = jest.spyOn(service, 'placeOneOrder').mockResolvedValue({
+      data: undefined,
+      body: { side: 'buy' },
+    } as any);
+    const placeStopLoss = jest.spyOn(service, 'placeSpotConditionalStopLoss');
+
+    const result = await service.buyTriggerFromMinPriceToMaxPrice('LTC', 100, 110, true, {
+      numberOfOrders: 1,
+      direction: 'down',
+      currentPrice: 120,
+    });
+
+    expect(placeBuy).toHaveBeenCalledTimes(1);
+    expect(placeStopLoss).not.toHaveBeenCalled();
+    expect(result.map(({ type }) => type)).toEqual(['BUY']);
+  });
 });
 
 describe('OkxService auto sell size and profit logging', () => {
@@ -933,29 +968,32 @@ describe('OkxService auto sell size and profit logging', () => {
   const createService = () => {
     const config = {
       get: jest.fn((key: string) => {
-        if (key === 'coin.ALGO') {
+        if (key === 'coin.ALGO' || key === 'coin.DOT') {
           return {
-            szToFixed: 4,
-            priceToFixed: 5,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            szToFixed: key === 'coin.DOT' ? 6 : 4,
+            priceToFixed: key === 'coin.DOT' ? 4 : 5,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
           };
         }
         const values = {
           maxUsdt: 4000,
           riskPerTrade: 0.02,
           amountOfUsdtPerStep: 12,
-          minSellPriceRatio: 0.05,
-          maxSellPriceRatio: 0.06,
+          minClosePriceRatio: 0.05,
+          maxClosePriceRatio: 0.06,
           stopLossSellPriceRatio: 0.1,
-          minTakeProfitRatio: -0.3,
-          sellWithoutCheckAvarageCost: true,
         };
         return values[key];
       }),
     };
     const logger = { log: jest.fn(), error: jest.fn() };
     const service = new OkxService(config as any, logger as any, {} as any);
+    jest.spyOn(service as any, 'fetchSpotInstrument').mockResolvedValue({
+      instId: 'ALGO-USDT',
+      lotSz: 0.0001,
+      minSz: 0.0001,
+    });
     jest.spyOn(service as any, 'getTicker').mockResolvedValue(0.08641);
     jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
     return { service, logger };
@@ -974,9 +1012,33 @@ describe('OkxService auto sell size and profit logging', () => {
 
     expect(placeOneOrder).not.toHaveBeenCalled();
     expect(logger.log).toHaveBeenCalledWith(
-      expect.stringContaining('size 0.0000 is zero after rounding'),
+      expect.stringContaining('is below minimum size 0.0001'),
       null,
       'ALGO',
+    );
+  });
+
+  it('does not submit a DOT dust sell order below the instrument minimum size', async () => {
+    const { service, logger } = createService();
+    jest.spyOn(service as any, 'fetchSpotInstrument').mockResolvedValue({
+      instId: 'DOT-USDT',
+      lotSz: 0.000001,
+      minSz: 0.01,
+    });
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [{ details: [{ availBal: '0.000001', openAvgPx: '0' }] }],
+    });
+    const placeOneOrder = jest.spyOn(service, 'placeOneOrder');
+
+    await expect(
+      service.autoSellFromMinPriceToStopLossPriceForDown('DOT', true),
+    ).resolves.toEqual([]);
+
+    expect(placeOneOrder).not.toHaveBeenCalled();
+    expect(logger.log).toHaveBeenCalledWith(
+      expect.stringContaining('size 0.000001 is below minimum size 0.01'),
+      null,
+      'DOT',
     );
   });
 
@@ -985,7 +1047,7 @@ describe('OkxService auto sell size and profit logging', () => {
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
       data: [{ details: [{ availBal: '1', openAvgPx: '0' }] }],
     });
-    jest.spyOn(service, 'placeOneOrder').mockResolvedValue({
+    const placeOneOrder = jest.spyOn(service, 'placeOneOrder').mockResolvedValue({
       body: { triggerPx: '0.08053', orderPx: '0.08037' },
     } as any);
 
@@ -997,6 +1059,7 @@ describe('OkxService auto sell size and profit logging', () => {
       'ALGO',
     );
     expect(logger.log.mock.calls.flat().join(' ')).not.toContain('Infinity');
+    expect(placeOneOrder).toHaveBeenCalled();
   });
 });
 
@@ -1023,9 +1086,9 @@ describe('OkxService sell percentage at a requested trigger price', () => {
     return { service, logger };
   };
 
-  it('sets orderPx below triggerPx when the sell price is below current price', async () => {
+  it('uses a conditional market stop-loss when the sell price is below current price', async () => {
     const { service } = createService();
-    const placeOneOrder = jest.spyOn(service, 'placeOneOrder');
+    const placeStopLoss = jest.spyOn(service, 'placeSpotConditionalStopLoss');
 
     const result = await service.sellAtTriggerPrice('BTC', 50000, 25);
 
@@ -1036,21 +1099,20 @@ describe('OkxService sell percentage at a requested trigger price', () => {
         percentage: 25,
         sizeToSell: '0.3086',
         triggerPrice: 50000,
-        orderPrice: 49900,
+        orderPrice: -1,
+        ordType: 'conditional',
         priceDirection: 'below_current_price',
       }),
     );
-    expect(placeOneOrder).toHaveBeenCalledWith(
+    expect(placeStopLoss).toHaveBeenCalledWith(
       'BTC',
-      'sell',
       '0.3086',
       '50000.00',
-      '49900.00',
       true,
     );
   });
 
-  it('sets orderPx above triggerPx when the sell price is above current price', async () => {
+  it('sets orderPx below triggerPx when the sell price is above current price', async () => {
     const { service } = createService();
     const placeOneOrder = jest.spyOn(service, 'placeOneOrder').mockResolvedValue({
       data: { code: '0', data: [{ algoId: '123' }] },
@@ -1063,7 +1125,7 @@ describe('OkxService sell percentage at a requested trigger price', () => {
       expect.objectContaining({
         status: 'submitted',
         triggerPrice: 70000,
-        orderPrice: 70140,
+        orderPrice: 69860,
         priceDirection: 'above_current_price',
       }),
     );
@@ -1072,7 +1134,7 @@ describe('OkxService sell percentage at a requested trigger price', () => {
       'sell',
       '0.3086',
       '70000.00',
-      '70140.00',
+      '69860.00',
       false,
     );
   });
@@ -1095,6 +1157,88 @@ describe('OkxService sell percentage at a requested trigger price', () => {
     await expect(service.sellAtTriggerPrice('BTC', 50000, 101)).rejects.toThrow(
       'Invalid percentage',
     );
+  });
+});
+
+describe('OkxService conditional spot stop-loss coverage', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  const createService = () => {
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'coin.BTC') return { priceToFixed: 2, szToFixed: 4 };
+        if (key === 'stopLossRatio') return 0.01;
+        return 'test';
+      }),
+    };
+    const logger = { log: jest.fn() };
+    const emailService = { sendEmail: jest.fn().mockResolvedValue(undefined) };
+    const service = new OkxService(config as any, logger as any, emailService as any);
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [{ details: [{ ccy: 'BTC', cashBal: '2', availBal: '2' }] }],
+    });
+    jest.spyOn(service as any, 'getTicker').mockResolvedValue(100);
+    return { service, logger, emailService };
+  };
+
+  it('creates a conditional market global stop-loss only for the missing spot size', async () => {
+    const { service } = createService();
+    jest.spyOn(service as any, 'getPendingConditionalSpotOrders').mockResolvedValue([
+      {
+        instId: 'BTC-USDT',
+        side: 'sell',
+        sz: '0.5',
+        slTriggerPx: '98',
+        slOrdPx: '-1',
+      },
+    ]);
+    const placeStopLoss = jest.spyOn(service, 'placeSpotConditionalStopLoss');
+
+    const result: any = await service.ensureSpotStopLoss('BTC', true);
+
+    expect(result).toEqual(expect.objectContaining({
+      status: 'preview',
+      positionSize: 2,
+      protectedSize: 0.5,
+      missingSize: 1.5,
+      stopLossPrice: 99,
+    }));
+    expect(placeStopLoss).toHaveBeenCalledWith('BTC', '1.5000', '99.00', true);
+    expect(result.order.body).toEqual(expect.objectContaining({
+      ordType: 'conditional',
+      side: 'sell',
+      slTriggerPx: '99.00',
+      slOrdPx: '-1',
+    }));
+  });
+
+  it('does not create another global stop-loss when conditional coverage is sufficient', async () => {
+    const { service } = createService();
+    jest.spyOn(service as any, 'getPendingConditionalSpotOrders').mockResolvedValue([
+      {
+        instId: 'BTC-USDT',
+        side: 'sell',
+        sz: '2',
+        slTriggerPx: '98',
+        slOrdPx: '-1',
+      },
+    ]);
+    const placeStopLoss = jest.spyOn(service, 'placeSpotConditionalStopLoss');
+
+    await expect(service.ensureSpotStopLoss('BTC', true)).resolves.toEqual(
+      expect.objectContaining({ status: 'already_protected', missingSize: 0 }),
+    );
+    expect(placeStopLoss).not.toHaveBeenCalled();
+  });
+
+  it('rejects a manual spot stop-loss above current price', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.placeSpotStopLossAtTriggerPrice('BTC', 110, 100, true),
+    ).rejects.toThrow('must be below current price');
   });
 });
 

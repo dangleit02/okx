@@ -20,8 +20,8 @@ export class FutureHedgeController {
       direction,
       isTesting: query.testing !== 'false',
       removeExistingOrders: parseBool(query.removeExistingOrders),
-      enableTakeProfit: parseBool(query.enableTakeProfit),
-      partialCloseOnRetrace: parseBool(query.partialCloseOnRetrace),
+      enableProtectiveClose: parseBool(query.enableProtectiveClose ?? query.enableTakeProfit),
+      protectiveCloseOnly: this.protectiveCloseOnly(query),
       justOnePartialOrder: parseBool(query.justOnePartialOrder),
       autoTrade: parseBool(query.autoTrade),
     };
@@ -47,6 +47,10 @@ export class FutureHedgeController {
     const coins = _.uniq(this.config.get<string[]>(key) || []);
     if (!coins.length) throw new Error(`No coins configured in ${key}`);
     return coins;
+  }
+
+  private protectiveCloseOnly(query: Record<string, string>) {
+    return parseBool(query.protectiveCloseOnly ?? query.partialCloseOnRetrace);
   }
 
   @Post('long-at-price/:coin')
@@ -154,6 +158,23 @@ export class FutureHedgeController {
     );
   }
 
+  @Post('close-at-price/:coin')
+  async closeAtPrice(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.closeAtTriggerPrice(coin, query);
+  }
+
+  @Post('stop-loss-at-trigger-price/:coin')
+  async stopLossAtTriggerPrice(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.okx.placePositionStopLossAtTriggerPrice(
+      coin,
+      this.parseDirection(query.direction),
+      Number(query.price),
+      query.percentage ? Number(query.percentage) : 100,
+      query.testing !== 'false',
+    );
+  }
+
+  // Backward-compatible alias. This places a stop-loss around 0.2% from current price.
   @Post('sell-all-at-price/:coin')
   async closeAtCurrentPrice(@Param('coin') coin: string, @Query() query: Record<string, string>) {
     return this.okx.closePositionAtCurrentPrice(
@@ -164,37 +185,116 @@ export class FutureHedgeController {
     );
   }
 
-  @Post('sell-at-price/:coin')
-  async closeAtPriceLadder(@Param('coin') coin: string, @Query() query: Record<string, string>) {
-    return this.okx.placeTakeProfitByClosePartialPosition(
+  @Post('stop-loss-near-current-price/:coin')
+  async stopLossNearCurrentPrice(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.closeAtCurrentPrice(coin, query);
+  }
+
+  @Post('protective-close-by-price-steps/:coin')
+  async protectiveCloseByPriceSteps(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.okx.placeProtectiveCloseByPriceSteps(
       coin,
       this.parseDirection(query.direction),
-      parseBool(query.partialCloseOnRetrace),
+      this.protectiveCloseOnly(query),
       parseBool(query.justOneOrder),
       query.testing !== 'false',
     );
   }
 
-  @Post('sell-at-price-all-coins')
-  async closeAtPriceAllCoins(@Query() query: Record<string, string>) {
+  @Post('sell-at-price/:coin')
+  async closeAtPriceLadder(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.protectiveCloseByPriceSteps(coin, query);
+  }
+
+  @Post('protective-close-ladder/:coin')
+  async protectiveCloseLadder(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.protectiveCloseByPriceSteps(coin, query);
+  }
+
+  @Post('close-ladder/:coin')
+  async closeLadder(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.protectiveCloseByPriceSteps(coin, query);
+  }
+
+  @Post('protective-close-by-price-steps-all-coins')
+  async protectiveCloseByPriceStepsAllCoins(@Query() query: Record<string, string>) {
     const direction = this.parseDirection(query.direction);
     const testing = query.testing !== 'false';
-    this.logger.log(`FUTURE hedge close ladder all coins start: direction=${direction}, testing=${testing}`, null, `ALL_${direction}_hedge`);
+    this.logger.log(`FUTURE hedge protective close by price steps all coins start: direction=${direction}, testing=${testing}`, null, `ALL_${direction}_hedge`);
     const results = [];
     for (const coin of this.configuredCoins(direction)) {
       results.push({
         coin,
         direction,
-        result: await this.okx.placeTakeProfitByClosePartialPosition(
+        result: await this.okx.placeProtectiveCloseByPriceSteps(
           coin,
           direction,
-          parseBool(query.partialCloseOnRetrace),
+          this.protectiveCloseOnly(query),
           parseBool(query.justOneOrder),
           testing,
         ),
       });
     }
-    this.logger.log(`FUTURE hedge close ladder all coins complete: direction=${direction}, testing=${testing}, coins=${results.length}`, null, `ALL_${direction}_hedge`);
+    this.logger.log(`FUTURE hedge protective close by price steps all coins complete: direction=${direction}, testing=${testing}, coins=${results.length}`, null, `ALL_${direction}_hedge`);
     return results;
+  }
+
+  @Post('sell-at-price-all-coins')
+  async closeAtPriceAllCoins(@Query() query: Record<string, string>) {
+    return this.protectiveCloseByPriceStepsAllCoins(query);
+  }
+
+  @Post('protective-close-ladder-all-coins')
+  async protectiveCloseLadderAllCoins(@Query() query: Record<string, string>) {
+    return this.protectiveCloseByPriceStepsAllCoins(query);
+  }
+
+  @Post('close-ladder-all-coins')
+  async closeLadderAllCoins(@Query() query: Record<string, string>) {
+    return this.protectiveCloseByPriceStepsAllCoins(query);
+  }
+
+  @Post('clean-protective-close-by-price-steps-orders/:coin')
+  async cleanProtectiveCloseByPriceStepsOrders(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.okx.cleanProtectiveCloseByPriceStepsOrdersForOneCoin(
+      coin,
+      this.parseDirection(query.direction),
+      query.testing !== 'false',
+    );
+  }
+
+  @Post('clean-close-orders/:coin')
+  async cleanCloseOrders(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.cleanProtectiveCloseByPriceStepsOrders(coin, query);
+  }
+
+  @Post('clean-protective-close-orders/:coin')
+  async cleanProtectiveCloseOrders(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.cleanProtectiveCloseByPriceStepsOrders(coin, query);
+  }
+
+  @Post('clean-protective-close-by-price-steps-orders-all-coins')
+  async cleanProtectiveCloseByPriceStepsOrdersAllCoins(@Query() query: Record<string, string>) {
+    const direction = this.parseDirection(query.direction);
+    const testing = query.testing !== 'false';
+    const results = [];
+    for (const coin of this.configuredCoins(direction)) {
+      results.push({
+        coin,
+        direction,
+        result: await this.okx.cleanProtectiveCloseByPriceStepsOrdersForOneCoin(coin, direction, testing),
+      });
+    }
+    return results;
+  }
+
+  @Post('clean-close-orders-all-coins')
+  async cleanCloseOrdersAllCoins(@Query() query: Record<string, string>) {
+    return this.cleanProtectiveCloseByPriceStepsOrdersAllCoins(query);
+  }
+
+  @Post('clean-protective-close-orders-all-coins')
+  async cleanProtectiveCloseOrdersAllCoins(@Query() query: Record<string, string>) {
+    return this.cleanProtectiveCloseByPriceStepsOrdersAllCoins(query);
   }
 }

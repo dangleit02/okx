@@ -6,6 +6,7 @@ import { AppLogger } from "../logger/logger.service";
 import * as _ from 'lodash';
 import * as moment from 'moment';
 import { OkxFutureHedgeService } from "../okx/okx.future.hedge.service";
+import { OkxFutureOneWayService } from "../okx/okx.future.oneway.service";
 @Injectable()
 export class TasksService {
     constructor(
@@ -13,7 +14,61 @@ export class TasksService {
         private readonly logger: AppLogger,
         private okxService: OkxService,
         private okxFutureHedgeService: OkxFutureHedgeService,
+        private okxFutureOneWayService: OkxFutureOneWayService,
     ) {
+    }
+
+    private async refreshFutureOrders(
+        service: OkxFutureHedgeService | OkxFutureOneWayService,
+        direction: 'long' | 'short',
+        mode: 'hedge' | 'oneway',
+        enabledConfigKey: string,
+    ) {
+        const allLogKey = `ALL_${direction}_${mode}`;
+        this.logger.log(`Cron refresh ${direction} entry, stop-loss and close orders ${moment().format('YY/MM/DD HH:mm:ss')}`, null, allLogKey);
+        if (!this.config.get<boolean>(enabledConfigKey)) {
+            this.logger.log(`Swap ${direction} ${mode} task is disabled in config`, null, allLogKey);
+            return;
+        }
+
+        let coins = this.config.get<any>(direction === 'long' ? 'coinsForLong' : 'coinsForShort');
+        if (!coins) {
+            throw new Error(`No configuration found for ${direction === 'long' ? 'coinsForLong' : 'coinsForShort'}: ${JSON.stringify(coins)}`);
+        }
+        coins = _.uniq(coins);
+        const results = [];
+        const isTesting = false;
+
+        for await (const coin of coins) {
+            const normalizedCoin = String(coin).toUpperCase();
+            this.logger.log(`Processing coin: ${normalizedCoin}`, null, `${normalizedCoin}_${direction}_${mode}`);
+
+            const cancelledEntries = await service.cancelFutureOrdersForOneCoin(coin, direction, 'open');
+            results.push({ coin, direction, action: 'refresh_entry_trigger_orders', result: cancelledEntries });
+
+            const cleanBefore = await service.cleanProtectiveCloseByPriceStepsOrdersForOneCoin(coin, direction, false);
+            results.push({ coin, direction, action: 'clean_protective_close_by_price_steps_orders_before_refresh', result: cleanBefore });
+
+            const stopLoss = await service.ensurePositionStopLoss(coin, direction, isTesting);
+            results.push({ coin, direction, action: 'ensure_position_stop_loss', result: stopLoss });
+
+            const refreshed = await service.tradeOneCoin({
+                coin,
+                direction,
+                isTesting,
+                removeExistingOrders: false,
+                enableProtectiveClose: true,
+                protectiveCloseOnly: true,
+                autoTrade: true,
+            });
+            results.push(...refreshed);
+
+            const cleanAfter = await service.cleanProtectiveCloseByPriceStepsOrdersForOneCoin(coin, direction, false);
+            results.push({ coin, direction, action: 'clean_protective_close_by_price_steps_orders_after_refresh', result: cleanAfter });
+        }
+
+        this.logger.log(`Refresh ${direction} ${mode} future orders results: ${JSON.stringify(results, null, 2)}`, null, allLogKey);
+        return results;
     }
 
     // run each 15 minutes
@@ -105,84 +160,44 @@ export class TasksService {
         }
     }
 
-    // Run every hour at minute 28, gated by runSwapTaskForShort.
+    // Run every hour at minute 28, gated by runSwapTaskForShortHedge.
     @Cron('28 * * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
     async refreshShortFutureOrders() {
-        this.logger.log(`Cron refresh short entry, stop-loss and close orders ${moment().format('YY/MM/DD HH:mm:ss')}`, null, 'ALL_short_hedge');
         try {
-            if (!this.config.get<boolean>('runSwapTaskForShort')) {
-                this.logger.log('Swap Short task is disabled in config', null, 'ALL_short_hedge');
-                return;
-            }
-            this.logger.log(`Starting to place all orders for all coins ${moment().format('YY/MM/DD HH:mm:ss')}`, null, 'ALL_short_hedge');
-            let coins = this.config.get<any>(`coinsForShort`);
-            if (!coins) {
-                throw new Error(`No configuration found for coinsForShort: ${JSON.stringify(coins)}`);
-            }
-            coins = _.uniq(coins);
-            this.logger.log(`Coins to process: ${JSON.stringify(coins)}`, null, 'ALL_short_hedge');
-            const results = [];
-            const isTesting = false,
-                removeExistingOrders = false,
-                enableTakeProfit = true,
-                partialCloseOnRetrace = true,
-                autoTrade = true;
-
-            for await (const coin of coins) {
-                this.logger.log(`Processing coin: ${coin.toUpperCase()}`, null, `${coin.toUpperCase()}_short_hedge`);
-                const cancelled = await this.okxFutureHedgeService.cancelFutureOrdersForOneCoin(coin, 'short', 'all');
-                results.push({ coin, direction: 'short', action: 'cancel_existing_trigger_orders', result: cancelled });
-                const stopLoss = await this.okxFutureHedgeService.ensurePositionStopLoss(coin, 'short', isTesting);
-                results.push({ coin, direction: 'short', action: 'ensure_position_stop_loss', result: stopLoss });
-                const result = await this.okxFutureHedgeService.tradeOneCoin({ coin, direction: 'short', isTesting, removeExistingOrders, enableTakeProfit, partialCloseOnRetrace, autoTrade });
-                results.push(...result);
-            }
-            this.logger.log(`Refresh short future orders results: ${JSON.stringify(results, null, 2)}`, null, 'ALL_short_hedge');
-
-            this.logger.log(`✅ Successfully refreshed short future orders ${moment().format('YYYY/MM/DD HH:mm:ss')}`, null, 'ALL_short_hedge')
+            return await this.refreshFutureOrders(this.okxFutureHedgeService, 'short', 'hedge', 'runSwapTaskForShortHedge');
         } catch (error) {
             this.logger.log(`⚠️ Error refreshing short future orders ${moment().format('YYYY/MM/DD HH:mm:ss')}, ${error.message}`, null, 'ALL_short_hedge')
             throw error;
         }
     }
 
-    // Run every hour at minute 45, gated by runSwapTaskForLong.
+    // Run every hour at minute 45, gated by runSwapTaskForLongHedge.
     @Cron('45 * * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
     async refreshLongFutureOrders() {
-        this.logger.log(`Cron refresh long entry, stop-loss and close orders ${moment().format('YY/MM/DD HH:mm:ss')}`, null, 'ALL_long_hedge');
         try {
-            if (!this.config.get<boolean>('runSwapTaskForLong')) {
-                this.logger.log('Swap Long task is disabled in config', null, 'ALL_long_hedge');
-                return;
-            }
-            this.logger.log(`Starting to place all orders for all coins ${moment().format('YY/MM/DD HH:mm:ss')}`, null, 'ALL_long_hedge');
-            let coins = this.config.get<any>(`coinsForLong`);
-            if (!coins) {
-                throw new Error(`No configuration found for coinsForLong: ${JSON.stringify(coins)}`);
-            }
-            coins = _.uniq(coins);
-            this.logger.log(`Coins to process: ${JSON.stringify(coins)}`, null, 'ALL_long_hedge');
-            const results = [];
-            const isTesting = false,
-                removeExistingOrders = false,
-                enableTakeProfit = true,
-                partialCloseOnRetrace = true,
-                autoTrade = true;
-
-            for await (const coin of coins) {
-                this.logger.log(`Processing coin: ${coin.toUpperCase()}`, null, `${coin.toUpperCase()}_long_hedge`);
-                const cancelled = await this.okxFutureHedgeService.cancelFutureOrdersForOneCoin(coin, 'long', 'all');
-                results.push({ coin, direction: 'long', action: 'cancel_existing_trigger_orders', result: cancelled });
-                const stopLoss = await this.okxFutureHedgeService.ensurePositionStopLoss(coin, 'long', isTesting);
-                results.push({ coin, direction: 'long', action: 'ensure_position_stop_loss', result: stopLoss });
-                const result = await this.okxFutureHedgeService.tradeOneCoin({ coin, direction: 'long', isTesting, removeExistingOrders, enableTakeProfit, partialCloseOnRetrace, autoTrade });
-                results.push(...result);
-            }
-            this.logger.log(`Refresh long future orders results: ${JSON.stringify(results, null, 2)}`, null, 'ALL_long_hedge');
-
-            this.logger.log(`✅ Successfully refreshed long future orders ${moment().format('YYYY/MM/DD HH:mm:ss')}`, null, 'ALL_long_hedge')
+            return await this.refreshFutureOrders(this.okxFutureHedgeService, 'long', 'hedge', 'runSwapTaskForLongHedge');
         } catch (error) {
             this.logger.log(`⚠️ Error refreshing long future orders ${moment().format('YYYY/MM/DD HH:mm:ss')}, ${error.message}`, null, 'ALL_long_hedge')
+            throw error;
+        }
+    }
+
+    @Cron('31 * * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+    async refreshShortFutureOneWayOrders() {
+        try {
+            return await this.refreshFutureOrders(this.okxFutureOneWayService, 'short', 'oneway', 'runSwapTaskForShortOneWay');
+        } catch (error) {
+            this.logger.log(`⚠️ Error refreshing short oneway future orders ${moment().format('YYYY/MM/DD HH:mm:ss')}, ${error.message}`, null, 'ALL_short_oneway');
+            throw error;
+        }
+    }
+
+    @Cron('48 * * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+    async refreshLongFutureOneWayOrders() {
+        try {
+            return await this.refreshFutureOrders(this.okxFutureOneWayService, 'long', 'oneway', 'runSwapTaskForLongOneWay');
+        } catch (error) {
+            this.logger.log(`⚠️ Error refreshing long oneway future orders ${moment().format('YYYY/MM/DD HH:mm:ss')}, ${error.message}`, null, 'ALL_long_oneway');
             throw error;
         }
     }

@@ -96,6 +96,9 @@ describe('SpotController buy order total response format', () => {
     cancelPendingOrdersByPriceRange: jest.Mock;
     sellAllAtCurrentPrice: jest.Mock;
     sellAtTriggerPrice: jest.Mock;
+    ensureSpotStopLoss: jest.Mock;
+    placeSpotStopLossAtTriggerPrice: jest.Mock;
+    placeSpotStopLossNearCurrentPrice: jest.Mock;
     sellOneCoin: jest.Mock;
     sellAtPriceAllCoins: jest.Mock;
     cleanSellOrdersForOneCoin: jest.Mock;
@@ -123,6 +126,9 @@ describe('SpotController buy order total response format', () => {
       }),
       sellAllAtCurrentPrice: jest.fn().mockResolvedValue({ status: 'preview' }),
       sellAtTriggerPrice: jest.fn().mockResolvedValue({ status: 'preview' }),
+      ensureSpotStopLoss: jest.fn().mockResolvedValue({ status: 'preview' }),
+      placeSpotStopLossAtTriggerPrice: jest.fn().mockResolvedValue({ status: 'preview' }),
+      placeSpotStopLossNearCurrentPrice: jest.fn().mockResolvedValue({ status: 'preview' }),
       sellOneCoin: jest.fn().mockResolvedValue(undefined),
       sellAtPriceAllCoins: jest.fn().mockResolvedValue([]),
       cleanSellOrdersForOneCoin: jest.fn().mockResolvedValue({ status: 'preview' }),
@@ -154,7 +160,6 @@ describe('SpotController buy order total response format', () => {
       minPrice: '40',
       maxPrice: '41',
       numberOfOrders: '10',
-      addStopLoss: 'false',
     });
 
     expect(okxService.validateBuyTriggerPriceDirection).toHaveBeenCalledWith(
@@ -170,7 +175,6 @@ describe('SpotController buy order total response format', () => {
       true,
       {
         numberOfOrders: 10,
-        addStopLoss: false,
         buyWithoutCheckAvarageCost: true,
         direction: 'down',
         currentPrice: 50,
@@ -192,6 +196,24 @@ describe('SpotController buy order total response format', () => {
       41,
       true,
       expect.objectContaining({ buyWithoutCheckAvarageCost: false }),
+    );
+  });
+
+  it('does not forward the removed addStopLoss query option', async () => {
+    await controller.buyTriggerFromMinToMax('LTC', {
+      testing: 'true',
+      minPrice: '60',
+      maxPrice: '70',
+      direction: 'up',
+      addStopLoss: 'true',
+    });
+
+    expect(okxService.buyTriggerFromMinPriceToMaxPrice).toHaveBeenCalledWith(
+      'LTC',
+      60,
+      70,
+      true,
+      expect.not.objectContaining({ addStopLoss: expect.anything() }),
     );
   });
 
@@ -375,6 +397,26 @@ describe('SpotController buy order total response format', () => {
       'btc',
       50000,
       25,
+      true,
+    );
+  });
+
+  it('exposes global, manual and near-current conditional spot stop-loss APIs', async () => {
+    await controller.ensurePositionStopLoss('btc');
+    expect(okxService.ensureSpotStopLoss).toHaveBeenCalledWith('btc', true);
+
+    await controller.stopLossAtTriggerPrice('btc', '50000', '25', 'false');
+    expect(okxService.placeSpotStopLossAtTriggerPrice).toHaveBeenCalledWith(
+      'btc',
+      50000,
+      25,
+      false,
+    );
+
+    await controller.stopLossNearCurrentPrice('btc');
+    expect(okxService.placeSpotStopLossNearCurrentPrice).toHaveBeenCalledWith(
+      'btc',
+      100,
       true,
     );
   });

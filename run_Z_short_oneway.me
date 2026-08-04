@@ -18,23 +18,27 @@ curl -X GET 'http://localhost:3030/future-oneway/orders-all-coins?direction=shor
   -H 'Content-Type: application/json'
 
 # 5. TAKE PROFIT SHORT: limit khi trigger.
-curl -X POST 'http://localhost:3030/future-oneway/sell-at-trigger-price/BTC?direction=short&testing=true&price=57000&percentage=25' \
+curl -X POST 'http://localhost:3030/future-oneway/close-at-price/BTC?direction=short&testing=true&price=57000&percentage=25' \
   -H 'Content-Type: application/json'
 
 # 6. STOP LOSS SHORT: market khi trigger.
-curl -X POST 'http://localhost:3030/future-oneway/sell-at-trigger-price/BTC?direction=short&testing=true&price=65000&percentage=100' \
+curl -X POST 'http://localhost:3030/future-oneway/stop-loss-at-trigger-price/BTC?direction=short&testing=true&price=65000&percentage=100' \
   -H 'Content-Type: application/json'
 
-# 7. Đặt trigger market đóng SHORT quanh currentPrice.
-curl -X POST 'http://localhost:3030/future-oneway/sell-all-at-price/BTC?direction=short&testing=true&percentage=100' \
+# 7. Đặt STOP LOSS market đóng SHORT tại khoảng 0.2% trên currentPrice.
+curl -X POST 'http://localhost:3030/future-oneway/stop-loss-near-current-price/BTC?direction=short&testing=true&percentage=100' \
   -H 'Content-Type: application/json'
 
-# 8. Đặt ladder đóng SHORT.
-curl -X POST 'http://localhost:3030/future-oneway/sell-at-price/BTC?direction=short&testing=true&partialCloseOnRetrace=true&justOneOrder=false' \
+# 8. Đặt ladder đóng SHORT từ 5%-6% trên current; market khi trigger.
+curl -X POST 'http://localhost:3030/future-oneway/protective-close-by-price-steps/BTC?direction=short&testing=true&protectiveCloseOnly=true&justOneOrder=false' \
   -H 'Content-Type: application/json'
 
 # 9. Đặt ladder đóng SHORT cho coinsForShort.
-curl -X POST 'http://localhost:3030/future-oneway/sell-at-price-all-coins?direction=short&testing=true&partialCloseOnRetrace=true&justOneOrder=false' \
+curl -X POST 'http://localhost:3030/future-oneway/protective-close-by-price-steps-all-coins?direction=short&testing=true&protectiveCloseOnly=true&justOneOrder=false' \
+  -H 'Content-Type: application/json'
+
+# Preview clean: chỉ tính short protective-close trigger trên current, không tính entry/TP phía dưới current/conditional SL.
+curl -X POST 'http://localhost:3030/future-oneway/clean-protective-close-by-price-steps-orders/BTC?direction=short&testing=true' \
   -H 'Content-Type: application/json'
 
 # WARNING: các DELETE dưới đây hủy lệnh thật, không có testing mode.

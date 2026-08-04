@@ -366,7 +366,6 @@ export class SpotController {
       isTesting,
       {
         numberOfOrders: numberOfOrders ? Number(numberOfOrders) : undefined,
-        addStopLoss: parseBool(query.addStopLoss),
         buyWithoutCheckAvarageCost: query.buyWithoutCheckAvarageCost === undefined
           ? true
           : parseBool(query.buyWithoutCheckAvarageCost),
@@ -419,6 +418,42 @@ export class SpotController {
       coin,
       Number(price),
       Number(percentage),
+      testing !== 'false',
+    );
+  }
+
+  @Post('ensure-position-stop-loss/:coin')
+  async ensurePositionStopLoss(
+    @Param('coin') coin: string,
+    @Query('testing') testing?: string,
+  ) {
+    return this.okxService.ensureSpotStopLoss(coin, testing !== 'false');
+  }
+
+  @Post('stop-loss-at-trigger-price/:coin')
+  async stopLossAtTriggerPrice(
+    @Param('coin') coin: string,
+    @Query('price') price: string,
+    @Query('percentage') percentage?: string,
+    @Query('testing') testing?: string,
+  ) {
+    return this.okxService.placeSpotStopLossAtTriggerPrice(
+      coin,
+      Number(price),
+      percentage ? Number(percentage) : 100,
+      testing !== 'false',
+    );
+  }
+
+  @Post('stop-loss-near-current-price/:coin')
+  async stopLossNearCurrentPrice(
+    @Param('coin') coin: string,
+    @Query('percentage') percentage?: string,
+    @Query('testing') testing?: string,
+  ) {
+    return this.okxService.placeSpotStopLossNearCurrentPrice(
+      coin,
+      percentage ? Number(percentage) : 100,
       testing !== 'false',
     );
   }

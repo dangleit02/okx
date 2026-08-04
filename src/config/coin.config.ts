@@ -3,11 +3,11 @@ export default () => ({
     buyWithoutCheckAvarageCost: true,
     runSpotTaskForSell: true,
     runSpotTaskForClean: true,
-    sellWithoutCheckAvarageCost: true,
-    minTakeProfitRatio: -0.3, // +5%
     runSpotTaskHavingStopLoss: false,
-    runSwapTaskForShort: false,
-    runSwapTaskForLong: false,
+    runSwapTaskForShortHedge: false,
+    runSwapTaskForLongHedge: false,
+    runSwapTaskForShortOneWay: false,
+    runSwapTaskForLongOneWay: false,
     maxUsdt: 4000,
     riskPerTrade: 0.02,
     amountOfUsdtPerStep: 12,
@@ -15,8 +15,8 @@ export default () => ({
     minBuyPriceRatio: 0.01, // +1%
     maxBuyPriceRatio: 0.02, // +2%
     stopLossBuyPriceRatio: 0.1,//0.06, // 6%//0.1, // 10%    0.3, // 30%    
-    minSellPriceRatio: 0.05, // +1%
-    maxSellPriceRatio: 0.06, // +2%
+    minClosePriceRatio: 0.05, // 5% from current price, shared by spot/futures close ranges
+    maxClosePriceRatio: 0.06, // 6% from current price, shared by spot/futures close ranges
     stopLossSellPriceRatio: 0.1,//0.06, // 6%//0.1, // 10%    0.3, // 30%    
     futureLeverage: 3,
     coinsSpotForTakeProfit: [
@@ -187,8 +187,8 @@ export default () => ({
             minTakeProfitPrice: 2.369, // Giá chốt lời (USDT)
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },
         STRK: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -203,8 +203,8 @@ export default () => ({
             priceToFixed: 4, // Số chữ số thập phân cho giá
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },
         WLD: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -219,8 +219,8 @@ export default () => ({
             priceToFixed: 4, // Số chữ số thập phân cho giá
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },
         DOT: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -238,8 +238,8 @@ export default () => ({
             minTakeProfitPrice: 4.095, // Giá chốt lời (USDT)
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },
         NEAR: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -254,8 +254,8 @@ export default () => ({
             priceToFixed: 3, // Số chữ số thập phân cho giá
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },
         DOGS: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -288,8 +288,8 @@ export default () => ({
             minTakeProfitPrice: 0.0907, // Giá chốt lời (USDT)
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },
         DYDX: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -529,8 +529,8 @@ export default () => ({
             priceToFixed: 9, // Số chữ số thập phân cho giá
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },
         WIF: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -590,8 +590,8 @@ export default () => ({
             priceToFixed: 5, // Số chữ số thập phân cho giá
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },
         BOME: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -687,8 +687,8 @@ export default () => ({
             priceToFixed: 4, // Số chữ số thập phân cho giá
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },
         LTC: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -703,8 +703,8 @@ export default () => ({
             priceToFixed: 2, // Số chữ số thập phân cho giá
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },
         XLM: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -719,8 +719,8 @@ export default () => ({
             priceToFixed: 5, // Số chữ số thập phân cho giá
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },
         UNI: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -735,8 +735,8 @@ export default () => ({
             priceToFixed: 3, // Số chữ số thập phân cho giá
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },
         SUI: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -835,8 +835,8 @@ export default () => ({
             priceToFixed: 1, // Số chữ số thập phân cho giá            
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },
         ETH: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -851,8 +851,8 @@ export default () => ({
             priceToFixed: 2, // Số chữ số thập phân cho giá
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },
         XRP: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -867,8 +867,8 @@ export default () => ({
             priceToFixed: 4, // Số chữ số thập phân cho giá      
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,      
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },
         BNB: {
             szToFixed: 6, // Số chữ số thập phân cho khối lượng
@@ -879,8 +879,8 @@ export default () => ({
             priceToFixed: 2, // Số chữ số thập phân cho giá 
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },
         LINK: {
             maxUsdt: 1500, // Số tiền tối đa để đầu tư cho mỗi coin (USDT)
@@ -927,8 +927,8 @@ export default () => ({
             priceToFixed: 2, // Số chữ số thập phân cho giá 
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },   
         SUSHI: {
             szToFixed: 6, // Số chữ số thập phân cho khối lượng
@@ -939,16 +939,16 @@ export default () => ({
             priceToFixed: 5, // Số chữ số thập phân cho giá 
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },
         ETC: {
             szToFixed: 6, // Số chữ số thập phân cho khối lượng
             priceToFixed: 3, // Số chữ số thập phân cho giá 
             minBuyPriceRatio: 0.01,
             maxBuyPriceRatio: 0.02,
-            minSellPriceRatio: 0.05,
-            maxSellPriceRatio: 0.06,
+            minClosePriceRatio: 0.05,
+            maxClosePriceRatio: 0.06,
         },
         ENA: {
             szToFixed: 2, // Số chữ số thập phân cho khối lượng

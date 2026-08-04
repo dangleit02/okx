@@ -1,6 +1,9 @@
 jest.mock('../okx/okx.future.hedge.service', () => ({
   OkxFutureHedgeService: class {},
 }));
+jest.mock('../okx/okx.future.oneway.service', () => ({
+  OkxFutureOneWayService: class {},
+}));
 
 import { TasksService } from './tasks.service';
 
@@ -23,6 +26,7 @@ describe('TasksService autoSellSpotForDown', () => {
       config as any,
       logger as any,
       okxService as any,
+      {} as any,
       {} as any,
     );
 
@@ -54,6 +58,7 @@ describe('TasksService autoSellSpotForDown', () => {
       logger as any,
       okxService as any,
       {} as any,
+      {} as any,
     );
 
     await service.cleanSellOrdersDaily();
@@ -67,7 +72,7 @@ describe('TasksService future long/short refresh', () => {
   it('refreshes short trigger orders and opens only through the protected auto-trade flow', async () => {
     const config = {
       get: jest.fn((key: string) => {
-        if (key === 'runSwapTaskForShort') return true;
+        if (key === 'runSwapTaskForShortHedge') return true;
         if (key === 'coinsForShort') return ['BTC', 'BTC'];
         return undefined;
       }),
@@ -75,6 +80,7 @@ describe('TasksService future long/short refresh', () => {
     const logger = { log: jest.fn() };
     const future = {
       cancelFutureOrdersForOneCoin: jest.fn().mockResolvedValue({ cancelled: [] }),
+      cleanProtectiveCloseByPriceStepsOrdersForOneCoin: jest.fn().mockResolvedValue({ status: 'clean' }),
       ensurePositionStopLoss: jest.fn().mockResolvedValue({ status: 'submitted' }),
       tradeOneCoin: jest.fn().mockResolvedValue([]),
     };
@@ -83,19 +89,22 @@ describe('TasksService future long/short refresh', () => {
       logger as any,
       {} as any,
       future as any,
+      {} as any,
     );
 
     await service.refreshShortFutureOrders();
 
-    expect(future.cancelFutureOrdersForOneCoin).toHaveBeenCalledWith('BTC', 'short', 'all');
+    expect(future.cancelFutureOrdersForOneCoin).toHaveBeenCalledWith('BTC', 'short', 'open');
+    expect(future.cleanProtectiveCloseByPriceStepsOrdersForOneCoin).toHaveBeenCalledTimes(2);
+    expect(future.cleanProtectiveCloseByPriceStepsOrdersForOneCoin).toHaveBeenCalledWith('BTC', 'short', false);
     expect(future.ensurePositionStopLoss).toHaveBeenCalledWith('BTC', 'short', false);
     expect(future.tradeOneCoin).toHaveBeenCalledWith(expect.objectContaining({
       coin: 'BTC',
       direction: 'short',
       isTesting: false,
       removeExistingOrders: false,
-      enableTakeProfit: true,
-      partialCloseOnRetrace: true,
+      enableProtectiveClose: true,
+      protectiveCloseOnly: true,
       autoTrade: true,
     }));
     expect(future.tradeOneCoin).toHaveBeenCalledTimes(1);
@@ -104,7 +113,7 @@ describe('TasksService future long/short refresh', () => {
   it('ensures stop-loss coverage before refreshing each long coin', async () => {
     const config = {
       get: jest.fn((key: string) => {
-        if (key === 'runSwapTaskForLong') return true;
+        if (key === 'runSwapTaskForLongHedge') return true;
         if (key === 'coinsForLong') return ['ETH'];
         return undefined;
       }),
@@ -112,6 +121,7 @@ describe('TasksService future long/short refresh', () => {
     const logger = { log: jest.fn() };
     const future = {
       cancelFutureOrdersForOneCoin: jest.fn().mockResolvedValue({ cancelled: [] }),
+      cleanProtectiveCloseByPriceStepsOrdersForOneCoin: jest.fn().mockResolvedValue({ status: 'clean' }),
       ensurePositionStopLoss: jest.fn().mockResolvedValue({ status: 'submitted' }),
       tradeOneCoin: jest.fn().mockResolvedValue([]),
     };
@@ -120,16 +130,53 @@ describe('TasksService future long/short refresh', () => {
       logger as any,
       {} as any,
       future as any,
+      {} as any,
     );
 
     await service.refreshLongFutureOrders();
 
-    expect(future.cancelFutureOrdersForOneCoin).toHaveBeenCalledWith('ETH', 'long', 'all');
+    expect(future.cancelFutureOrdersForOneCoin).toHaveBeenCalledWith('ETH', 'long', 'open');
     expect(future.ensurePositionStopLoss).toHaveBeenCalledWith('ETH', 'long', false);
+    expect(future.cleanProtectiveCloseByPriceStepsOrdersForOneCoin).toHaveBeenCalledTimes(2);
     expect(future.tradeOneCoin).toHaveBeenCalledTimes(1);
     expect(future.cancelFutureOrdersForOneCoin.mock.invocationCallOrder[0])
       .toBeLessThan(future.ensurePositionStopLoss.mock.invocationCallOrder[0]);
     expect(future.ensurePositionStopLoss.mock.invocationCallOrder[0])
       .toBeLessThan(future.tradeOneCoin.mock.invocationCallOrder[0]);
+  });
+
+  it('runs the one-way refresh through its separate config flag and service', async () => {
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'runSwapTaskForShortOneWay') return true;
+        if (key === 'coinsForShort') return ['BTC'];
+        return undefined;
+      }),
+    };
+    const logger = { log: jest.fn() };
+    const oneway = {
+      cancelFutureOrdersForOneCoin: jest.fn().mockResolvedValue({ cancelled: [] }),
+      cleanProtectiveCloseByPriceStepsOrdersForOneCoin: jest.fn().mockResolvedValue({ status: 'clean' }),
+      ensurePositionStopLoss: jest.fn().mockResolvedValue({ status: 'submitted' }),
+      tradeOneCoin: jest.fn().mockResolvedValue([]),
+    };
+    const service = new TasksService(
+      config as any,
+      logger as any,
+      {} as any,
+      {} as any,
+      oneway as any,
+    );
+
+    await service.refreshShortFutureOneWayOrders();
+
+    expect(oneway.cancelFutureOrdersForOneCoin).toHaveBeenCalledWith('BTC', 'short', 'open');
+    expect(oneway.ensurePositionStopLoss).toHaveBeenCalledWith('BTC', 'short', false);
+    expect(oneway.cleanProtectiveCloseByPriceStepsOrdersForOneCoin).toHaveBeenCalledTimes(2);
+    expect(oneway.tradeOneCoin).toHaveBeenCalledWith(expect.objectContaining({
+      direction: 'short',
+      autoTrade: true,
+      enableProtectiveClose: true,
+    }));
   });
 });

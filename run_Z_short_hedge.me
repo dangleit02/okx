@@ -18,23 +18,27 @@ curl -X GET 'http://localhost:3030/future-hedge/orders-all-coins?direction=short
   -H 'Content-Type: application/json'
 
 # 5. Đặt sẵn TAKE PROFIT SHORT tại giá thấp hơn currentPrice: limit khi trigger.
-curl -X POST 'http://localhost:3030/future-hedge/sell-at-trigger-price/BTC?direction=short&testing=true&price=57000&percentage=25' \
+curl -X POST 'http://localhost:3030/future-hedge/close-at-price/BTC?direction=short&testing=true&price=57000&percentage=25' \
   -H 'Content-Type: application/json'
 
 # 6. Đặt sẵn STOP LOSS SHORT tại giá cao hơn currentPrice: market khi trigger.
-curl -X POST 'http://localhost:3030/future-hedge/sell-at-trigger-price/BTC?direction=short&testing=true&price=65000&percentage=100' \
+curl -X POST 'http://localhost:3030/future-hedge/stop-loss-at-trigger-price/BTC?direction=short&testing=true&price=65000&percentage=100' \
   -H 'Content-Type: application/json'
 
-# 7. Đặt trigger market đóng SHORT quanh currentPrice.
-curl -X POST 'http://localhost:3030/future-hedge/sell-all-at-price/BTC?direction=short&testing=true&percentage=100' \
+# 7. Đặt STOP LOSS market đóng SHORT tại khoảng 0.2% trên currentPrice.
+curl -X POST 'http://localhost:3030/future-hedge/stop-loss-near-current-price/BTC?direction=short&testing=true&percentage=100' \
   -H 'Content-Type: application/json'
 
-# 8. Đặt ladder đóng SHORT. Retrace/stop-loss sẽ dùng market khi trigger.
-curl -X POST 'http://localhost:3030/future-hedge/sell-at-price/BTC?direction=short&testing=true&partialCloseOnRetrace=true&justOneOrder=false' \
+# 8. Đặt ladder đóng SHORT từ 5%-6% trên current; market khi trigger.
+curl -X POST 'http://localhost:3030/future-hedge/protective-close-by-price-steps/BTC?direction=short&testing=true&protectiveCloseOnly=true&justOneOrder=false' \
   -H 'Content-Type: application/json'
 
 # 9. Đặt ladder đóng SHORT cho coinsForShort.
-curl -X POST 'http://localhost:3030/future-hedge/sell-at-price-all-coins?direction=short&testing=true&partialCloseOnRetrace=true&justOneOrder=false' \
+curl -X POST 'http://localhost:3030/future-hedge/protective-close-by-price-steps-all-coins?direction=short&testing=true&protectiveCloseOnly=true&justOneOrder=false' \
+  -H 'Content-Type: application/json'
+
+# Preview clean: chỉ tính short protective-close trigger trên current, không tính entry/TP phía dưới current/conditional SL.
+curl -X POST 'http://localhost:3030/future-hedge/clean-protective-close-by-price-steps-orders/BTC?direction=short&testing=true' \
   -H 'Content-Type: application/json'
 
 # WARNING: các DELETE dưới đây hủy lệnh thật, không có testing mode.

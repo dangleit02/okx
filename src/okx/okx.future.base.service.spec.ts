@@ -23,6 +23,8 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
       get: jest.fn((key: string) => {
         const values = {
           amountOfUsdtPerStep: 12,
+          minClosePriceRatio: 0.05,
+          maxClosePriceRatio: 0.06,
           stopLossBuyPriceRatio: 0.1,
           futureLeverage: 3,
           'okx.baseUrl': 'https://example.invalid',
@@ -124,17 +126,17 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
     }));
     expect(result.body.posSide).toBeUndefined();
     expect(result.body.orderPx).not.toBe('-1');
-    expect(result.closeType).toBe('take_profit');
+    expect(result.closeType).toBe('limit_on_trigger');
     expect(result.executionType).toBe('limit');
   });
 
-  it('uses market execution for a long stop loss below current price', async () => {
+  it('uses market execution for every long close price below current price', async () => {
     const { service } = createService();
     jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
       data: [{ instId: 'BTC-USDT-SWAP', posSide: 'long', pos: '2', avgPx: '100' }],
     });
 
-    const result: any = await service.closePositionAtTriggerPrice(
+    const result: any = await service.placePositionStopLossAtTriggerPrice(
       'BTC',
       'long',
       90,
@@ -145,20 +147,67 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
     expect(result.body).toEqual(expect.objectContaining({
       side: 'sell',
       posSide: 'long',
-      orderPx: '-1',
-      reduceOnly: true,
+      ordType: 'conditional',
+      slTriggerPx: '90',
+      slOrdPx: '-1',
     }));
-    expect(result.closeType).toBe('stop_loss');
+    expect(result.closeType).toBe('market_on_trigger');
     expect(result.executionType).toBe('market');
   });
 
-  it('uses market execution for a short stop loss above current price', async () => {
+  it('uses a limit order on trigger for every long close price above current price', async () => {
+    const { service } = createService();
+    jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
+      data: [{ instId: 'BTC-USDT-SWAP', posSide: 'long', pos: '2', avgPx: '100' }],
+    });
+
+    const result: any = await service.closePositionAtTriggerPrice(
+      'BTC',
+      'long',
+      110,
+      100,
+      true,
+    );
+
+    expect(result).toEqual(expect.objectContaining({
+      closeType: 'limit_on_trigger',
+      executionType: 'limit',
+      body: expect.objectContaining({
+        side: 'sell',
+        triggerPx: '110',
+        orderPx: '109.8',
+      }),
+    }));
+  });
+
+  it('uses market execution when the long close price equals current price', async () => {
+    const { service } = createService();
+    jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
+      data: [{ instId: 'BTC-USDT-SWAP', posSide: 'long', pos: '2', avgPx: '90' }],
+    });
+
+    const result: any = await service.closePositionAtTriggerPrice(
+      'BTC',
+      'long',
+      100,
+      100,
+      true,
+    );
+
+    expect(result).toEqual(expect.objectContaining({
+      closeType: 'market_on_trigger',
+      executionType: 'market',
+      body: expect.objectContaining({ ordType: 'conditional', slOrdPx: '-1' }),
+    }));
+  });
+
+  it('uses market execution for every short close price above current price', async () => {
     const { service } = createService(false);
     jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
       data: [{ instId: 'BTC-USDT-SWAP', pos: '-2', avgPx: '100' }],
     });
 
-    const result: any = await service.closePositionAtTriggerPrice(
+    const result: any = await service.placePositionStopLossAtTriggerPrice(
       'BTC',
       'short',
       110,
@@ -168,21 +217,56 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
 
     expect(result.body).toEqual(expect.objectContaining({
       side: 'buy',
-      orderPx: '-1',
+      ordType: 'conditional',
+      slTriggerPx: '110',
+      slOrdPx: '-1',
       reduceOnly: true,
     }));
-    expect(result.closeType).toBe('stop_loss');
+    expect(result.closeType).toBe('market_on_trigger');
     expect(result.executionType).toBe('market');
   });
 
-  it('uses market execution for retrace close orders in the close ladder', async () => {
+  it('rejects a dedicated stop-loss trigger placed on the take-profit side', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.placePositionStopLossAtTriggerPrice('BTC', 'long', 110, 100, true),
+    ).rejects.toThrow('must be below current price');
+  });
+
+  it('places the near-current stop loss as a market order when triggered', async () => {
+    const { service } = createService();
+    jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
+      data: [{ instId: 'BTC-USDT-SWAP', posSide: 'long', pos: '2', avgPx: '100' }],
+    });
+
+    const result: any = await service.closePositionAtCurrentPrice(
+      'BTC',
+      'long',
+      100,
+      true,
+    );
+
+    expect(result).toEqual(expect.objectContaining({
+      closeType: 'market_on_trigger',
+      executionType: 'market',
+      body: expect.objectContaining({
+        ordType: 'conditional',
+        slTriggerPx: '99.8',
+        slOrdPx: '-1',
+        sz: '2',
+      }),
+    }));
+  });
+
+  it('uses market execution for a long protective close by price steps without requiring average price', async () => {
     const { service } = createService();
     (service as any).getTicker.mockResolvedValue(200);
     jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
-      data: [{ instId: 'BTC-USDT-SWAP', posSide: 'long', pos: '100', avgPx: '100' }],
+      data: [{ instId: 'BTC-USDT-SWAP', posSide: 'long', pos: '100', avgPx: '0' }],
     });
 
-    const result = await service.placeTakeProfitByClosePartialPosition(
+    const result = await service.placeProtectiveCloseByPriceSteps(
       'BTC',
       'long',
       true,
@@ -192,9 +276,36 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(expect.objectContaining({
-      closeType: 'stop_loss',
+      closeType: 'market_on_trigger',
       executionType: 'market',
-      body: expect.objectContaining({ orderPx: '-1', reduceOnly: true }),
+      body: expect.objectContaining({ triggerPx: '188.4', orderPx: '-1', reduceOnly: true }),
+    }));
+  });
+
+  it('uses the configured current-price close range symmetrically for a short ladder', async () => {
+    const { service } = createService();
+    jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
+      data: [{ instId: 'BTC-USDT-SWAP', posSide: 'short', pos: '100', avgPx: '120' }],
+    });
+
+    const result = await service.placeProtectiveCloseByPriceSteps(
+      'BTC',
+      'short',
+      true,
+      true,
+      true,
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual(expect.objectContaining({
+      step: 'market_on_trigger_5.00%',
+      closeType: 'market_on_trigger',
+      executionType: 'market',
+      body: expect.objectContaining({
+        triggerPx: '104.8',
+        orderPx: '-1',
+        posSide: 'short',
+      }),
     }));
   });
 
@@ -237,25 +348,25 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
     expect(emailService.sendEmail).not.toHaveBeenCalled();
   });
 
-  it('emails live close details including stop-loss and market execution', async () => {
+  it('emails live market-on-trigger close details', async () => {
     const { service, emailService } = createService();
     jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
       data: [{ instId: 'BTC-USDT-SWAP', posSide: 'long', pos: '2', avgPx: '100' }],
     });
-    jest.spyOn(service, 'closePartialPosition').mockResolvedValue({
+    jest.spyOn(service, 'placePositionStopLoss').mockResolvedValue({
       data: { code: '0' },
-      body: { triggerPx: '90', orderPx: '-1', sz: '2', reduceOnly: true },
+      body: { ordType: 'conditional', slTriggerPx: '90', slOrdPx: '-1', sz: '2', posSide: 'long' },
     } as any);
 
     await service.closePositionAtTriggerPrice('BTC', 'long', 90, 100, false);
 
     expect(emailService.sendEmail).toHaveBeenCalledWith(
       process.env.EMAIL_TO,
-      '[FUTURE HEDGE] Close long stop_loss BTC',
+      '[FUTURE HEDGE] Close long market_on_trigger BTC',
       expect.objectContaining({
-        closeType: 'stop_loss',
+        closeType: 'market_on_trigger',
         executionType: 'market',
-        reduceOnly: true,
+        ordType: 'conditional',
       }),
     );
   });
@@ -396,6 +507,47 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
         stopLossPrice: 90,
       }),
     );
+  });
+
+  it('cleans only excess long protective-close triggers and ignores entries and take-profit-above-current orders', async () => {
+    const { service } = createService(true);
+    jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
+      data: [{ instId: 'BTC-USDT-SWAP', posSide: 'long', pos: '1', avgPx: '0' }],
+    });
+    jest.spyOn(service, 'getPendingTriggerOrdersForCoin').mockResolvedValue([
+      { algoId: 'near', instId: 'BTC-USDT-SWAP', posSide: 'long', side: 'sell', triggerPx: '90', ordPx: '-1', sz: '0.6' },
+      { algoId: 'far', instId: 'BTC-USDT-SWAP', posSide: 'long', side: 'sell', triggerPx: '80', ordPx: '-1', sz: '0.6' },
+      { algoId: 'take-profit', instId: 'BTC-USDT-SWAP', posSide: 'long', side: 'sell', triggerPx: '110', ordPx: '109', sz: '5' },
+      { algoId: 'entry', instId: 'BTC-USDT-SWAP', posSide: 'long', side: 'buy', triggerPx: '95', ordPx: '96', sz: '5' },
+    ]);
+
+    const result: any = await service.cleanProtectiveCloseByPriceStepsOrdersForOneCoin('BTC', 'long', true);
+
+    expect(result).toEqual(expect.objectContaining({
+      status: 'preview',
+      positionSize: 1,
+      protectiveCloseByPriceStepsOrderCount: 2,
+      cancelOrderCount: 1,
+    }));
+    expect(result.keptOrders.map((order) => order.algoId)).toEqual(['near']);
+    expect(result.ordersToCancel.map((order) => order.algoId)).toEqual(['far']);
+  });
+
+  it('keeps the nearest short protective close and cleans the farther excess trigger in oneway mode', async () => {
+    const { service } = createService(false);
+    jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
+      data: [{ instId: 'BTC-USDT-SWAP', pos: '-1', avgPx: '0' }],
+    });
+    jest.spyOn(service, 'getPendingTriggerOrdersForCoin').mockResolvedValue([
+      { algoId: 'near', instId: 'BTC-USDT-SWAP', side: 'buy', triggerPx: '110', ordPx: '-1', sz: '0.6' },
+      { algoId: 'far', instId: 'BTC-USDT-SWAP', side: 'buy', triggerPx: '120', ordPx: '-1', sz: '0.6' },
+      { algoId: 'take-profit', instId: 'BTC-USDT-SWAP', side: 'buy', triggerPx: '90', ordPx: '91', sz: '5' },
+    ]);
+
+    const result: any = await service.cleanProtectiveCloseByPriceStepsOrdersForOneCoin('BTC', 'short', true);
+
+    expect(result.keptOrders.map((order) => order.algoId)).toEqual(['near']);
+    expect(result.ordersToCancel.map((order) => order.algoId)).toEqual(['far']);
   });
 
   it('builds distinct hedge and oneway log filename keys', () => {
