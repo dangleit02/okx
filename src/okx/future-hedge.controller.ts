@@ -174,6 +174,20 @@ export class FutureHedgeController {
     );
   }
 
+  @Post('reconcile-position-stop-loss/:coin')
+  async reconcilePositionStopLoss(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.okx.reconcilePositionStopLoss(
+      coin,
+      this.parseDirection(query.direction),
+      query.testing !== 'false',
+    );
+  }
+
+  @Post('ensure-position-stop-loss/:coin')
+  async ensurePositionStopLoss(@Param('coin') coin: string, @Query() query: Record<string, string>) {
+    return this.reconcilePositionStopLoss(coin, query);
+  }
+
   // Backward-compatible alias. This places a stop-loss around 0.2% from current price.
   @Post('sell-all-at-price/:coin')
   async closeAtCurrentPrice(@Param('coin') coin: string, @Query() query: Record<string, string>) {

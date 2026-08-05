@@ -10,9 +10,10 @@ bán giá cao nhất tháng
         curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/ETH?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=1500&maxPrice=1600&numberOfOrders=10' \
             -H 'Content-Type: application/json'
 
-        curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/XLM?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=0.1616&maxPrice=0.1699&numberOfOrders=10' \
+        # up xlm
+        curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/XLM?testing=false&direction=up&removeExistingBuyOrders=false&minPrice=0.1639&maxPrice=0.1699&numberOfOrders=10' \
             -H 'Content-Type: application/json'
-
+        # down xlm
         curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/XLM?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=0.146&maxPrice=0.16&numberOfOrders=10' \
             -H 'Content-Type: application/json'
 
@@ -34,7 +35,7 @@ bán giá cao nhất tháng
         curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/ADA?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=0.14&maxPrice=0.15&numberOfOrders=10' \
             -H 'Content-Type: application/json'
 
-        curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/AAVE?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=72&maxPrice=82&numberOfOrders=10' \
+        curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/AAVE?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=86.48&maxPrice=88.97&numberOfOrders=10' \
             -H 'Content-Type: application/json'
 
         curl -X POST 'http://localhost:3030/buy-trigger-from-min-to-max/SUI?testing=false&direction=down&removeExistingBuyOrders=false&minPrice=0.65&maxPrice=0.67&numberOfOrders=10' \

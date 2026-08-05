@@ -29,6 +29,10 @@ curl -X POST 'http://localhost:3030/future-hedge/stop-loss-at-trigger-price/BTC?
 curl -X POST 'http://localhost:3030/future-hedge/stop-loss-near-current-price/BTC?direction=long&testing=true&percentage=100' \
   -H 'Content-Type: application/json'
 
+# Reconcile SL LONG: hủy phần dư, bổ sung phần thiếu, hủy toàn bộ nếu position đã đóng.
+curl -X POST 'http://localhost:3030/future-hedge/reconcile-position-stop-loss/BTC?direction=long&testing=true' \
+  -H 'Content-Type: application/json'
+
 # 8. Đặt ladder đóng LONG từ 5%-6% dưới current; market khi trigger.
 curl -X POST 'http://localhost:3030/future-hedge/protective-close-by-price-steps/BTC?direction=long&testing=true&protectiveCloseOnly=true&justOneOrder=false' \
   -H 'Content-Type: application/json'

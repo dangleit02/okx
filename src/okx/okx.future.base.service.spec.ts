@@ -455,7 +455,7 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
     expect(placeStopLoss).not.toHaveBeenCalled();
   });
 
-  it('creates a reduce-only market conditional stop loss for a one-way short', async () => {
+  it('creates a whole-position market conditional stop loss for a one-way short', async () => {
     const { service } = createService(false);
     jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
       data: [{ instId: 'BTC-USDT-SWAP', pos: '-2', avgPx: '100' }],
@@ -476,11 +476,12 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
     expect(result.order.body).toEqual(expect.objectContaining({
       side: 'buy',
       ordType: 'conditional',
-      sz: '1.5',
+      closeFraction: '1',
       slTriggerPx: '110',
       slOrdPx: '-1',
       reduceOnly: true,
     }));
+    expect(result.order.body.sz).toBeUndefined();
     expect(result.order.body.posSide).toBeUndefined();
   });
 
@@ -499,7 +500,7 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
 
     expect(emailService.sendEmail).toHaveBeenCalledWith(
       process.env.EMAIL_TO,
-      '[FUTURE HEDGE] Ensure long stop-loss BTC',
+      '[FUTURE HEDGE] Reconcile long stop-loss BTC',
       expect.objectContaining({
         positionSize: 2,
         protectedSize: 0,
@@ -507,6 +508,71 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
         stopLossPrice: 90,
       }),
     );
+  });
+
+  it('reconciles excess hedge stop-loss size and replaces only the missing remainder', async () => {
+    const { service } = createService(true);
+    jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
+      data: [{ instId: 'BTC-USDT-SWAP', posSide: 'long', pos: '1', avgPx: '100' }],
+    });
+    jest.spyOn(service, 'getPendingConditionalOrdersForCoin').mockResolvedValue([
+      { algoId: 'near', instId: 'BTC-USDT-SWAP', posSide: 'long', side: 'sell', sz: '0.75', slTriggerPx: '95', slOrdPx: '-1' },
+      { algoId: 'far', instId: 'BTC-USDT-SWAP', posSide: 'long', side: 'sell', sz: '0.75', slTriggerPx: '90', slOrdPx: '-1' },
+    ]);
+
+    const result: any = await service.reconcilePositionStopLoss('BTC', 'long', true);
+
+    expect(result).toEqual(expect.objectContaining({
+      status: 'preview',
+      positionSize: 1,
+      protectedSize: 0.75,
+      missingSize: 0.25,
+      cancelOrderCount: 1,
+      stopLossPrice: 95,
+    }));
+    expect(result.cancellations).toEqual([
+      expect.objectContaining({ preview: true, algoId: 'far' }),
+    ]);
+    expect(result.order.body).toEqual(expect.objectContaining({ sz: '0.25', posSide: 'long' }));
+  });
+
+  it('cancels stale hedge stop losses when the position is closed', async () => {
+    const { service } = createService(true);
+    jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({ data: [] });
+    jest.spyOn(service, 'getPendingConditionalOrdersForCoin').mockResolvedValue([
+      { algoId: 'stale', instId: 'BTC-USDT-SWAP', posSide: 'long', side: 'sell', sz: '1', slTriggerPx: '90', slOrdPx: '-1' },
+    ]);
+
+    const result: any = await service.reconcilePositionStopLoss('BTC', 'long', true);
+
+    expect(result).toEqual(expect.objectContaining({
+      status: 'preview',
+      positionSize: 0,
+      cancelOrderCount: 1,
+    }));
+  });
+
+  it('keeps one one-way whole-position stop loss and removes size-based stop losses', async () => {
+    const { service } = createService(false);
+    jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
+      data: [{ instId: 'BTC-USDT-SWAP', pos: '2', avgPx: '100' }],
+    });
+    jest.spyOn(service, 'getPendingConditionalOrdersForCoin').mockResolvedValue([
+      { algoId: 'whole', instId: 'BTC-USDT-SWAP', side: 'sell', closeFraction: '1', slTriggerPx: '90', slOrdPx: '-1' },
+      { algoId: 'attached', instId: 'BTC-USDT-SWAP', side: 'sell', sz: '2', slTriggerPx: '85', slOrdPx: '-1' },
+    ]);
+
+    const result: any = await service.reconcilePositionStopLoss('BTC', 'long', true);
+
+    expect(result).toEqual(expect.objectContaining({
+      status: 'preview',
+      wholePositionStopLoss: true,
+      keptOrderId: 'whole',
+      cancelOrderCount: 1,
+    }));
+    expect(result.cancellations).toEqual([
+      expect.objectContaining({ algoId: 'attached' }),
+    ]);
   });
 
   it('cleans only excess long protective-close triggers and ignores entries and take-profit-above-current orders', async () => {

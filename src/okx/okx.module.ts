@@ -9,10 +9,11 @@ import { OkxFutureHedgeService } from "./okx.future.hedge.service";
 import { OkxFutureOneWayService } from "./okx.future.oneway.service";
 import { LoggerModule } from "src/logger/logger.module";
 import { EmailModule } from "src/email/email.module";
+import { OkxFuturePositionReconcileWsService } from "./okx.future.position-reconcile-ws.service";
 
 @Module({
     controllers: [SpotController, FutureController, FutureHedgeController, FutureOneWayController],
-    providers: [OkxService, OkxFutureService, OkxFutureHedgeService, OkxFutureOneWayService],
+    providers: [OkxService, OkxFutureService, OkxFutureHedgeService, OkxFutureOneWayService, OkxFuturePositionReconcileWsService],
     imports: [LoggerModule, EmailModule],
     exports: [OkxService, OkxFutureService, OkxFutureHedgeService, OkxFutureOneWayService],
 })

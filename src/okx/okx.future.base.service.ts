@@ -81,6 +81,7 @@ export abstract class OkxFutureBaseService {
     // ---------- instrument cache & helpers ----------
     // cache instId => instrument data
     private instrumentCache: Map<string, any> = new Map();
+    private stopLossReconcileInFlight: Map<string, Promise<any>> = new Map();
 
     protected async fetchInstrument(instId: string) {
         // use cached if available
@@ -964,125 +965,349 @@ export abstract class OkxFutureBaseService {
         }
     }
 
-    async ensurePositionStopLoss(
+    async placeWholePositionStopLoss(
         coin: string,
         direction: FutureDirection,
+        stopLossPrice: number,
         testing: boolean = true,
     ) {
         const normalizedCoin = coin.toUpperCase();
         const instId = `${normalizedCoin}-USDT-SWAP`;
         const logFileKey = this.getFutureLogFileKey(direction, normalizedCoin);
-        const positionResponse = await this.getOpenPosition(instId);
-        if (positionResponse?.code !== undefined && String(positionResponse.code) !== '0') {
-            throw new Error(`OKX rejected position request for ${instId}: ${JSON.stringify(positionResponse)}`);
+        if (this.includePosSide()) {
+            throw new Error('Whole-position stop-loss with closeFraction=1 is only supported in one-way mode');
         }
-        const position = this.selectPositionForDirection(positionResponse?.data ?? [], direction);
-        const positionSize = Math.abs(Number(position?.pos ?? 0));
+        if (!Number.isFinite(stopLossPrice) || stopLossPrice <= 0) {
+            throw new Error(`Invalid whole-position stop-loss price: ${stopLossPrice}`);
+        }
+        const inst = await this.fetchInstrument(instId);
+        if (!inst) throw new Error(`Instrument info not available for ${instId}`);
+        const body = {
+            instId,
+            tdMode: 'isolated',
+            side: direction === 'long' ? 'sell' : 'buy',
+            ordType: 'conditional',
+            closeFraction: '1',
+            reduceOnly: true,
+            slTriggerPx: this.formatPrice(stopLossPrice, inst).toString(),
+            slTriggerPxType: 'last',
+            slOrdPx: '-1',
+        };
+        const requestPath = '/api/v5/trade/order-algo';
+        const bodyString = JSON.stringify(body);
+        const timestamp = new Date().toISOString();
+        const headers = this.buildHeaders(timestamp, 'POST', requestPath, bodyString);
+        this.logger.log(
+            `FUTURE oneway whole-position stop-loss order: coin=${normalizedCoin}, direction=${direction}, testing=${testing}, triggerPx=${body.slTriggerPx}, closeFraction=1`,
+            null,
+            logFileKey,
+        );
+        let responseData: any;
+        if (!testing) {
+            const response = await axios.post(
+                this.config.get<string>('okx.baseUrl') + requestPath,
+                bodyString,
+                { headers },
+            );
+            responseData = response.data;
+            const rejectedItem = responseData?.data?.find((item: any) => item.sCode && String(item.sCode) !== '0');
+            if (String(responseData?.code) !== '0' || rejectedItem) {
+                throw new Error(`OKX rejected whole-position stop-loss: ${JSON.stringify(responseData)}`);
+            }
+        }
+        return { data: responseData, body };
+    }
 
-        if (!Number.isFinite(positionSize) || positionSize <= 0) {
-            const result = {
-                status: 'no_open_position',
+    private getPositionStopLossOrders(
+        conditionalOrders: any[],
+        direction: FutureDirection,
+        instId: string,
+    ) {
+        const closeSide = direction === 'long' ? 'sell' : 'buy';
+        return conditionalOrders.filter((order: any) => {
+            const matchesDirection = !this.includePosSide() || order.posSide === direction;
+            const hasMarketStopLoss = Number(order.slTriggerPx) > 0
+                && String(order.slOrdPx ?? '') === '-1';
+            return order.instId === instId
+                && matchesDirection
+                && order.side === closeSide
+                && hasMarketStopLoss
+                && Boolean(order.algoId);
+        });
+    }
+
+    private getReconciledStopLossPrice(
+        direction: FutureDirection,
+        currentPrice: number,
+        stopLossOrders: any[],
+    ) {
+        const stopLossRatio = Number(this.config.get<number>('stopLossBuyPriceRatio'));
+        if (!Number.isFinite(stopLossRatio) || stopLossRatio <= 0 || stopLossRatio >= 1) {
+            throw new Error(`Invalid stopLossBuyPriceRatio: ${stopLossRatio}`);
+        }
+        const fallbackPrice = direction === 'long'
+            ? currentPrice * (1 - stopLossRatio)
+            : currentPrice * (1 + stopLossRatio);
+        const validExistingPrices = stopLossOrders
+            .map((order: any) => Number(order.slTriggerPx))
+            .filter((price: number) => Number.isFinite(price) && price > 0 && (
+                direction === 'long' ? price < currentPrice : price > currentPrice
+            ));
+        if (validExistingPrices.length === 0) return fallbackPrice;
+        return direction === 'long'
+            ? Math.max(fallbackPrice, ...validExistingPrices)
+            : Math.min(fallbackPrice, ...validExistingPrices);
+    }
+
+    private async cancelStopLossOrders(orders: any[], testing: boolean) {
+        if (orders.length === 0) return [];
+        if (testing) {
+            return orders.map((order) => ({
+                preview: true,
+                algoId: order.algoId,
+                instId: order.instId,
+            }));
+        }
+        const responses: any = await this.cancelOrdersFromList({ orders });
+        const responseList = Array.isArray(responses) ? responses : [responses];
+        const rejectedResponse = responseList.find((response: any) => (
+            response?.code !== undefined && String(response.code) !== '0'
+        ));
+        const rejectedItem = responseList
+            .flatMap((response: any) => response?.data ?? [])
+            .find((item: any) => item.sCode !== undefined && String(item.sCode) !== '0');
+        if (rejectedResponse || rejectedItem) {
+            throw new Error(`OKX rejected stop-loss cancellation: ${JSON.stringify(responses)}`);
+        }
+        return responses;
+    }
+
+    private async reconcileOneWayPositionStopLoss(
+        normalizedCoin: string,
+        direction: FutureDirection,
+        positionSize: number,
+        stopLossOrders: any[],
+        testing: boolean,
+    ) {
+        const instId = `${normalizedCoin}-USDT-SWAP`;
+        const wholePositionOrders = stopLossOrders
+            .filter((order: any) => String(order.closeFraction ?? '') === '1')
+            .sort((left: any, right: any) => direction === 'long'
+                ? Number(right.slTriggerPx) - Number(left.slTriggerPx)
+                : Number(left.slTriggerPx) - Number(right.slTriggerPx));
+
+        if (positionSize <= 0) {
+            const cancellations = await this.cancelStopLossOrders(stopLossOrders, testing);
+            return {
+                status: stopLossOrders.length > 0 ? (testing ? 'preview' : 'reconciled') : 'no_open_position',
                 coin: normalizedCoin,
                 direction,
                 positionSize: 0,
                 protectedSize: 0,
                 missingSize: 0,
+                protectedOrderCount: stopLossOrders.length,
+                cancelOrderCount: stopLossOrders.length,
+                cancellations,
             };
-            this.logger.log(
-                `FUTURE ${this.getPositionMode()} ensure stop-loss skipped: coin=${normalizedCoin}, direction=${direction}, reason=no_open_position`,
-                null,
-                logFileKey,
-            );
-            return result;
         }
 
-        const closeSide = direction === 'long' ? 'sell' : 'buy';
-        const conditionalOrders = await this.getPendingConditionalOrdersForCoin(normalizedCoin, 'SWAP');
-        const stopLossOrders = conditionalOrders.filter((order: any) => {
-            const matchesDirection = !this.includePosSide() || order.posSide === direction;
-            const hasMarketStopLoss = Number(order.slTriggerPx) > 0
-                && String(order.slOrdPx ?? '') === '-1';
-            return matchesDirection && order.side === closeSide && hasMarketStopLoss;
-        });
-        const protectedSizeRaw = stopLossOrders.reduce((total: number, order: any) => {
-            if (String(order.closeFraction ?? '') === '1') return positionSize;
-            const orderSize = Number(order.sz ?? 0);
-            return total + (Number.isFinite(orderSize) && orderSize > 0 ? orderSize : 0);
-        }, 0);
-        const protectedSize = Math.min(positionSize, protectedSizeRaw);
-        const missingSize = Math.max(0, positionSize - protectedSize);
-
-        const inst = await this.fetchInstrument(instId);
-        if (!inst) throw new Error(`Instrument info not available for ${instId}`);
-        const sizeTolerance = Number(inst.lotSz || inst.minSz || 1) * 1e-8;
-        if (missingSize <= sizeTolerance) {
-            const result = {
-                status: 'already_protected',
+        if (wholePositionOrders.length > 0) {
+            const keptOrder = wholePositionOrders[0];
+            const ordersToCancel = stopLossOrders.filter((order: any) => order.algoId !== keptOrder.algoId);
+            const cancellations = await this.cancelStopLossOrders(ordersToCancel, testing);
+            return {
+                status: ordersToCancel.length > 0 ? (testing ? 'preview' : 'reconciled') : 'already_protected',
                 coin: normalizedCoin,
                 direction,
                 positionSize,
-                protectedSize,
+                protectedSize: positionSize,
                 missingSize: 0,
                 protectedOrderCount: stopLossOrders.length,
+                wholePositionStopLoss: true,
+                keptOrderId: keptOrder.algoId,
+                cancelOrderCount: ordersToCancel.length,
+                cancellations,
             };
-            this.logger.log(
-                `FUTURE ${this.getPositionMode()} ensure stop-loss complete: coin=${normalizedCoin}, direction=${direction}, status=already_protected, positionSize=${positionSize}, protectedSize=${protectedSize}, missingSize=0`,
-                null,
-                logFileKey,
-            );
-            return result;
-        }
-        const formattedMissingSize = this.formatSize(missingSize + sizeTolerance, inst);
-        if (!formattedMissingSize) {
-            const message = `Cannot protect missing position size for ${instId}: missingSize=${missingSize}, minSz=${inst.minSz}`;
-            this.logger.error(message, null, null, logFileKey);
-            throw new Error(message);
         }
 
-        const stopLossRatio = Number(this.config.get<number>('stopLossBuyPriceRatio'));
-        if (!Number.isFinite(stopLossRatio) || stopLossRatio <= 0 || stopLossRatio >= 1) {
-            throw new Error(`Invalid stopLossBuyPriceRatio: ${stopLossRatio}`);
-        }
         const currentPrice = await this.getTicker(instId);
         if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
             throw new Error(`Invalid current price for ${instId}: ${currentPrice}`);
         }
-        const rawStopLossPrice = direction === 'long'
-            ? currentPrice * (1 - stopLossRatio)
-            : currentPrice * (1 + stopLossRatio);
-        const order = await this.placePositionStopLoss(
+        const stopLossPrice = this.getReconciledStopLossPrice(direction, currentPrice, stopLossOrders);
+        const order = await this.placeWholePositionStopLoss(
             normalizedCoin,
             direction,
-            formattedMissingSize,
-            rawStopLossPrice,
+            stopLossPrice,
             testing,
         );
-        const result = {
-            status: testing ? 'preview' : 'submitted',
+        const cancellations = await this.cancelStopLossOrders(stopLossOrders, testing);
+        return {
+            status: testing ? 'preview' : 'reconciled',
             coin: normalizedCoin,
             direction,
             positionSize,
-            protectedSize,
-            missingSize: formattedMissingSize,
+            protectedSize: positionSize,
+            missingSize: 0,
             protectedOrderCount: stopLossOrders.length,
+            wholePositionStopLoss: true,
             currentPrice,
             stopLossPrice: Number(order.body.slTriggerPx),
             order,
+            cancelOrderCount: stopLossOrders.length,
+            cancellations,
         };
+    }
+
+    private async reconcileHedgePositionStopLoss(
+        normalizedCoin: string,
+        direction: FutureDirection,
+        positionSize: number,
+        stopLossOrders: any[],
+        testing: boolean,
+    ) {
+        const instId = `${normalizedCoin}-USDT-SWAP`;
+        if (positionSize <= 0) {
+            const cancellations = await this.cancelStopLossOrders(stopLossOrders, testing);
+            return {
+                status: stopLossOrders.length > 0 ? (testing ? 'preview' : 'reconciled') : 'no_open_position',
+                coin: normalizedCoin,
+                direction,
+                positionSize: 0,
+                protectedSize: 0,
+                missingSize: 0,
+                protectedOrderCount: stopLossOrders.length,
+                cancelOrderCount: stopLossOrders.length,
+                cancellations,
+            };
+        }
+
+        const inst = await this.fetchInstrument(instId);
+        if (!inst) throw new Error(`Instrument info not available for ${instId}`);
+        const lotSize = Number(inst.lotSz || inst.minSz || 1);
+        const sizeTolerance = lotSize * 0.5;
+        const sizedOrders = stopLossOrders
+            .map((order: any) => ({ order, size: Number(order.sz), triggerPrice: Number(order.slTriggerPx) }))
+            .filter(({ size }) => Number.isFinite(size) && size > 0)
+            .sort((left, right) => direction === 'long'
+                ? right.triggerPrice - left.triggerPrice
+                : left.triggerPrice - right.triggerPrice);
+        const keptOrders: typeof sizedOrders = [];
+        const ordersToCancel: any[] = [];
+        let keptSize = 0;
+        for (const item of sizedOrders) {
+            if (keptSize + item.size <= positionSize + sizeTolerance) {
+                keptOrders.push(item);
+                keptSize += item.size;
+            } else {
+                ordersToCancel.push(item.order);
+            }
+        }
+        const sizedOrderIds = new Set(sizedOrders.map(({ order }) => order.algoId));
+        ordersToCancel.push(...stopLossOrders.filter((order: any) => !sizedOrderIds.has(order.algoId)));
+        const missingSize = Math.max(0, positionSize - keptSize);
+        const formattedMissingSize = missingSize <= sizeTolerance
+            ? 0
+            : this.formatSize(missingSize + lotSize * 1e-8, inst);
+        if (missingSize > sizeTolerance && !formattedMissingSize) {
+            throw new Error(`Cannot protect missing position size for ${instId}: missingSize=${missingSize}, minSz=${inst.minSz}`);
+        }
+
+        const cancellations = await this.cancelStopLossOrders(ordersToCancel, testing);
+        let order: any;
+        let currentPrice: number | undefined;
+        let stopLossPrice: number | undefined;
+        if (formattedMissingSize > 0) {
+            currentPrice = await this.getTicker(instId);
+            if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+                throw new Error(`Invalid current price for ${instId}: ${currentPrice}`);
+            }
+            stopLossPrice = this.getReconciledStopLossPrice(direction, currentPrice, keptOrders.map(({ order }) => order));
+            order = await this.placePositionStopLoss(
+                normalizedCoin,
+                direction,
+                formattedMissingSize,
+                stopLossPrice,
+                testing,
+            );
+        }
+        const changed = ordersToCancel.length > 0 || formattedMissingSize > 0;
+        return {
+            status: changed ? (testing ? 'preview' : 'reconciled') : 'already_protected',
+            coin: normalizedCoin,
+            direction,
+            positionSize,
+            protectedSize: keptSize,
+            missingSize: formattedMissingSize,
+            protectedOrderCount: stopLossOrders.length,
+            keptOrderCount: keptOrders.length,
+            cancelOrderCount: ordersToCancel.length,
+            currentPrice,
+            stopLossPrice: order ? Number(order.body.slTriggerPx) : undefined,
+            order,
+            cancellations,
+        };
+    }
+
+    private async reconcilePositionStopLossInternal(
+        coin: string,
+        direction: FutureDirection,
+        testing: boolean,
+    ) {
+        const normalizedCoin = coin.trim().toUpperCase();
+        const instId = `${normalizedCoin}-USDT-SWAP`;
+        const logFileKey = this.getFutureLogFileKey(direction, normalizedCoin);
+        const [positionResponse, conditionalOrders] = await Promise.all([
+            this.getOpenPosition(instId),
+            this.getPendingConditionalOrdersForCoin(normalizedCoin, 'SWAP'),
+        ]);
+        if (positionResponse?.code !== undefined && String(positionResponse.code) !== '0') {
+            throw new Error(`OKX rejected position request for ${instId}: ${JSON.stringify(positionResponse)}`);
+        }
+        const position = this.selectPositionForDirection(positionResponse?.data ?? [], direction);
+        const rawPositionSize = Math.abs(Number(position?.pos ?? 0));
+        const positionSize = Number.isFinite(rawPositionSize) ? rawPositionSize : 0;
+        const stopLossOrders = this.getPositionStopLossOrders(conditionalOrders, direction, instId);
+        const result = this.includePosSide()
+            ? await this.reconcileHedgePositionStopLoss(normalizedCoin, direction, positionSize, stopLossOrders, testing)
+            : await this.reconcileOneWayPositionStopLoss(normalizedCoin, direction, positionSize, stopLossOrders, testing);
         this.logger.log(
-            `FUTURE ${this.getPositionMode()} ensure stop-loss complete: coin=${normalizedCoin}, direction=${direction}, status=${result.status}, positionSize=${positionSize}, protectedSize=${protectedSize}, missingSize=${formattedMissingSize}, stopLossPrice=${result.stopLossPrice}`,
+            `FUTURE ${this.getPositionMode()} reconcile stop-loss: ${JSON.stringify(result)}`,
             null,
             logFileKey,
         );
-        if (!testing) {
-            await this.sendFutureEmail(`Ensure ${direction} stop-loss ${normalizedCoin}`, {
+        if (!testing && result.status === 'reconciled') {
+            await this.sendFutureEmail(`Reconcile ${direction} stop-loss ${normalizedCoin}`, {
                 mode: this.getPositionMode(),
                 ...result,
-                order: order.body,
-                response: order.data,
+                order: result.order?.body,
+                response: result.order?.data,
             });
         }
         return result;
+    }
+
+    async reconcilePositionStopLoss(
+        coin: string,
+        direction: FutureDirection,
+        testing: boolean = true,
+    ) {
+        const key = `${coin.trim().toUpperCase()}:${direction}:${testing}`;
+        const existing = this.stopLossReconcileInFlight.get(key);
+        if (existing) return existing;
+        const operation = this.reconcilePositionStopLossInternal(coin, direction, testing)
+            .finally(() => this.stopLossReconcileInFlight.delete(key));
+        this.stopLossReconcileInFlight.set(key, operation);
+        return operation;
+    }
+
+    // Backward-compatible alias.
+    async ensurePositionStopLoss(
+        coin: string,
+        direction: FutureDirection,
+        testing: boolean = true,
+    ) {
+        return this.reconcilePositionStopLoss(coin, direction, testing);
     }
 
     private normalizePosition(position: any, direction: FutureDirection) {

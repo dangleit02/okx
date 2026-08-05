@@ -11,7 +11,7 @@ curl -X POST 'http://localhost:3030/stop-loss-at-trigger-price/BTC?price=50000&p
   -H 'Content-Type: application/json'
 
 # Near-current SPOT SL: tự đặt conditional market SL khoảng 0.2% dưới current.
-curl -X POST 'http://localhost:3030/stop-loss-near-current-price/BTC?percentage=100&testing=true' \
+curl -X POST 'http://localhost:3030/stop-loss-near-current-price/DOT?percentage=100&testing=false' \
   -H 'Content-Type: application/json'
 
 # Legacy alias: đặt conditional market SL gần current cho một phần available balance.

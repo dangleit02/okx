@@ -49,8 +49,8 @@ export class TasksService {
             const cleanBefore = await service.cleanProtectiveCloseByPriceStepsOrdersForOneCoin(coin, direction, false);
             results.push({ coin, direction, action: 'clean_protective_close_by_price_steps_orders_before_refresh', result: cleanBefore });
 
-            const stopLoss = await service.ensurePositionStopLoss(coin, direction, isTesting);
-            results.push({ coin, direction, action: 'ensure_position_stop_loss', result: stopLoss });
+            const stopLoss = await service.reconcilePositionStopLoss(coin, direction, isTesting);
+            results.push({ coin, direction, action: 'reconcile_position_stop_loss', result: stopLoss });
 
             const refreshed = await service.tradeOneCoin({
                 coin,
@@ -200,5 +200,41 @@ export class TasksService {
             this.logger.log(`⚠️ Error refreshing long oneway future orders ${moment().format('YYYY/MM/DD HH:mm:ss')}, ${error.message}`, null, 'ALL_long_oneway');
             throw error;
         }
+    }
+
+    // Polling fallback for missed/disconnected private WebSocket position events.
+    @Cron('*/5 * * * *', { timeZone: 'Asia/Ho_Chi_Minh' })
+    async reconcileFutureStopLosses() {
+        const definitions: Array<{
+            service: OkxFutureHedgeService | OkxFutureOneWayService;
+            mode: 'hedge' | 'oneway';
+            direction: 'long' | 'short';
+            enabledConfigKey: string;
+            coinsConfigKey: string;
+        }> = [
+            { service: this.okxFutureHedgeService, mode: 'hedge', direction: 'long', enabledConfigKey: 'runSwapTaskForLongHedge', coinsConfigKey: 'coinsForLong' },
+            { service: this.okxFutureHedgeService, mode: 'hedge', direction: 'short', enabledConfigKey: 'runSwapTaskForShortHedge', coinsConfigKey: 'coinsForShort' },
+            { service: this.okxFutureOneWayService, mode: 'oneway', direction: 'long', enabledConfigKey: 'runSwapTaskForLongOneWay', coinsConfigKey: 'coinsForLong' },
+            { service: this.okxFutureOneWayService, mode: 'oneway', direction: 'short', enabledConfigKey: 'runSwapTaskForShortOneWay', coinsConfigKey: 'coinsForShort' },
+        ];
+        const results = [];
+        for (const definition of definitions) {
+            if (!this.config.get<boolean>(definition.enabledConfigKey)) continue;
+            const coins = _.uniq(this.config.get<string[]>(definition.coinsConfigKey) || []);
+            for (const coin of coins) {
+                try {
+                    const result = await definition.service.reconcilePositionStopLoss(coin, definition.direction, false);
+                    results.push({ coin, mode: definition.mode, direction: definition.direction, result });
+                } catch (error) {
+                    this.logger.error(
+                        `Failed polling stop-loss reconcile for ${coin} ${definition.direction} ${definition.mode}`,
+                        error?.message ?? String(error),
+                        null,
+                        `${String(coin).toUpperCase()}_${definition.direction}_${definition.mode}`,
+                    );
+                }
+            }
+        }
+        return results;
     }
 }
