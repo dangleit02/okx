@@ -206,21 +206,77 @@ export abstract class OkxFutureBaseService {
     }
 
     async getAllPendingTriggerOrders(instType: 'SWAP' | 'SPOT' = 'SWAP') {
-        const timestamp = new Date().toISOString();
-        const ordType = 'trigger';
-        const getPath = `/api/v5/trade/orders-algo-pending?instType=${instType}&ordType=${ordType}`;
-        const getSign = this.sign(timestamp, 'GET', getPath);
+        return this.getAllPendingAlgoOrders('trigger', instType);
+    }
 
-        const getRes = await axios.get(this.config.get<string>('okx.baseUrl') + getPath, {
-            headers: {
-                'OK-ACCESS-KEY': this.config.get<string>('okx.apiKeyHEDGE'),
-                'OK-ACCESS-SIGN': getSign,
-                'OK-ACCESS-TIMESTAMP': timestamp,
-                'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphraseHEDGE'),
-            },
-        });
+    async getAllPendingConditionalOrders(instType: 'SWAP' | 'SPOT' = 'SWAP') {
+        return this.getAllPendingAlgoOrders('conditional', instType);
+    }
 
-        return getRes.data?.data || [];
+    private async getAllPendingAlgoOrders(
+        ordType: 'trigger' | 'conditional',
+        instType: 'SWAP' | 'SPOT' = 'SWAP',
+    ) {
+        const orders: any[] = [];
+        let after: string | undefined;
+
+        while (true) {
+            const query = [
+                `instType=${instType}`,
+                `ordType=${ordType}`,
+                'limit=100',
+                after ? `after=${encodeURIComponent(after)}` : null,
+            ].filter(Boolean).join('&');
+            const getPath = `/api/v5/trade/orders-algo-pending?${query}`;
+            const timestamp = new Date().toISOString();
+            const getSign = this.sign(timestamp, 'GET', getPath);
+
+            const getRes = await axios.get(this.config.get<string>('okx.baseUrl') + getPath, {
+                headers: {
+                    'OK-ACCESS-KEY': this.config.get<string>('okx.apiKeyHEDGE'),
+                    'OK-ACCESS-SIGN': getSign,
+                    'OK-ACCESS-TIMESTAMP': timestamp,
+                    'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphraseHEDGE'),
+                },
+            });
+
+            if (getRes.data?.code !== undefined && String(getRes.data.code) !== '0') {
+                throw new Error(`OKX rejected pending ${ordType} orders request: ${JSON.stringify(getRes.data)}`);
+            }
+
+            const page = getRes.data?.data ?? [];
+            orders.push(...page);
+
+            const nextAfter = page[page.length - 1]?.algoId;
+            if (page.length < 100 || !nextAfter || nextAfter === after) {
+                break;
+            }
+            after = nextAfter;
+        }
+
+        return orders;
+    }
+
+    private getFuturePendingOrderType(order: any): 'trigger' | 'conditional' | 'stop_loss' {
+        if (order.ordType === 'conditional' && order.slTriggerPx) {
+            return 'stop_loss';
+        }
+        return order.ordType === 'conditional' ? 'conditional' : 'trigger';
+    }
+
+    private summarizeFuturePendingOrderTypes(orders: any[]) {
+        return orders.reduce((counts, order) => {
+            const orderType = this.getFuturePendingOrderType(order);
+            if (order.ordType === 'conditional') {
+                counts.conditional++;
+            } else {
+                counts.trigger++;
+            }
+            if (orderType === 'stop_loss') {
+                counts.stopLoss++;
+            }
+            return counts;
+        }, { trigger: 0, conditional: 0, stopLoss: 0 });
     }
 
     private getOrderIntent(order: any, direction: FutureDirection): 'open' | 'close' {
@@ -271,11 +327,28 @@ export abstract class OkxFutureBaseService {
         direction: FutureDirection,
         intent: FutureOrderIntent = 'all',
     ) {
+        const [triggerOrders, conditionalOrders] = await Promise.all([
+            this.getAllPendingTriggerOrders('SWAP'),
+            this.getAllPendingConditionalOrders('SWAP'),
+        ]);
+        const allOrders = [
+            ...triggerOrders.map((order: any) => ({
+                ...order,
+                ordType: order.ordType ?? 'trigger',
+            })),
+            ...conditionalOrders.map((order: any) => ({
+                ...order,
+                ordType: order.ordType ?? 'conditional',
+            })),
+        ];
         const orders = this.filterOrdersByDirectionAndIntent(
-            await this.getAllPendingTriggerOrders('SWAP'),
+            allOrders,
             direction,
             intent,
-        );
+        ).map((order: any) => ({
+            ...order,
+            orderType: this.getFuturePendingOrderType(order),
+        }));
         const byCoin = new Map<string, any[]>();
         for (const order of orders) {
             const coin = String(order.instId ?? '').split('-')[0].toUpperCase();
@@ -286,10 +359,12 @@ export abstract class OkxFutureBaseService {
             direction,
             intent,
             orderCount: orders.length,
+            orderTypeCounts: this.summarizeFuturePendingOrderTypes(orders),
             coins: Array.from(byCoin.entries()).map(([coin, coinOrders]) => ({
                 coin,
                 instId: `${coin}-USDT-SWAP`,
                 orderCount: coinOrders.length,
+                orderTypeCounts: this.summarizeFuturePendingOrderTypes(coinOrders),
                 orders: coinOrders,
             })),
         };

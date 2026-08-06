@@ -45,6 +45,7 @@ describe('SpotController buy order total response format', () => {
         coin: 'ADA',
         instId: 'ADA-USDT',
         quoteCurrency: 'USDT',
+        orderType: 'trigger',
         currentPrice: 0.5,
         minPrice: 0.4,
         maxPrice: 0.45,
@@ -57,6 +58,7 @@ describe('SpotController buy order total response format', () => {
         coin: 'BTC',
         instId: 'BTC-USDT',
         quoteCurrency: 'USDT',
+        orderType: 'trigger',
         currentPrice: 51000,
         minPrice: 45000,
         maxPrice: 50000,
@@ -222,14 +224,14 @@ describe('SpotController buy order total response format', () => {
 
     expect(result).toContain('TABLE SUMMARY');
     expect(result).toContain(
-      'COIN | CURENT PRICE | CURRENT PROFIT (%) | AVERAGE COST | FROM PRICE | FROM PROFIT (%) | TO PRICE | TO PROFIT (%) | TOTAL AMOUNT (USDT) | TOTAL BOUGHT (USDT)',
+      'COIN | ORDER TYPE | CURENT PRICE | CURRENT PROFIT (%) | AVERAGE COST | FROM PRICE | FROM PROFIT (%) | TO PRICE | TO PROFIT (%) | ORDER COUNT | TOTAL AMOUNT (USDT) | TOTAL BOUGHT (USDT)',
     );
-    expect(result).toContain('ADA  | 0.5');
-    expect(result).toContain('BTC  | 51000');
-    expect(result).toMatch(/ADA\s+\| 0\.5\s+\|\s+\|\s+\| 0\.4\s+\|\s+\| 0\.45\s+\|\s+\|/);
-    expect(result).toMatch(/BTC\s+\| 51000\s+\| 2\s+\| 50000\s+\| 45000\s+\| -10\s+\| 50000\s+\| 0/);
-    expect(result).toMatch(/ADA\s+\|[^\n]+\| 0\s*$/m);
-    expect(result).toMatch(/BTC\s+\|[^\n]+\| 5100\s*$/m);
+    expect(result).toContain('ADA  | TRIGGER    | 0.5');
+    expect(result).toContain('BTC  | TRIGGER    | 51000');
+    expect(result).toMatch(/ADA\s+\| TRIGGER\s+\| 0\.5\s+\|\s+\|\s+\| 0\.4\s+\|\s+\| 0\.45\s+\|\s+\|/);
+    expect(result).toMatch(/BTC\s+\| TRIGGER\s+\| 51000\s+\| 2\s+\| 50000\s+\| 45000\s+\| -10\s+\| 50000\s+\| 0/);
+    expect(result).toMatch(/ADA\s+\|[^\n]+\| 2\s+\| 425\s+\| 0\s*$/m);
+    expect(result).toMatch(/BTC\s+\|[^\n]+\| 1\s+\| 910\s+\| 5100\s*$/m);
     expect(result).not.toContain('Summary:');
     expect(okxService.getPendingOrdersTotalForAllCoins).toHaveBeenCalledWith(
       'buy',
@@ -292,10 +294,10 @@ describe('SpotController buy order total response format', () => {
 
     expect(result).toContain('TABLE DETAIL');
     expect(result).toContain(
-      'COIN | FROM PRICE | FROM PROFIT (%) | TO PRICE | TO PROFIT (%) | AMOUNT (USDT)',
+      'COIN | ORDER TYPE | FROM PRICE | FROM PROFIT (%) | TO PRICE | TO PROFIT (%) | AMOUNT (USDT)',
     );
-    expect(result).toMatch(/BTC\s+\| 40000\s+\| -21\.57\s+\| 41000\s+\| -19\.61\s+\| 810/);
-    expect(result).toMatch(/BTC\s+\| 49000\s+\| -3\.92\s+\| 50000\s+\| -1\.96\s+\| 990/);
+    expect(result).toMatch(/BTC\s+\| TRIGGER\s+\| 40000\s+\| -21\.57\s+\| 41000\s+\| -19\.61\s+\| 810/);
+    expect(result).toMatch(/BTC\s+\| TRIGGER\s+\| 49000\s+\| -3\.92\s+\| 50000\s+\| -1\.96\s+\| 990/);
   });
 
   it('returns and logs an ASCII table when format=table', async () => {

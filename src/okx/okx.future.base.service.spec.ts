@@ -52,6 +52,57 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
     jest.restoreAllMocks();
   });
 
+  it('includes trigger, conditional and stop-loss orders in all-coins statistics', async () => {
+    const { service } = createService();
+    jest.spyOn(service, 'getAllPendingTriggerOrders').mockResolvedValue([
+      { algoId: '1', instId: 'BTC-USDT-SWAP', side: 'sell', posSide: 'long' },
+      { algoId: '2', instId: 'BTC-USDT-SWAP', side: 'buy', posSide: 'long' },
+    ]);
+    jest.spyOn(service, 'getAllPendingConditionalOrders').mockResolvedValue([
+      {
+        algoId: '3',
+        instId: 'BTC-USDT-SWAP',
+        side: 'sell',
+        posSide: 'long',
+        slTriggerPx: '90',
+        slOrdPx: '-1',
+      },
+      {
+        algoId: '4',
+        instId: 'ETH-USDT-SWAP',
+        side: 'sell',
+        posSide: 'long',
+        tpTriggerPx: '120',
+        tpOrdPx: '-1',
+      },
+    ]);
+
+    const result = await service.getFutureOrdersForAllCoins('long', 'close');
+
+    expect(result.orderCount).toBe(3);
+    expect(result.orderTypeCounts).toEqual({
+      trigger: 1,
+      conditional: 2,
+      stopLoss: 1,
+    });
+    expect(result.coins).toEqual([
+      expect.objectContaining({
+        coin: 'BTC',
+        orderCount: 2,
+        orderTypeCounts: { trigger: 1, conditional: 1, stopLoss: 1 },
+        orders: expect.arrayContaining([
+          expect.objectContaining({ algoId: '1', orderType: 'trigger' }),
+          expect.objectContaining({ algoId: '3', orderType: 'stop_loss' }),
+        ]),
+      }),
+      expect.objectContaining({
+        coin: 'ETH',
+        orderTypeCounts: { trigger: 0, conditional: 1, stopLoss: 0 },
+        orders: [expect.objectContaining({ algoId: '4', orderType: 'conditional' })],
+      }),
+    ]);
+  });
+
   it('rejects every entry order that does not have a stop loss', async () => {
     const { service } = createService();
 

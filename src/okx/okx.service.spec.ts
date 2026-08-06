@@ -273,6 +273,7 @@ describe('OkxService pending order totals', () => {
       ['ADA-USDT', 0.5],
       ['BTC-USDT', 50000],
     ]));
+    jest.spyOn(service as any, 'getPendingConditionalSpotOrders').mockResolvedValue([]);
 
     const result = await service.getPendingOrdersTotalForAllCoins('buy');
 
@@ -311,6 +312,7 @@ describe('OkxService pending order totals', () => {
     jest.spyOn(service as any, 'getSpotTickers').mockResolvedValue(new Map([
       ['BTC-USDT', 51000],
     ]));
+    jest.spyOn(service as any, 'getPendingConditionalSpotOrders').mockResolvedValue([]);
 
     const result = await service.getPendingOrdersTotalForAllCoins('buy', { step: 2 });
 
@@ -318,6 +320,42 @@ describe('OkxService pending order totals', () => {
       { fromPrice: 40000, toPrice: 41000, amount: 810 },
       { fromPrice: 49000, toPrice: 50000, amount: 990 },
       { fromPrice: 60000, toPrice: 60000, amount: 600 },
+    ]);
+  });
+
+  it('includes conditional stop-loss orders as a separate all-coins order type', async () => {
+    jest.spyOn(service as any, 'getPendingTriggerSpotOrders').mockResolvedValue([
+      { instId: 'BTC-USDT', side: 'sell', triggerPx: '60000', ordPx: '60000', sz: '0.01' },
+    ]);
+    jest.spyOn(service as any, 'getPendingConditionalSpotOrders').mockResolvedValue([
+      { instId: 'BTC-USDT', side: 'sell', slTriggerPx: '45000', slOrdPx: '-1', sz: '0.02' },
+    ]);
+    jest.spyOn(service as any, 'getSpotTickers').mockResolvedValue(new Map([
+      ['BTC-USDT', 50000],
+    ]));
+
+    const result = await service.getPendingOrdersTotalForAllCoins('sell');
+
+    expect(result.coinCount).toBe(1);
+    expect(result.orderCount).toBe(2);
+    expect(result.totalAmount).toBe(1500);
+    expect(result.coins).toEqual([
+      expect.objectContaining({
+        coin: 'BTC',
+        orderType: 'conditional',
+        minPrice: 45000,
+        maxPrice: 45000,
+        orderCount: 1,
+        totalAmount: 900,
+      }),
+      expect.objectContaining({
+        coin: 'BTC',
+        orderType: 'trigger',
+        minPrice: 60000,
+        maxPrice: 60000,
+        orderCount: 1,
+        totalAmount: 600,
+      }),
     ]);
   });
 });

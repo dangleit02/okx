@@ -227,6 +227,7 @@ export class SpotController {
     };
     const summaryHeaders = [
       'COIN',
+      'ORDER TYPE',
       'CURENT PRICE',
       'CURRENT PROFIT (%)',
       'AVERAGE COST',
@@ -234,11 +235,13 @@ export class SpotController {
       'FROM PROFIT (%)',
       'TO PRICE',
       'TO PROFIT (%)',
+      'ORDER COUNT',
       'TOTAL AMOUNT (USDT)',
       'TOTAL BOUGHT (USDT)',
     ];
     const summaryRows = sortedCoins.map((coin) => [
       coin.coin,
+      coin.orderType.toUpperCase(),
       coin.currentPrice === undefined ? '' : String(coin.currentPrice),
       currentProfitPercentageByCoin.has(coin.coin.toUpperCase())
         ? String(currentProfitPercentageByCoin.get(coin.coin.toUpperCase()))
@@ -256,6 +259,7 @@ export class SpotController {
         coin.maxPrice,
         averageCostByCoin.get(coin.coin.toUpperCase()),
       ),
+      String(coin.orderCount),
       String(coin.totalAmount),
       String(totalBoughtUsdtByCoin.get(coin.coin.toUpperCase()) ?? 0),
     ]);
@@ -267,6 +271,7 @@ export class SpotController {
     if (hasRanges) {
       const detailHeaders = [
         'COIN',
+        'ORDER TYPE',
         'FROM PRICE',
         'FROM PROFIT (%)',
         'TO PRICE',
@@ -281,6 +286,7 @@ export class SpotController {
 
           return [
             coin.coin,
+            coin.orderType.toUpperCase(),
             String(range.fromPrice),
             formatProfitPercentage(range.fromPrice, profitReferencePrice),
             String(range.toPrice),
