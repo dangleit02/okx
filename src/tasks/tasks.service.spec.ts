@@ -94,7 +94,13 @@ describe('TasksService future long/short refresh', () => {
 
     await service.refreshShortFutureOrders();
 
-    expect(future.cancelFutureOrdersForOneCoin).toHaveBeenCalledWith('BTC', 'short', 'open');
+    expect(future.cancelFutureOrdersForOneCoin).toHaveBeenCalledWith(
+      'BTC',
+      'short',
+      'open',
+      'trigger',
+      false,
+    );
     expect(future.cleanProtectiveCloseByPriceStepsOrdersForOneCoin).toHaveBeenCalledTimes(2);
     expect(future.cleanProtectiveCloseByPriceStepsOrdersForOneCoin).toHaveBeenCalledWith('BTC', 'short', false);
     expect(future.reconcilePositionStopLoss).toHaveBeenCalledWith('BTC', 'short', false);
@@ -135,7 +141,13 @@ describe('TasksService future long/short refresh', () => {
 
     await service.refreshLongFutureOrders();
 
-    expect(future.cancelFutureOrdersForOneCoin).toHaveBeenCalledWith('ETH', 'long', 'open');
+    expect(future.cancelFutureOrdersForOneCoin).toHaveBeenCalledWith(
+      'ETH',
+      'long',
+      'open',
+      'trigger',
+      false,
+    );
     expect(future.reconcilePositionStopLoss).toHaveBeenCalledWith('ETH', 'long', false);
     expect(future.cleanProtectiveCloseByPriceStepsOrdersForOneCoin).toHaveBeenCalledTimes(2);
     expect(future.tradeOneCoin).toHaveBeenCalledTimes(1);
@@ -170,7 +182,13 @@ describe('TasksService future long/short refresh', () => {
 
     await service.refreshShortFutureOneWayOrders();
 
-    expect(oneway.cancelFutureOrdersForOneCoin).toHaveBeenCalledWith('BTC', 'short', 'open');
+    expect(oneway.cancelFutureOrdersForOneCoin).toHaveBeenCalledWith(
+      'BTC',
+      'short',
+      'open',
+      'trigger',
+      false,
+    );
     expect(oneway.reconcilePositionStopLoss).toHaveBeenCalledWith('BTC', 'short', false);
     expect(oneway.cleanProtectiveCloseByPriceStepsOrdersForOneCoin).toHaveBeenCalledTimes(2);
     expect(oneway.tradeOneCoin).toHaveBeenCalledWith(expect.objectContaining({

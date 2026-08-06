@@ -8,6 +8,7 @@ import { EmailService } from 'src/email/email.service';
 
 export type FutureDirection = 'long' | 'short';
 export type FutureOrderIntent = 'open' | 'close' | 'all';
+export type FutureAlgoOrderType = 'trigger' | 'conditional' | 'all';
 
 export interface FutureRangeOptions {
     numberOfOrders?: number;
@@ -217,6 +218,33 @@ export abstract class OkxFutureBaseService {
         return this.getAllPendingAlgoOrders('conditional', instType);
     }
 
+    private async getPendingOrdersForCoinByType(
+        coin: string,
+        ordType: FutureAlgoOrderType,
+        instType: 'SWAP' | 'SPOT' = 'SWAP',
+    ) {
+        if (ordType === 'trigger') return this.getPendingTriggerOrdersForCoin(coin, instType);
+        if (ordType === 'conditional') return this.getPendingConditionalOrdersForCoin(coin, instType);
+        const [triggerOrders, conditionalOrders] = await Promise.all([
+            this.getPendingTriggerOrdersForCoin(coin, instType),
+            this.getPendingConditionalOrdersForCoin(coin, instType),
+        ]);
+        return [...triggerOrders, ...conditionalOrders];
+    }
+
+    private async getAllPendingOrdersByType(
+        ordType: FutureAlgoOrderType,
+        instType: 'SWAP' | 'SPOT' = 'SWAP',
+    ) {
+        if (ordType === 'trigger') return this.getAllPendingTriggerOrders(instType);
+        if (ordType === 'conditional') return this.getAllPendingConditionalOrders(instType);
+        const [triggerOrders, conditionalOrders] = await Promise.all([
+            this.getAllPendingTriggerOrders(instType),
+            this.getAllPendingConditionalOrders(instType),
+        ]);
+        return [...triggerOrders, ...conditionalOrders];
+    }
+
     private async getAllPendingAlgoOrders(
         ordType: 'trigger' | 'conditional',
         instType: 'SWAP' | 'SPOT' = 'SWAP',
@@ -401,30 +429,54 @@ export abstract class OkxFutureBaseService {
         coin: string,
         direction: FutureDirection,
         intent: FutureOrderIntent = 'all',
+        ordType: FutureAlgoOrderType = 'trigger',
+        testing: boolean = true,
     ) {
         const normalizedCoin = coin.toUpperCase();
         this.logger.log(
-            `FUTURE ${this.getPositionMode()} cancel one coin start: coin=${normalizedCoin}, direction=${direction}, intent=${intent}`,
+            `FUTURE ${this.getPositionMode()} cancel one coin start: coin=${normalizedCoin}, direction=${direction}, intent=${intent}, ordType=${ordType}, testing=${testing}`,
             null,
             this.getFutureLogFileKey(direction, normalizedCoin),
         );
         const orders = this.filterOrdersByDirectionAndIntent(
-            await this.getPendingTriggerOrdersForCoin(coin, 'SWAP'),
+            await this.getPendingOrdersForCoinByType(coin, ordType, 'SWAP'),
             direction,
             intent,
         );
-        const result = await this.cancelOrdersFromList({ orders });
+        const result = testing
+            ? {
+                status: 'preview',
+                coin: normalizedCoin,
+                direction,
+                intent,
+                ordType,
+                testing,
+                matchedOrderCount: orders.length,
+                orders: orders.map((order) => ({
+                    algoId: order.algoId,
+                    instId: order.instId,
+                    ordType: order.ordType,
+                    side: order.side,
+                    posSide: order.posSide,
+                    triggerPx: order.triggerPx ?? order.slTriggerPx ?? order.tpTriggerPx,
+                    orderPx: order.ordPx ?? order.orderPx ?? order.slOrdPx ?? order.tpOrdPx,
+                    size: order.sz,
+                })),
+                cancelled: [],
+            }
+            : await this.cancelOrdersFromList({ orders });
         this.logger.log(
-            `FUTURE ${this.getPositionMode()} cancel one coin result: coin=${normalizedCoin}, direction=${direction}, intent=${intent}, matched=${orders.length}, result=${JSON.stringify(result)}`,
+            `FUTURE ${this.getPositionMode()} cancel one coin result: coin=${normalizedCoin}, direction=${direction}, intent=${intent}, ordType=${ordType}, testing=${testing}, matched=${orders.length}, result=${JSON.stringify(result)}`,
             null,
             this.getFutureLogFileKey(direction, normalizedCoin),
         );
-        if (orders.length > 0) {
+        if (!testing && orders.length > 0) {
             await this.sendFutureEmail(`Cancel ${direction} ${intent} orders ${normalizedCoin}`, {
                 mode: this.getPositionMode(),
                 coin: normalizedCoin,
                 direction,
                 intent,
+                ordType,
                 matchedOrderCount: orders.length,
                 orders: orders.map((order) => ({
                     algoId: order.algoId,
@@ -443,28 +495,51 @@ export abstract class OkxFutureBaseService {
     async cancelFutureOrdersForAllCoins(
         direction: FutureDirection,
         intent: FutureOrderIntent = 'all',
+        ordType: FutureAlgoOrderType = 'trigger',
+        testing: boolean = true,
     ) {
         this.logger.log(
-            `FUTURE ${this.getPositionMode()} cancel all start: direction=${direction}, intent=${intent}`,
+            `FUTURE ${this.getPositionMode()} cancel all start: direction=${direction}, intent=${intent}, ordType=${ordType}, testing=${testing}`,
             null,
             this.getFutureLogFileKey(direction),
         );
         const orders = this.filterOrdersByDirectionAndIntent(
-            await this.getAllPendingTriggerOrders('SWAP'),
+            await this.getAllPendingOrdersByType(ordType, 'SWAP'),
             direction,
             intent,
         );
-        const result = await this.cancelOrdersFromList({ orders });
+        const result = testing
+            ? {
+                status: 'preview',
+                direction,
+                intent,
+                ordType,
+                testing,
+                matchedOrderCount: orders.length,
+                orders: orders.map((order) => ({
+                    algoId: order.algoId,
+                    instId: order.instId,
+                    ordType: order.ordType,
+                    side: order.side,
+                    posSide: order.posSide,
+                    triggerPx: order.triggerPx ?? order.slTriggerPx ?? order.tpTriggerPx,
+                    orderPx: order.ordPx ?? order.orderPx ?? order.slOrdPx ?? order.tpOrdPx,
+                    size: order.sz,
+                })),
+                cancelled: [],
+            }
+            : await this.cancelOrdersFromList({ orders });
         this.logger.log(
-            `FUTURE ${this.getPositionMode()} cancel all result: direction=${direction}, intent=${intent}, matched=${orders.length}, result=${JSON.stringify(result)}`,
+            `FUTURE ${this.getPositionMode()} cancel all result: direction=${direction}, intent=${intent}, ordType=${ordType}, testing=${testing}, matched=${orders.length}, result=${JSON.stringify(result)}`,
             null,
             this.getFutureLogFileKey(direction),
         );
-        if (orders.length > 0) {
+        if (!testing && orders.length > 0) {
             await this.sendFutureEmail(`Cancel all ${direction} ${intent} orders`, {
                 mode: this.getPositionMode(),
                 direction,
                 intent,
+                ordType,
                 matchedOrderCount: orders.length,
                 orders: orders.map((order) => ({
                     algoId: order.algoId,

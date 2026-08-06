@@ -45,12 +45,20 @@ curl -X POST 'http://localhost:3030/future-oneway/protective-close-by-price-step
 curl -X POST 'http://localhost:3030/future-oneway/clean-protective-close-by-price-steps-orders/BTC?direction=long&testing=true' \
   -H 'Content-Type: application/json'
 
-# WARNING: các DELETE dưới đây hủy lệnh thật, không có testing mode.
-curl -X DELETE 'http://localhost:3030/future-oneway/cancel-orders/BTC?direction=long&intent=open' \
+# Preview conditional close orders/stop-loss LONG của BTC, không hủy.
+curl -X DELETE 'http://localhost:3030/future-oneway/cancel-orders/BTC?direction=long&intent=close&ordType=conditional&testing=true' \
   -H 'Content-Type: application/json'
 
-curl -X DELETE 'http://localhost:3030/future-oneway/cancel-orders-one-coin/BTC?direction=long&intent=close' \
+# WARNING: bỏ dấu # để hủy thật conditional close orders/stop-loss LONG.
+# curl -X DELETE 'http://localhost:3030/future-oneway/cancel-orders/BTC?direction=long&intent=close&ordType=conditional&testing=false' \
+#   -H 'Content-Type: application/json'
+
+# WARNING: các DELETE trigger với testing=false dưới đây hủy lệnh thật.
+curl -X DELETE 'http://localhost:3030/future-oneway/cancel-orders/BTC?direction=long&intent=open&ordType=trigger&testing=false' \
   -H 'Content-Type: application/json'
 
-curl -X DELETE 'http://localhost:3030/future-oneway/cancel-all-orders?direction=long&intent=all' \
+curl -X DELETE 'http://localhost:3030/future-oneway/cancel-orders-one-coin/BTC?direction=long&intent=close&ordType=trigger&testing=false' \
+  -H 'Content-Type: application/json'
+
+curl -X DELETE 'http://localhost:3030/future-oneway/cancel-all-orders?direction=long&intent=all&ordType=trigger&testing=false' \
   -H 'Content-Type: application/json'

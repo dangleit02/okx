@@ -2,19 +2,31 @@ chơi theo tháng
 mua giá rẻ nhất tháng
 bán giá cao nhất tháng
 
-# cancel all orders for one coin
-  curl -X DELETE 'http://localhost:3030/cancel-orders/BTC' \
+# WARNING: hủy thật toàn bộ trigger orders của BTC (cả BUY và SELL).
+  curl -X DELETE 'http://localhost:3030/cancel-orders/BTC?ordType=trigger&testing=false' \
     -H "Content-Type: application/json"
 
 
-# cancel all orders for all coins
-  curl -X DELETE 'http://localhost:3030/cancel-all-orders' \
+# Preview tất cả trigger + conditional orders của BTC, không hủy.
+  curl -X DELETE 'http://localhost:3030/cancel-orders/BTC?ordType=all&testing=true' \
+    -H "Content-Type: application/json"
+
+# Preview conditional orders của tất cả coin, không hủy.
+  curl -X DELETE 'http://localhost:3030/cancel-all-orders?ordType=conditional&testing=true' \
+    -H "Content-Type: application/json"
+
+# WARNING: bỏ dấu # để hủy thật conditional orders của tất cả coin.
+# curl -X DELETE 'http://localhost:3030/cancel-all-orders?ordType=conditional&testing=false' \
+#   -H "Content-Type: application/json"
+
+# WARNING: hủy thật toàn bộ trigger orders của tất cả coin.
+  curl -X DELETE 'http://localhost:3030/cancel-all-orders?ordType=trigger&testing=false' \
     -H "Content-Type: application/json"    
 
-  # cancel BUY orders for all coins
-    curl -X DELETE 'http://localhost:3030/cancel-all-orders?side=buy' \
+  # WARNING: hủy thật BUY trigger orders của tất cả coin.
+    curl -X DELETE 'http://localhost:3030/cancel-all-orders?side=buy&ordType=trigger&testing=false' \
       -H "Content-Type: application/json"    
 
-  # cancel SELL orders for all coins
-    curl -X DELETE 'http://localhost:3030/cancel-all-orders?side=sell' \
+  # WARNING: hủy thật SELL trigger orders của tất cả coin.
+    curl -X DELETE 'http://localhost:3030/cancel-all-orders?side=sell&ordType=trigger&testing=false' \
       -H "Content-Type: application/json"    

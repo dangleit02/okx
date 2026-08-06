@@ -94,7 +94,8 @@ describe('SpotController buy order total response format', () => {
     getAllSpotBoughtCoins: jest.Mock;
     validateBuyTriggerPriceDirection: jest.Mock;
     buyTriggerFromMinPriceToMaxPrice: jest.Mock;
-    cancelOpenConditionSpotOrdersForOneCoin: jest.Mock;
+    cancelPendingSpotOrdersForOneCoin: jest.Mock;
+    cancelAllPendingSpotOrders: jest.Mock;
     cancelPendingOrdersByPriceRange: jest.Mock;
     sellAtTriggerPrice: jest.Mock;
     ensureSpotStopLoss: jest.Mock;
@@ -121,7 +122,8 @@ describe('SpotController buy order total response format', () => {
       getAllSpotBoughtCoins: jest.fn().mockResolvedValue(boughtCoinsResponse),
       validateBuyTriggerPriceDirection: jest.fn().mockResolvedValue(50),
       buyTriggerFromMinPriceToMaxPrice: jest.fn().mockResolvedValue([]),
-      cancelOpenConditionSpotOrdersForOneCoin: jest.fn().mockResolvedValue({ status: 'cancelled' }),
+      cancelPendingSpotOrdersForOneCoin: jest.fn().mockResolvedValue({ status: 'preview' }),
+      cancelAllPendingSpotOrders: jest.fn().mockResolvedValue({ status: 'preview' }),
       cancelPendingOrdersByPriceRange: jest.fn().mockResolvedValue({
         status: 'preview',
       }),
@@ -376,6 +378,24 @@ describe('SpotController buy order total response format', () => {
       40000,
       50000,
       true,
+      'all',
+    );
+  });
+
+  it('defaults cancel APIs to previewing all algo order types', async () => {
+    await controller.cancelOrdersForOneCoin('BTC', 'sell');
+    expect(okxService.cancelPendingSpotOrdersForOneCoin).toHaveBeenCalledWith(
+      'BTC',
+      'sell',
+      'all',
+      true,
+    );
+
+    await controller.cancelAllOrders(undefined, 'conditional', 'false');
+    expect(okxService.cancelAllPendingSpotOrders).toHaveBeenCalledWith(
+      undefined,
+      'conditional',
+      false,
     );
   });
 

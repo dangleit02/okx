@@ -1,6 +1,6 @@
 import { BadRequestException, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { OkxFutureHedgeService } from './okx.future.hedge.service';
-import { FutureDirection, FutureOrderIntent } from './okx.future.base.service';
+import { FutureAlgoOrderType, FutureDirection, FutureOrderIntent } from './okx.future.base.service';
 import { ConfigService } from '@nestjs/config';
 import * as _ from 'lodash';
 import { TradeOneCoinParams } from 'src/interfaces/interface';
@@ -40,6 +40,14 @@ export class FutureHedgeController {
       throw new BadRequestException('intent must be open, close or all');
     }
     return intent;
+  }
+
+  private parseAlgoOrderType(value?: string): FutureAlgoOrderType {
+    const ordType = value ?? 'all';
+    if (ordType !== 'trigger' && ordType !== 'conditional' && ordType !== 'all') {
+      throw new BadRequestException('ordType must be trigger, conditional or all');
+    }
+    return ordType;
   }
 
   private configuredCoins(direction: FutureDirection) {
@@ -107,6 +115,8 @@ export class FutureHedgeController {
       coin,
       this.parseDirection(query.direction),
       this.parseIntent(query.intent),
+      this.parseAlgoOrderType(query.ordType),
+      query.testing !== 'false',
     );
   }
 
@@ -120,6 +130,8 @@ export class FutureHedgeController {
     return this.okx.cancelFutureOrdersForAllCoins(
       this.parseDirection(query.direction),
       this.parseIntent(query.intent),
+      this.parseAlgoOrderType(query.ordType),
+      query.testing !== 'false',
     );
   }
 

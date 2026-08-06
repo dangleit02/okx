@@ -1,5 +1,5 @@
 import { BadRequestException, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
-import { AllPendingOrdersTotal, AllSpotBoughtCoins, OkxService, PendingOrdersSide, PendingOrdersTotalResponse } from './okx.service';
+import { AllPendingOrdersTotal, AllSpotBoughtCoins, OkxService, PendingAlgoOrderType, PendingOrdersSide, PendingOrdersTotalResponse } from './okx.service';
 import { ConfigService } from '@nestjs/config';
 import { AppLogger } from '../logger/logger.service';
 import * as _ from 'lodash';
@@ -12,6 +12,14 @@ export class SpotController {
     private config: ConfigService,
     private readonly logger: AppLogger,
   ) { }
+
+  private parseAlgoOrderType(value?: string): PendingAlgoOrderType {
+    const ordType = value ?? 'all';
+    if (ordType !== 'trigger' && ordType !== 'conditional' && ordType !== 'all') {
+      throw new BadRequestException('ordType must be trigger, conditional or all');
+    }
+    return ordType;
+  }
 
   @Get('balance')
   async getBalance(@Query('ccy') ccy?: string) {
@@ -362,7 +370,7 @@ export class SpotController {
     );
 
     if (!isTesting && parseBool(query.removeExistingBuyOrders)) {
-      const res = await this.okxService.cancelOpenConditionSpotOrdersForOneCoin(coin, 'buy');
+      const res = await this.okxService.cancelPendingSpotOrdersForOneCoin(coin, 'buy', 'trigger', false);
       this.logger.log('Cancel existing buy orders:', JSON.stringify(res, null, 2));
       results.push({ coin, action: 'cancel_existing_buy_orders', result: res });
     }
@@ -478,16 +486,29 @@ export class SpotController {
   @Delete('cancel-all-orders')
   async cancelAllOrders(
     @Query('side') side?: 'buy' | 'sell' | null,
+    @Query('ordType') ordType?: string,
+    @Query('testing') testing?: string,
   ) {
-    return await this.okxService.cancelAllOpenConditionSpotOrders(side);
+    return this.okxService.cancelAllPendingSpotOrders(
+      side,
+      this.parseAlgoOrderType(ordType),
+      testing !== 'false',
+    );
   }
 
   @Delete('cancel-orders/:coin')
   async cancelOrdersForOneCoin(
     @Param('coin') coin: string,
     @Query('side') side?: 'buy' | 'sell' | null,
+    @Query('ordType') ordType?: string,
+    @Query('testing') testing?: string,
   ) {
-    return await this.okxService.cancelOpenConditionSpotOrdersForOneCoin(coin, side);
+    return this.okxService.cancelPendingSpotOrdersForOneCoin(
+      coin,
+      side,
+      this.parseAlgoOrderType(ordType),
+      testing !== 'false',
+    );
   }
 
   @Post('clean-sell-orders/:coin')
@@ -516,6 +537,7 @@ export class SpotController {
     @Query('side') side?: string,
     @Query('minPrice') minPrice?: string,
     @Query('maxPrice') maxPrice?: string,
+    @Query('ordType') ordType?: string,
     @Query('testing') testing?: string,
   ) {
     if (side !== 'buy' && side !== 'sell') {
@@ -528,6 +550,7 @@ export class SpotController {
       Number(minPrice),
       Number(maxPrice),
       testing !== 'false',
+      this.parseAlgoOrderType(ordType),
     );
   }
 

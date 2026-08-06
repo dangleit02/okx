@@ -2,14 +2,21 @@ chơi theo tháng
 mua giá rẻ nhất tháng
 bán giá cao nhất tháng
 
-# cancel BUY orders for one coin
-  curl -X DELETE 'http://localhost:3030/cancel-orders/NEAR?side=buy' \
+# WARNING: hủy thật toàn bộ BUY trigger orders của một coin.
+  curl -X DELETE 'http://localhost:3030/cancel-orders/NEAR?side=buy&ordType=trigger&testing=false' \
     -H "Content-Type: application/json"
 
-  
-# WARNING cancel buy orders in price range
-  curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/XLM?side=buy&minPrice=0.14571&maxPrice=0.16496&testing=false' \
+# Preview BUY conditional orders của một coin, không hủy.
+  curl -X DELETE 'http://localhost:3030/cancel-orders/NEAR?side=buy&ordType=conditional&testing=true' \
     -H "Content-Type: application/json"
 
-  curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/AAVE?side=buy&minPrice=71.86&maxPrice=81.84&testing=false' \
+# WARNING: bỏ dấu # để hủy thật BUY conditional orders.
+# curl -X DELETE 'http://localhost:3030/cancel-orders/NEAR?side=buy&ordType=conditional&testing=false' \
+#   -H "Content-Type: application/json"
+
+# WARNING: hủy thật BUY trigger orders trong khoảng giá.
+  curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/XLM?side=buy&minPrice=0.14571&maxPrice=0.16496&ordType=trigger&testing=false' \
+    -H "Content-Type: application/json"
+
+  curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/AAVE?side=buy&minPrice=71.86&maxPrice=81.84&ordType=trigger&testing=false' \
     -H "Content-Type: application/json"

@@ -447,7 +447,7 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
     ]);
     jest.spyOn(service, 'cancelOrdersFromList').mockResolvedValue([{ code: '0' }] as any);
 
-    await service.cancelFutureOrdersForOneCoin('BTC', 'long', 'open');
+    await service.cancelFutureOrdersForOneCoin('BTC', 'long', 'open', 'trigger', false);
 
     expect(logger.log).toHaveBeenCalledWith(
       expect.stringContaining('matched=1'),
@@ -459,6 +459,33 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
       '[FUTURE HEDGE] Cancel long open orders BTC',
       expect.objectContaining({ matchedOrderCount: 1 }),
     );
+  });
+
+  it('previews trigger and conditional future cancellations together', async () => {
+    const { service, emailService } = createService();
+    jest.spyOn(service, 'getPendingTriggerOrdersForCoin').mockResolvedValue([
+      { algoId: 'open-1', instId: 'BTC-USDT-SWAP', ordType: 'trigger', posSide: 'long', side: 'buy' },
+    ]);
+    jest.spyOn(service, 'getPendingConditionalOrdersForCoin').mockResolvedValue([
+      { algoId: 'close-1', instId: 'BTC-USDT-SWAP', ordType: 'conditional', posSide: 'long', side: 'sell', slTriggerPx: '90' },
+    ]);
+    const cancel = jest.spyOn(service, 'cancelOrdersFromList');
+
+    const result = await service.cancelFutureOrdersForOneCoin('BTC', 'long', 'all', 'all', true);
+
+    expect(result).toEqual(expect.objectContaining({
+      status: 'preview',
+      ordType: 'all',
+      testing: true,
+      matchedOrderCount: 2,
+      cancelled: [],
+    }));
+    expect((result as any).orders.map((order: any) => order.ordType)).toEqual([
+      'trigger',
+      'conditional',
+    ]);
+    expect(cancel).not.toHaveBeenCalled();
+    expect(emailService.sendEmail).not.toHaveBeenCalled();
   });
 
   it('creates a market conditional stop loss for the unprotected long size in hedge mode', async () => {

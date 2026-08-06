@@ -43,7 +43,13 @@ export class TasksService {
             const normalizedCoin = String(coin).toUpperCase();
             this.logger.log(`Processing coin: ${normalizedCoin}`, null, `${normalizedCoin}_${direction}_${mode}`);
 
-            const cancelledEntries = await service.cancelFutureOrdersForOneCoin(coin, direction, 'open');
+            const cancelledEntries = await service.cancelFutureOrdersForOneCoin(
+                coin,
+                direction,
+                'open',
+                'trigger',
+                false,
+            );
             results.push({ coin, direction, action: 'refresh_entry_trigger_orders', result: cancelledEntries });
 
             const cleanBefore = await service.cleanProtectiveCloseByPriceStepsOrdersForOneCoin(coin, direction, false);

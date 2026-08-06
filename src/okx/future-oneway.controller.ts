@@ -5,7 +5,7 @@ import { AppLogger } from 'src/logger/logger.service';
 import * as _ from 'lodash';
 import { TradeOneCoinParams } from 'src/interfaces/interface';
 import { parseBool } from 'src/common/util';
-import { FutureDirection, FutureOrderIntent } from './okx.future.base.service';
+import { FutureAlgoOrderType, FutureDirection, FutureOrderIntent } from './okx.future.base.service';
 
 @Controller('future-oneway')
 export class FutureOneWayController {
@@ -40,6 +40,14 @@ export class FutureOneWayController {
       throw new BadRequestException('intent must be open, close or all');
     }
     return intent;
+  }
+
+  private parseAlgoOrderType(value?: string): FutureAlgoOrderType {
+    const ordType = value ?? 'all';
+    if (ordType !== 'trigger' && ordType !== 'conditional' && ordType !== 'all') {
+      throw new BadRequestException('ordType must be trigger, conditional or all');
+    }
+    return ordType;
   }
 
   private configuredCoins(direction: FutureDirection) {
@@ -97,7 +105,13 @@ export class FutureOneWayController {
 
   @Delete('cancel-orders/:coin')
   async cancelOneCoin(@Param('coin') coin: string, @Query() query: Record<string, string>) {
-    return this.okx.cancelFutureOrdersForOneCoin(coin, this.parseDirection(query.direction), this.parseIntent(query.intent));
+    return this.okx.cancelFutureOrdersForOneCoin(
+      coin,
+      this.parseDirection(query.direction),
+      this.parseIntent(query.intent),
+      this.parseAlgoOrderType(query.ordType),
+      query.testing !== 'false',
+    );
   }
 
   @Delete('cancel-orders-one-coin/:coin')
@@ -107,7 +121,12 @@ export class FutureOneWayController {
 
   @Delete('cancel-all-orders')
   async cancelAll(@Query() query: Record<string, string>) {
-    return this.okx.cancelFutureOrdersForAllCoins(this.parseDirection(query.direction), this.parseIntent(query.intent));
+    return this.okx.cancelFutureOrdersForAllCoins(
+      this.parseDirection(query.direction),
+      this.parseIntent(query.intent),
+      this.parseAlgoOrderType(query.ordType),
+      query.testing !== 'false',
+    );
   }
 
   @Get('orders-all-coins')

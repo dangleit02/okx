@@ -15,6 +15,7 @@ interface BuyTriggerRangeOptions {
 }
 
 export type PendingOrdersSide = 'buy' | 'sell';
+export type PendingAlgoOrderType = 'trigger' | 'conditional' | 'all';
 export type PendingSpotOrderType = 'trigger' | 'conditional';
 
 export interface PendingOrdersTotalOptions {
@@ -265,6 +266,19 @@ export class OkxService {
 
     private async getPendingConditionalSpotOrders(coin?: string) {
         return this.getPendingSpotAlgoOrders('conditional', coin);
+    }
+
+    private async getPendingSpotOrdersByType(
+        ordType: PendingAlgoOrderType,
+        coin?: string,
+    ) {
+        if (ordType === 'trigger') return this.getPendingTriggerSpotOrders(coin);
+        if (ordType === 'conditional') return this.getPendingConditionalSpotOrders(coin);
+        const [triggerOrders, conditionalOrders] = await Promise.all([
+            this.getPendingTriggerSpotOrders(coin),
+            this.getPendingConditionalSpotOrders(coin),
+        ]);
+        return [...triggerOrders, ...conditionalOrders];
     }
 
     private async getPendingSpotAlgoOrders(
@@ -762,6 +776,7 @@ export class OkxService {
         minPrice: number,
         maxPrice: number,
         testing: boolean = true,
+        ordType: PendingAlgoOrderType = 'trigger',
     ) {
         if (side !== 'buy' && side !== 'sell') {
             throw new Error(`Invalid side: ${side}. side must be buy or sell`);
@@ -778,10 +793,10 @@ export class OkxService {
 
         const normalizedCoin = coin.trim().toUpperCase();
         const instId = `${normalizedCoin}-USDT`;
-        const pendingOrders = await this.getPendingTriggerSpotOrders(normalizedCoin);
+        const pendingOrders = await this.getPendingSpotOrdersByType(ordType, normalizedCoin);
         const matchedOrders = pendingOrders
             .filter((order: any) => {
-                const triggerPrice = Number(order.triggerPx);
+                const triggerPrice = this.getPendingOrderTriggerPrice(order);
                 return order.side === side
                     && order.instId === instId
                     && Boolean(order.algoId)
@@ -790,11 +805,12 @@ export class OkxService {
                     && triggerPrice <= maxPrice;
             })
             .map((order: any) => {
-                const triggerPrice = Number(order.triggerPx);
-                const orderPrice = Number(order.ordPx);
+                const triggerPrice = this.getPendingOrderTriggerPrice(order);
+                const orderPrice = this.getPendingOrderPrice(order);
                 const size = Number(order.sz);
                 return {
                     algoId: String(order.algoId),
+                    ordType: order.ordType,
                     triggerPrice,
                     orderPrice,
                     size: Number.isFinite(size) ? size : 0,
@@ -811,6 +827,7 @@ export class OkxService {
             minPrice,
             maxPrice,
             testing,
+            ordType,
             matchedOrderCount: matchedOrders.length,
             totalAmount,
             orders: matchedOrders,
@@ -848,7 +865,12 @@ export class OkxService {
         return result;
     }
 
-    async cancelOpenConditionSpotOrdersForOneCoin(coin: string, side: 'buy' | 'sell' | null = null, _onlyForDown: boolean = false) {
+    async cancelPendingSpotOrdersForOneCoin(
+        coin: string,
+        side: 'buy' | 'sell' | null = null,
+        ordType: PendingAlgoOrderType = 'trigger',
+        testing: boolean = true,
+    ) {
         const normalizedCoin = coin.trim().toUpperCase();
         if (!normalizedCoin || !/^[A-Z0-9]+$/.test(normalizedCoin)) {
             throw new Error(`Invalid coin: ${coin}`);
@@ -858,7 +880,7 @@ export class OkxService {
         }
 
         const instId = `${normalizedCoin}-USDT`;
-        const pendingOrders = await this.getPendingTriggerSpotOrders(normalizedCoin);
+        const pendingOrders = await this.getPendingSpotOrdersByType(ordType, normalizedCoin);
         const ordersBySide = pendingOrders.filter((order: any) => (
             order.instId === instId
             && (!side || order.side === side)
@@ -869,13 +891,32 @@ export class OkxService {
             instId: o.instId,
         }));
 
+        const baseResult = {
+            coin: normalizedCoin,
+            instId,
+            side,
+            ordType,
+            testing,
+            matchedOrderCount: ordersToCancel.length,
+            orders: ordersBySide.map((order: any) => ({
+                algoId: String(order.algoId),
+                instId: order.instId,
+                ordType: order.ordType,
+                side: order.side,
+                triggerPrice: this.getPendingOrderTriggerPrice(order),
+                orderPrice: this.getPendingOrderPrice(order),
+                size: Number(order.sz),
+            })),
+        };
+
+        if (testing) {
+            return { status: 'preview', ...baseResult };
+        }
+
         if (ordersToCancel.length === 0) {
             return {
                 status: 'no_matching_orders',
-                coin: normalizedCoin,
-                instId,
-                side,
-                matchedOrderCount: 0,
+                ...baseResult,
                 cancelledOrderCount: 0,
                 failedOrderCount: 0,
                 responses: [],
@@ -888,15 +929,12 @@ export class OkxService {
 
         const result = {
             status: failedOrderCount === 0 ? 'cancelled' : 'partially_cancelled',
-            coin: normalizedCoin,
-            instId,
-            side,
-            matchedOrderCount: ordersToCancel.length,
+            ...baseResult,
             cancelledOrderCount,
             failedOrderCount,
             responses,
         };
-        this.logger.log(JSON.stringify(result, null, 2), 'Cancel pending spot trigger orders', normalizedCoin);
+        this.logger.log(JSON.stringify(result, null, 2), `Cancel pending spot ${ordType} orders`, normalizedCoin);
         return result;
     }
 
@@ -1118,52 +1156,57 @@ export class OkxService {
         return result;
     }
 
-    async cancelAllOpenConditionSpotOrders(side: 'buy' | 'sell' | null = null) {
-        const timestamp = new Date().toISOString();
+    async cancelAllPendingSpotOrders(
+        side: 'buy' | 'sell' | null = null,
+        ordType: PendingAlgoOrderType = 'trigger',
+        testing: boolean = true,
+    ) {
+        if (side !== null && side !== 'buy' && side !== 'sell') {
+            throw new Error(`Invalid side: ${side}. side must be buy or sell`);
+        }
+        const pendingOrders = await this.getPendingSpotOrdersByType(ordType);
+        const matchedOrders = pendingOrders.filter((order: any) => (
+            (!side || order.side === side) && Boolean(order.algoId) && Boolean(order.instId)
+        ));
+        const baseResult = {
+            side,
+            ordType,
+            testing,
+            matchedOrderCount: matchedOrders.length,
+            orders: matchedOrders.map((order: any) => ({
+                algoId: String(order.algoId),
+                instId: order.instId,
+                ordType: order.ordType,
+                side: order.side,
+                triggerPrice: this.getPendingOrderTriggerPrice(order),
+                orderPrice: this.getPendingOrderPrice(order),
+                size: Number(order.sz),
+            })),
+        };
 
-        // 1. Get open orders
-        const ordType = 'trigger';  // bắt buộc
-        const instType = 'SPOT';
-        const getPath = `/api/v5/trade/orders-algo-pending?instType=${instType}&ordType=${ordType}`;
-        const getSign = this.sign(timestamp, 'GET', getPath);
-        const getRes = await axios.get(
-            this.config.get<string>('okx.baseUrl') + getPath,
-            {
-                headers: {
-                    'OK-ACCESS-KEY': this.config.get<string>('okx.apiKey'),
-                    'OK-ACCESS-SIGN': getSign,
-                    'OK-ACCESS-TIMESTAMP': timestamp,
-                    'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphrase'),
-                },
-            }
+        if (testing) return { status: 'preview', ...baseResult };
+        if (matchedOrders.length === 0) {
+            return {
+                status: 'no_matching_orders',
+                ...baseResult,
+                cancelledOrderCount: 0,
+                failedOrderCount: 0,
+                responses: [],
+            };
+        }
+
+        const { responses, cancelledOrderCount, failedOrderCount } = await this.cancelAlgoOrders(
+            matchedOrders.map((order: any) => ({ algoId: order.algoId, instId: order.instId })),
         );
-
-        const pendingOrders = getRes.data?.data || [];
-        if (pendingOrders.length === 0) {
-            this.logger.log('No pending algo orders to cancel.');
-            return { message: 'No pending algo orders' };
-        }
-
-        // 2. Filter theo side
-        let ordersBySide = side ? pendingOrders.filter((order: any) => order.side === side) : pendingOrders;
-
-        if (ordersBySide.length === 0) {
-            this.logger.log(`No ${side.toUpperCase()} orders to cancel`);
-            return { cancelled: [] };
-        }
-
-        // 2. Chuẩn hoá orders để huỷ        
-        const ordersToCancel = ordersBySide.map((o: any) => ({
-            algoId: o.algoId,
-            instId: o.instId,
-        }));
-
-
-        this.logger.log(`Found ${ordersToCancel.length} pending algo orders. Cancelling...`);
-
-        const result = await this.cancelAlgoOrders(ordersToCancel);
-        this.logger.log(`Cancel response: ${JSON.stringify(result, null, 2)}`);
-        return result.responses;
+        const result = {
+            status: failedOrderCount === 0 ? 'cancelled' : 'partially_cancelled',
+            ...baseResult,
+            cancelledOrderCount,
+            failedOrderCount,
+            responses,
+        };
+        this.logger.log(JSON.stringify(result, null, 2), `Cancel all pending spot ${ordType} orders`);
+        return result;
     }
 
     async getAccountBalance(ccy?: string) {
@@ -2143,7 +2186,7 @@ export class OkxService {
     async buyOneCoin(isTesting: boolean, removeExistingBuyOrders: string, coin: string, results: any[], autobuy: string) {
         if (!isTesting) {
             if (removeExistingBuyOrders === 'true') {
-                const res1 = await this.cancelOpenConditionSpotOrdersForOneCoin(coin, 'buy');
+                const res1 = await this.cancelPendingSpotOrdersForOneCoin(coin, 'buy', 'trigger', false);
                 this.logger.log('Cancel existing buy orders:', JSON.stringify(res1, null, 2));
                 results.push({ coin, action: 'cancel_existing_buy_orders', result: res1 });
             }
@@ -2200,7 +2243,7 @@ export class OkxService {
     async sellOneCoin({ coin, isTesting, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder, results }: { isTesting: boolean, removeExistingSellOrders: string, coin: string, addSellStopLoss: string, addSellTakeProfit: string, onlyForDown: string, justOneOrder: string, results: any[] }) {
         if (!isTesting) {
             if (removeExistingSellOrders === 'true') {
-                const res1 = await this.cancelOpenConditionSpotOrdersForOneCoin(coin, 'sell', onlyForDown === 'true');
+                const res1 = await this.cancelPendingSpotOrdersForOneCoin(coin, 'sell', 'trigger', false);
                 this.logger.log('Cancel existing sell orders:', JSON.stringify(res1, null, 2), coin);
                 results.push({ coin, action: 'cancel_existing_sell_orders', result: res1 });
             }

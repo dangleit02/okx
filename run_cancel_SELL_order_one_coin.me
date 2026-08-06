@@ -2,14 +2,22 @@ chơi theo tháng
 mua giá rẻ nhất tháng
 bán giá cao nhất tháng
 
-# cancel SELL orders for one coin
-  curl -X DELETE 'http://localhost:3030/cancel-orders/XLM?side=sell' \
+# WARNING: hủy thật toàn bộ SELL trigger orders của một coin.
+  curl -X DELETE 'http://localhost:3030/cancel-orders/XLM?side=sell&ordType=trigger&testing=false' \
     -H "Content-Type: application/json"
 
-# preview cancel pending sell orders in price range (does not cancel)
-  curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/BTC?side=sell&minPrice=60000&maxPrice=70000&testing=true' \
+# Preview SELL conditional orders (thường là stop-loss), không hủy.
+  curl -X DELETE 'http://localhost:3030/cancel-orders/XLM?side=sell&ordType=conditional&testing=true' \
+    -H "Content-Type: application/json"
+
+# WARNING: bỏ dấu # để hủy thật SELL conditional orders/stop-loss.
+# curl -X DELETE 'http://localhost:3030/cancel-orders/XLM?side=sell&ordType=conditional&testing=false' \
+#   -H "Content-Type: application/json"
+
+# Preview SELL trigger orders trong khoảng giá, không hủy.
+  curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/BTC?side=sell&minPrice=60000&maxPrice=70000&ordType=trigger&testing=true' \
     -H "Content-Type: application/json"
   
-  # WARNING cancel sell orders in price range
-  curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/AAVE?side=sell&minPrice=71.86&maxPrice=81.84&testing=false' \
+# WARNING: hủy thật SELL trigger orders trong khoảng giá.
+  curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/AAVE?side=sell&minPrice=71.86&maxPrice=81.84&ordType=trigger&testing=false' \
     -H "Content-Type: application/json"

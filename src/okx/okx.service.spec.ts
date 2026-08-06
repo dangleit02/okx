@@ -467,7 +467,7 @@ describe('OkxService bought spot coins', () => {
   });
 });
 
-describe('OkxService cancel pending spot trigger orders for one coin', () => {
+describe('OkxService cancel pending spot algo orders for one coin', () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
@@ -499,7 +499,7 @@ describe('OkxService cancel pending spot trigger orders for one coin', () => {
       },
     });
 
-    const result = await service.cancelOpenConditionSpotOrdersForOneCoin('xrp', 'buy');
+    const result = await service.cancelPendingSpotOrdersForOneCoin('xrp', 'buy', 'trigger', false);
 
     expect(ticker).not.toHaveBeenCalled();
     expect(axios.post).toHaveBeenCalledWith(
@@ -552,7 +552,7 @@ describe('OkxService cancel pending spot trigger orders for one coin', () => {
         },
       });
 
-    const result = await service.cancelOpenConditionSpotOrdersForOneCoin('ETC', 'sell');
+    const result = await service.cancelPendingSpotOrdersForOneCoin('ETC', 'sell', 'trigger', false);
 
     expect(post).toHaveBeenCalledTimes(2);
     expect(JSON.parse(String(post.mock.calls[1][1]))).toEqual([
@@ -565,6 +565,28 @@ describe('OkxService cancel pending spot trigger orders for one coin', () => {
       cancelledOrderCount: 2,
       failedOrderCount: 0,
     }));
+  });
+
+  it('previews trigger and conditional orders together without cancelling', async () => {
+    const service = new OkxService({} as any, { log: jest.fn() } as any, {} as any);
+    jest.spyOn(service as any, 'getPendingTriggerSpotOrders').mockResolvedValue([
+      { algoId: 'trigger-1', instId: 'BTC-USDT', ordType: 'trigger', side: 'sell', triggerPx: '110', ordPx: '-1', sz: '1' },
+    ]);
+    jest.spyOn(service as any, 'getPendingConditionalSpotOrders').mockResolvedValue([
+      { algoId: 'sl-1', instId: 'BTC-USDT', ordType: 'conditional', side: 'sell', slTriggerPx: '90', slOrdPx: '-1', sz: '1' },
+    ]);
+    const post = jest.spyOn(axios, 'post');
+
+    const result = await service.cancelPendingSpotOrdersForOneCoin('BTC', 'sell', 'all', true);
+
+    expect(post).not.toHaveBeenCalled();
+    expect(result).toEqual(expect.objectContaining({
+      status: 'preview',
+      ordType: 'all',
+      testing: true,
+      matchedOrderCount: 2,
+    }));
+    expect(result.orders.map((order: any) => order.ordType)).toEqual(['trigger', 'conditional']);
   });
 });
 
