@@ -402,19 +402,6 @@ export class SpotController {
     return results;
   }
 
-  @Post('sell-all-at-price/:coin')
-  async sellAllAtCurrentPrice(
-    @Param('coin') coin: string,
-    @Query('percentage') percentage: string,
-    @Query('testing') testing?: string,
-  ) {
-    return this.okxService.sellAllAtCurrentPrice(
-      coin,
-      Number(percentage),
-      testing !== 'false',
-    );
-  }
-
   @Post('sell-at-trigger-price/:coin')
   async sellAtTriggerPrice(
     @Param('coin') coin: string,

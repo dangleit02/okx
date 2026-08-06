@@ -843,7 +843,7 @@ describe('OkxService clean excess sell orders', () => {
   });
 });
 
-describe('OkxService sell all at current price', () => {
+describe('OkxService place spot stop loss near current price', () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
@@ -874,7 +874,7 @@ describe('OkxService sell all at current price', () => {
     jest.spyOn(service as any, 'getTicker').mockResolvedValue(60000);
     const placeStopLoss = jest.spyOn(service, 'placeSpotConditionalStopLoss');
 
-    const result = await service.sellAllAtCurrentPrice(' btc ', 25);
+    const result = await service.placeSpotStopLossNearCurrentPrice(' btc ', 25);
 
     expect(result).toEqual(
       expect.objectContaining({
@@ -922,7 +922,7 @@ describe('OkxService sell all at current price', () => {
       body: { ordType: 'conditional' },
     } as any);
 
-    const result = await service.sellAllAtCurrentPrice('ETH', 100, false);
+    const result = await service.placeSpotStopLossNearCurrentPrice('ETH', 100, false);
 
     expect(result.status).toBe('submitted');
     expect(placeStopLoss).toHaveBeenCalledWith(
@@ -942,7 +942,7 @@ describe('OkxService sell all at current price', () => {
     const ticker = jest.spyOn(service as any, 'getTicker');
     const placeOneOrder = jest.spyOn(service, 'placeOneOrder');
 
-    await expect(service.sellAllAtCurrentPrice('ADA', 100, false)).resolves.toEqual({
+    await expect(service.placeSpotStopLossNearCurrentPrice('ADA', 100, false)).resolves.toEqual({
       status: 'no_available_balance',
       coin: 'ADA',
       instId: 'ADA-USDT',
@@ -958,7 +958,7 @@ describe('OkxService sell all at current price', () => {
     const { service } = createService();
     const getBalance = jest.spyOn(service, 'getAccountBalance');
 
-    await expect(service.sellAllAtCurrentPrice('BTC', 0)).rejects.toThrow(
+    await expect(service.placeSpotStopLossNearCurrentPrice('BTC', 0)).rejects.toThrow(
       'Invalid percentage',
     );
     expect(getBalance).not.toHaveBeenCalled();

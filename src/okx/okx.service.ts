@@ -1242,9 +1242,9 @@ export class OkxService {
         };
     }
 
-    async sellAllAtCurrentPrice(
+    async placeSpotStopLossNearCurrentPrice(
         coin: string,
-        percentage: number,
+        percentage: number = 100,
         testing: boolean = true,
     ) {
         const normalizedCoin = coin?.trim().toUpperCase();
@@ -1454,14 +1454,6 @@ export class OkxService {
             );
         }
         return this.sellAtTriggerPrice(normalizedCoin, triggerPrice, percentage, testing);
-    }
-
-    async placeSpotStopLossNearCurrentPrice(
-        coin: string,
-        percentage: number = 100,
-        testing: boolean = true,
-    ) {
-        return this.sellAllAtCurrentPrice(coin, percentage, testing);
     }
 
     private validateSellPercentage(percentage: number) {

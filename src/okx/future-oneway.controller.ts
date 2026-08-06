@@ -150,15 +150,9 @@ export class FutureOneWayController {
     return this.reconcilePositionStopLoss(coin, query);
   }
 
-  // Backward-compatible alias. This places a stop-loss around 0.2% from current price.
-  @Post('sell-all-at-price/:coin')
-  async closeAtCurrentPrice(@Param('coin') coin: string, @Query() query: Record<string, string>) {
-    return this.okx.closePositionAtCurrentPrice(coin, this.parseDirection(query.direction), query.percentage ? Number(query.percentage) : 100, query.testing !== 'false');
-  }
-
   @Post('stop-loss-near-current-price/:coin')
   async stopLossNearCurrentPrice(@Param('coin') coin: string, @Query() query: Record<string, string>) {
-    return this.closeAtCurrentPrice(coin, query);
+    return this.okx.closePositionAtCurrentPrice(coin, this.parseDirection(query.direction), query.percentage ? Number(query.percentage) : 100, query.testing !== 'false');
   }
 
   @Post('protective-close-by-price-steps/:coin')

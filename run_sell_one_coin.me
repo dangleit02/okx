@@ -14,9 +14,9 @@ curl -X POST 'http://localhost:3030/stop-loss-at-trigger-price/BTC?price=50000&p
 curl -X POST 'http://localhost:3030/stop-loss-near-current-price/DOT?percentage=100&testing=false' \
   -H 'Content-Type: application/json'
 
-# Legacy alias: đặt conditional market SL gần current cho một phần available balance.
+# Near-current SPOT SL cho ALGO: đặt conditional market SL cho một phần available balance.
   # WARNING: testing=false sẽ đặt lệnh thật.
-    curl -X POST 'http://localhost:3030/sell-all-at-price/ALGO?percentage=100&testing=false' \
+    curl -X POST 'http://localhost:3030/stop-loss-near-current-price/ALGO?percentage=100&testing=false' \
       -H "Content-Type: application/json"
 
 # Legacy generic API: price <= current tạo conditional market SL; price > current tạo trigger limit sell.
