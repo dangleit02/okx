@@ -8,6 +8,28 @@ describe('OkxService pending order totals', () => {
     service = new OkxService({} as any, {} as any, {} as any);
   });
 
+  it('retries pending algo orders while the OKX trading bot engine is upgrading', async () => {
+    const config = {
+      get: jest.fn((key: string) => key === 'okx.baseUrl' ? 'https://www.okx.test' : 'value'),
+    };
+    const logger = { warn: jest.fn() };
+    service = new OkxService(config as any, logger as any, {} as any);
+    const sleep = jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+    const get = jest.spyOn(axios, 'get')
+      .mockResolvedValueOnce({
+        data: { code: '51290', data: [], msg: 'Trading bot engine currently upgrading.' },
+      })
+      .mockResolvedValueOnce({ data: { code: '0', data: [] } });
+
+    const result = await (service as any).getPendingSpotAlgoOrders('trigger');
+
+    expect(result).toEqual([]);
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledWith(1000);
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('OKX 51290'));
+    get.mockRestore();
+  });
+
   it('splits the requested price range without counting boundary orders twice', async () => {
     jest
       .spyOn(service as any, 'getPendingTriggerSpotOrders')
@@ -355,6 +377,42 @@ describe('OkxService pending order totals', () => {
         maxPrice: 60000,
         orderCount: 1,
         totalAmount: 600,
+      }),
+    ]);
+  });
+
+  it('keeps successful coins and reports only failed coins in all-coins totals', async () => {
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'coinsForBuy') return ['BTC', 'ETH'];
+        if (key === 'coinsSpotForTakeProfit') return [];
+        return undefined;
+      }),
+    };
+    service = new OkxService(config as any, { warn: jest.fn() } as any, {} as any);
+    jest.spyOn(service as any, 'getPendingTriggerSpotOrders')
+      .mockImplementation(async (coin?: string) => {
+        if (!coin) throw new Error('OKX 51290');
+        if (coin === 'ETH') throw new Error('ETH unavailable');
+        return [{ instId: 'BTC-USDT', side: 'buy', triggerPx: '40000', ordPx: '40000', sz: '0.01' }];
+      });
+    jest.spyOn(service as any, 'getPendingConditionalSpotOrders').mockResolvedValue([]);
+    jest.spyOn(service as any, 'getSpotTickers').mockResolvedValue(new Map([
+      ['BTC-USDT', 50000],
+      ['ETH-USDT', 3000],
+    ]));
+
+    const result = await service.getPendingOrdersTotalForAllCoins('buy');
+
+    expect(result.orderCount).toBe(1);
+    expect(result.totalAmount).toBe(400);
+    expect(result.coins).toEqual([
+      expect.objectContaining({ coin: 'BTC', orderType: 'trigger', orderCount: 1 }),
+      expect.objectContaining({
+        coin: 'ETH',
+        orderType: 'trigger',
+        orderCount: 0,
+        error: 'ETH unavailable',
       }),
     ]);
   });

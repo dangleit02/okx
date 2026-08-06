@@ -78,6 +78,10 @@ export abstract class OkxFutureBaseService {
         return out;
     }
 
+    protected sleep(ms: number) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
     // ---------- instrument cache & helpers ----------
     // cache instId => instrument data
     private instrumentCache: Map<string, any> = new Map();
@@ -228,17 +232,34 @@ export abstract class OkxFutureBaseService {
                 after ? `after=${encodeURIComponent(after)}` : null,
             ].filter(Boolean).join('&');
             const getPath = `/api/v5/trade/orders-algo-pending?${query}`;
-            const timestamp = new Date().toISOString();
-            const getSign = this.sign(timestamp, 'GET', getPath);
+            const maxAttempts = 3;
+            let getRes: any;
 
-            const getRes = await axios.get(this.config.get<string>('okx.baseUrl') + getPath, {
-                headers: {
-                    'OK-ACCESS-KEY': this.config.get<string>('okx.apiKeyHEDGE'),
-                    'OK-ACCESS-SIGN': getSign,
-                    'OK-ACCESS-TIMESTAMP': timestamp,
-                    'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphraseHEDGE'),
-                },
-            });
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                const timestamp = new Date().toISOString();
+                const getSign = this.sign(timestamp, 'GET', getPath);
+
+                getRes = await axios.get(this.config.get<string>('okx.baseUrl') + getPath, {
+                    headers: {
+                        'OK-ACCESS-KEY': this.config.get<string>('okx.apiKeyHEDGE'),
+                        'OK-ACCESS-SIGN': getSign,
+                        'OK-ACCESS-TIMESTAMP': timestamp,
+                        'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphraseHEDGE'),
+                    },
+                });
+
+                const responseCode = String(getRes.data?.code ?? '0');
+                if (!['50011', '51290'].includes(responseCode) || attempt === maxAttempts) {
+                    break;
+                }
+
+                const retryDelayMs = attempt * 1000;
+                this.logger.warn(
+                    `Retry pending future ${ordType} orders after OKX ${responseCode} `
+                    + `(attempt ${attempt}/${maxAttempts}, delay ${retryDelayMs}ms)`,
+                );
+                await this.sleep(retryDelayMs);
+            }
 
             if (getRes.data?.code !== undefined && String(getRes.data.code) !== '0') {
                 throw new Error(`OKX rejected pending ${ordType} orders request: ${JSON.stringify(getRes.data)}`);

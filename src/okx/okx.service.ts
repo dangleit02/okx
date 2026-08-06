@@ -60,6 +60,7 @@ export interface PendingBuyOrdersTotal {
     pricedOrderCount: number;
     unpricedOrderCount: number;
     totalAmount: number;
+    error?: string;
     ranges?: PendingBuyOrdersRangeTotal[];
 }
 
@@ -284,19 +285,36 @@ export class OkxService {
                 after ? `after=${encodeURIComponent(after)}` : null,
             ].filter(Boolean).join('&');
             const getPath = `/api/v5/trade/orders-algo-pending?${query}`;
-            const timestamp = new Date().toISOString();
-            const getSign = this.sign(timestamp, 'GET', getPath);
-            const response = await axios.get(
-                this.config.get<string>('okx.baseUrl') + getPath,
-                {
-                    headers: {
-                        'OK-ACCESS-KEY': this.config.get<string>('okx.apiKey'),
-                        'OK-ACCESS-SIGN': getSign,
-                        'OK-ACCESS-TIMESTAMP': timestamp,
-                        'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphrase'),
-                    },
+            const maxAttempts = 3;
+            let response: any;
+
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                const timestamp = new Date().toISOString();
+                const getSign = this.sign(timestamp, 'GET', getPath);
+                response = await axios.get(
+                    this.config.get<string>('okx.baseUrl') + getPath,
+                    {
+                        headers: {
+                            'OK-ACCESS-KEY': this.config.get<string>('okx.apiKey'),
+                            'OK-ACCESS-SIGN': getSign,
+                            'OK-ACCESS-TIMESTAMP': timestamp,
+                            'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphrase'),
+                        },
+                    }
+                );
+
+                const responseCode = String(response.data?.code ?? '0');
+                if (!['50011', '51290'].includes(responseCode) || attempt === maxAttempts) {
+                    break;
                 }
-            );
+
+                const retryDelayMs = attempt * 1000;
+                this.logger.warn(
+                    `Retry pending spot ${ordType} orders after OKX ${responseCode} `
+                    + `(attempt ${attempt}/${maxAttempts}, delay ${retryDelayMs}ms)`,
+                );
+                await this.sleep(retryDelayMs);
+            }
 
             if (response.data?.code !== undefined && String(response.data.code) !== '0') {
                 throw new Error(`OKX rejected pending spot ${ordType} orders request: ${JSON.stringify(response.data)}`);
@@ -596,15 +614,82 @@ export class OkxService {
         }
         this.validatePendingOrdersTotalOptions(options);
 
-        const [triggerOrders, conditionalOrders, tickers] = await Promise.all([
-            this.getPendingTriggerSpotOrders(),
-            this.getPendingConditionalSpotOrders(),
+        const [triggerResult, conditionalResult, tickers] = await Promise.all([
+            Promise.resolve(this.getPendingTriggerSpotOrders())
+                .then((value) => ({ status: 'fulfilled' as const, value }))
+                .catch((reason) => ({ status: 'rejected' as const, reason })),
+            Promise.resolve(this.getPendingConditionalSpotOrders())
+                .then((value) => ({ status: 'fulfilled' as const, value }))
+                .catch((reason) => ({ status: 'rejected' as const, reason })),
             this.getSpotTickers(),
         ]);
-        const orders = [
-            ...triggerOrders.map((order: any) => ({ ...order, ordType: order.ordType ?? 'trigger' })),
-            ...conditionalOrders.map((order: any) => ({ ...order, ordType: order.ordType ?? 'conditional' })),
+        const sourceResults = [
+            { orderType: 'trigger' as const, result: triggerResult },
+            { orderType: 'conditional' as const, result: conditionalResult },
         ];
+        const orders: any[] = [];
+        const orderErrors: Array<{
+            coin: string;
+            orderType: PendingSpotOrderType;
+            error: string;
+        }> = [];
+
+        for (const source of sourceResults) {
+            if (source.result.status === 'fulfilled') {
+                orders.push(...source.result.value.map((order: any) => ({
+                    ...order,
+                    ordType: order.ordType ?? source.orderType,
+                })));
+            }
+        }
+
+        const failedSources = sourceResults.filter((item) => item.result.status === 'rejected');
+        const configuredCoins = failedSources.length === 0 ? [] : Array.from(new Set([
+            ...(this.config.get<string[]>('coinsForBuy') ?? []),
+            ...(this.config.get<string[]>('coinsSpotForTakeProfit') ?? []),
+            ...orders
+                .map((order: any) => String(order.instId ?? '').split('-')[0])
+                .filter(Boolean),
+        ].map((coin) => String(coin).trim().toUpperCase()).filter(Boolean))).sort();
+
+        for (const source of failedSources) {
+            if (configuredCoins.length === 0) {
+                orderErrors.push({
+                    coin: 'ALL',
+                    orderType: source.orderType,
+                    error: source.result.status === 'rejected'
+                        ? String(source.result.reason?.message ?? source.result.reason)
+                        : 'Unknown OKX error',
+                });
+                continue;
+            }
+
+            const perCoinResults = await Promise.all(configuredCoins.map(async (coin) => {
+                try {
+                    const coinOrders = source.orderType === 'trigger'
+                        ? await this.getPendingTriggerSpotOrders(coin)
+                        : await this.getPendingConditionalSpotOrders(coin);
+                    return { coin, orders: coinOrders };
+                } catch (error: any) {
+                    return { coin, error: String(error?.message ?? error) };
+                }
+            }));
+
+            for (const coinResult of perCoinResults) {
+                if (coinResult.error) {
+                    orderErrors.push({
+                        coin: coinResult.coin,
+                        orderType: source.orderType,
+                        error: coinResult.error,
+                    });
+                } else {
+                    orders.push(...(coinResult.orders ?? []).map((order: any) => ({
+                        ...order,
+                        ordType: order.ordType ?? source.orderType,
+                    })));
+                }
+            }
+        }
         const groups = Array.from(new Set(
             orders
                 .filter((order: any) => order.side === side && String(order.instId).endsWith('-USDT'))
@@ -642,6 +727,19 @@ export class OkxService {
                 return total;
             })
             .filter((item) => item.orderCount > 0);
+
+        coins.push(...orderErrors.map(({ coin, orderType, error }) => ({
+            coin,
+            instId: coin === 'ALL' ? '' : `${coin}-USDT`,
+            quoteCurrency: 'USDT',
+            orderType,
+            currentPrice: coin === 'ALL' ? undefined : tickers.get(`${coin}-USDT`),
+            orderCount: 0,
+            pricedOrderCount: 0,
+            unpricedOrderCount: 0,
+            totalAmount: 0,
+            error,
+        })));
 
         return {
             side,

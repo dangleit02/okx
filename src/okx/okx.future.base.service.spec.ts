@@ -2,6 +2,7 @@ jest.mock('src/logger/logger.service', () => ({ AppLogger: class {} }), { virtua
 jest.mock('src/email/email.service', () => ({ EmailService: class {} }), { virtual: true });
 
 import { OkxFutureBaseService } from './okx.future.base.service';
+import axios from 'axios';
 
 class TestFutureService extends OkxFutureBaseService {
   constructor(config: any, logger: any, emailService: any, private readonly hedgeMode = true) {
@@ -101,6 +102,23 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
         orders: [expect.objectContaining({ algoId: '4', orderType: 'conditional' })],
       }),
     ]);
+  });
+
+  it('retries pending algo orders while the OKX trading bot engine is upgrading', async () => {
+    const { service, logger } = createService();
+    const sleep = jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+    const get = jest.spyOn(axios, 'get')
+      .mockResolvedValueOnce({
+        data: { code: '51290', data: [], msg: 'Trading bot engine currently upgrading.' },
+      })
+      .mockResolvedValueOnce({ data: { code: '0', data: [] } });
+
+    const result = await service.getAllPendingTriggerOrders('SWAP');
+
+    expect(result).toEqual([]);
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledWith(1000);
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('OKX 51290'));
   });
 
   it('rejects every entry order that does not have a stop loss', async () => {

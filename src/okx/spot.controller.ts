@@ -238,6 +238,7 @@ export class SpotController {
       'ORDER COUNT',
       'TOTAL AMOUNT (USDT)',
       'TOTAL BOUGHT (USDT)',
+      'ERROR',
     ];
     const summaryRows = sortedCoins.map((coin) => [
       coin.coin,
@@ -262,6 +263,7 @@ export class SpotController {
       String(coin.orderCount),
       String(coin.totalAmount),
       String(totalBoughtUsdtByCoin.get(coin.coin.toUpperCase()) ?? 0),
+      coin.error ?? '',
     ]);
     const tables = [
       'TABLE SUMMARY',
