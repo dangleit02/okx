@@ -381,6 +381,41 @@ describe('OkxService pending order totals', () => {
     ]);
   });
 
+  it('uses TP fields when OKX returns empty SL fields for a conditional take-profit', async () => {
+    jest.spyOn(service as any, 'getPendingTriggerSpotOrders').mockResolvedValue([]);
+    jest.spyOn(service as any, 'getPendingConditionalSpotOrders').mockResolvedValue([
+      {
+        instId: 'XLM-USDT',
+        ordType: 'conditional',
+        side: 'sell',
+        slTriggerPx: '',
+        slOrdPx: '',
+        tpTriggerPx: '0.1967',
+        tpOrdPx: '-1',
+        sz: '592.831734',
+      },
+    ]);
+    jest.spyOn(service as any, 'getSpotTickers').mockResolvedValue(new Map([
+      ['XLM-USDT', 0.16223],
+    ]));
+
+    const result = await service.getPendingOrdersTotalForAllCoins('sell', { step: 1 });
+
+    expect(result.coins).toEqual([
+      expect.objectContaining({
+        coin: 'XLM',
+        orderType: 'conditional',
+        minPrice: 0.1967,
+        maxPrice: 0.1967,
+        pricedOrderCount: 1,
+        totalAmount: 116.61000208,
+        ranges: [
+          { fromPrice: 0.1967, toPrice: 0.1967, amount: 116.61000208 },
+        ],
+      }),
+    ]);
+  });
+
   it('keeps successful coins and reports only failed coins in all-coins totals', async () => {
     const config = {
       get: jest.fn((key: string) => {

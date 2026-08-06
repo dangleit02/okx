@@ -147,13 +147,34 @@ describe('SpotController buy order total response format', () => {
     const result = await controller.getAllSpotBoughtCoins();
 
     expect(result).toContain(
-      'COIN | NUMBER OF COIN | AMOUNT (USDT) | AVARAGE COST | CURRENT PRICE | PROFIT (%) | PROFIT (USDT)',
+      'COIN | NUMBER OF COIN | AMOUNT (USDT) | AVERAGE COST | CURRENT PRICE | PROFIT (USDT)',
     );
     expect(result).toContain('BTC');
     expect(result).toContain('0.1');
     expect(result).toContain('50000');
-    expect(result).toContain('51000');
+    expect(result).toContain('51000 (2%)');
     expect(result).toContain('100');
+  });
+
+  it('sorts bought spot coins alphabetically', async () => {
+    okxService.getAllSpotBoughtCoins.mockResolvedValueOnce({
+      ...boughtCoinsResponse,
+      coinCount: 2,
+      coins: [
+        {
+          ...boughtCoinsResponse.coins[0],
+          coin: 'ETH',
+        },
+        {
+          ...boughtCoinsResponse.coins[0],
+          coin: 'ADA',
+        },
+      ],
+    });
+
+    const result = await controller.getAllSpotBoughtCoins() as string;
+
+    expect(result.indexOf('ADA')).toBeLessThan(result.indexOf('ETH'));
   });
 
   it('defaults buy trigger direction to down and passes the validated current price', async () => {
@@ -223,13 +244,13 @@ describe('SpotController buy order total response format', () => {
     const result = await controller.getOrdersTotalForAllCoins('buy');
 
     expect(result).toContain('TABLE SUMMARY');
-    expect(result).toContain(
-      'COIN | ORDER TYPE | CURENT PRICE | CURRENT PROFIT (%) | AVERAGE COST | FROM PRICE | FROM PROFIT (%) | TO PRICE | TO PROFIT (%) | ORDER COUNT | TOTAL AMOUNT (USDT) | TOTAL BOUGHT (USDT) | ERROR',
+    expect(result).toMatch(
+      /COIN \| ORDER TYPE \| CURRENT PRICE \| AVERAGE COST \| FROM PRICE\s+\| TO PRICE\s+\| ORDER COUNT \| TOTAL AMOUNT \(USDT\) \| TOTAL BOUGHT \(USDT\) \| ERROR/,
     );
     expect(result).toContain('ADA  | TRIGGER    | 0.5');
     expect(result).toContain('BTC  | TRIGGER    | 51000');
-    expect(result).toMatch(/ADA\s+\| TRIGGER\s+\| 0\.5\s+\|\s+\|\s+\| 0\.4\s+\|\s+\| 0\.45\s+\|\s+\|/);
-    expect(result).toMatch(/BTC\s+\| TRIGGER\s+\| 51000\s+\| 2\s+\| 50000\s+\| 45000\s+\| -10\s+\| 50000\s+\| 0/);
+    expect(result).toMatch(/ADA\s+\| TRIGGER\s+\| 0\.5\s+\|\s+\| 0\.4\s+\| 0\.45\s+\|/);
+    expect(result).toMatch(/BTC\s+\| TRIGGER\s+\| 51000 \(2%\)\s+\| 50000\s+\| 45000 \(-10%\)\s+\| 50000 \(0%\)/);
     expect(result).toMatch(/ADA\s+\|[^\n]+\| 2\s+\| 425\s+\| 0\s+\|\s*$/m);
     expect(result).toMatch(/BTC\s+\|[^\n]+\| 1\s+\| 910\s+\| 5100\s+\|\s*$/m);
     expect(result).not.toContain('Summary:');
@@ -272,6 +293,51 @@ describe('SpotController buy order total response format', () => {
     expect(table.indexOf('ADA')).toBeLessThan(table.indexOf('BTC'));
   });
 
+  it('sorts all-coins table rows by coin and then from price', async () => {
+    okxService.getPendingOrdersTotalForAllCoins.mockResolvedValueOnce({
+      ...allCoinsResponse,
+      side: 'sell',
+      filter: { step: 1 },
+      coinCount: 1,
+      coins: [
+        {
+          ...allCoinsResponse.coins[1],
+          orderType: 'conditional',
+          minPrice: 0.1967,
+          maxPrice: 0.1967,
+          ranges: [{ fromPrice: 0.1967, toPrice: 0.1967, amount: 116.61 }],
+        },
+        {
+          ...allCoinsResponse.coins[1],
+          orderType: 'trigger',
+          minPrice: 0.15,
+          maxPrice: 0.2,
+          ranges: [
+            { fromPrice: 0.2, toPrice: 0.2, amount: 20 },
+            { fromPrice: 0.15, toPrice: 0.15, amount: 15 },
+          ],
+        },
+      ],
+    });
+
+    const table = await controller.getOrdersTotalForAllCoins(
+      'sell',
+      undefined,
+      undefined,
+      '1',
+    ) as string;
+    const detailRows = table
+      .split('TABLE DETAIL')[1]
+      .split('\n')
+      .filter((line) => line.startsWith('BTC'));
+
+    expect(detailRows.map((line) => parseFloat(line.split('|')[2].trim()))).toEqual([
+      0.15,
+      0.1967,
+      0.2,
+    ]);
+  });
+
   it('shows buy detail profit relative to current price for each order-count step', async () => {
     okxService.getPendingOrdersTotalForAllCoins.mockResolvedValueOnce({
       ...allCoinsResponse,
@@ -293,11 +359,11 @@ describe('SpotController buy order total response format', () => {
     );
 
     expect(result).toContain('TABLE DETAIL');
-    expect(result).toContain(
-      'COIN | ORDER TYPE | FROM PRICE | FROM PROFIT (%) | TO PRICE | TO PROFIT (%) | AMOUNT (USDT)',
+    expect(result).toMatch(
+      /COIN \| ORDER TYPE \| FROM PRICE\s+\| TO PRICE\s+\| AMOUNT \(USDT\)/,
     );
-    expect(result).toMatch(/BTC\s+\| TRIGGER\s+\| 40000\s+\| -21\.57\s+\| 41000\s+\| -19\.61\s+\| 810/);
-    expect(result).toMatch(/BTC\s+\| TRIGGER\s+\| 49000\s+\| -3\.92\s+\| 50000\s+\| -1\.96\s+\| 990/);
+    expect(result).toMatch(/BTC\s+\| TRIGGER\s+\| 40000 \(-21\.57%\)\s+\| 41000 \(-19\.61%\)\s+\| 810/);
+    expect(result).toMatch(/BTC\s+\| TRIGGER\s+\| 49000 \(-3\.92%\)\s+\| 50000 \(-1\.96%\)\s+\| 990/);
   });
 
   it('returns and logs an ASCII table when format=table', async () => {

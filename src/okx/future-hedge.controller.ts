@@ -6,6 +6,7 @@ import * as _ from 'lodash';
 import { TradeOneCoinParams } from 'src/interfaces/interface';
 import { parseBool } from 'src/common/util';
 import { AppLogger } from 'src/logger/logger.service';
+import { formatFutureOrdersAsTable, formatFuturePositionsAsTable } from './future-table';
 
 @Controller('future-hedge')
 export class FutureHedgeController {
@@ -137,10 +138,13 @@ export class FutureHedgeController {
 
   @Get('orders-all-coins')
   async ordersAllCoins(@Query() query: Record<string, string>) {
-    return this.okx.getFutureOrdersForAllCoins(
+    const result = await this.okx.getFutureOrdersForAllCoins(
       this.parseDirection(query.direction),
       this.parseIntent(query.intent),
     );
+    return query.format?.toLowerCase() === 'json'
+      ? result
+      : formatFutureOrdersAsTable(result);
   }
 
   @Get('orders-one-coin/:coin')
@@ -153,10 +157,13 @@ export class FutureHedgeController {
   }
 
   @Get('spot-bought-coins')
-  async openPositions(@Query('direction') direction?: string) {
-    return this.okx.getOpenFuturePositions(
-      direction === undefined ? undefined : this.parseDirection(direction),
+  async openPositions(@Query() query: Record<string, string>) {
+    const result = await this.okx.getOpenFuturePositions(
+      query.direction === undefined ? undefined : this.parseDirection(query.direction),
     );
+    return query.format?.toLowerCase() === 'json'
+      ? result
+      : formatFuturePositionsAsTable(result);
   }
 
   @Post('close-at-trigger-price/:coin')

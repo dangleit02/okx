@@ -349,16 +349,22 @@ export class OkxService {
     }
 
     private getPendingOrderTriggerPrice(order: any): number {
-        const triggerPrice = order.ordType === 'conditional'
-            ? order.slTriggerPx ?? order.tpTriggerPx ?? order.triggerPx
-            : order.triggerPx ?? order.slTriggerPx ?? order.tpTriggerPx;
+        const candidates = order.ordType === 'conditional'
+            ? [order.slTriggerPx, order.tpTriggerPx, order.triggerPx]
+            : [order.triggerPx, order.slTriggerPx, order.tpTriggerPx];
+        const triggerPrice = candidates.find((value) => (
+            value !== undefined && value !== null && String(value).trim() !== ''
+        ));
         return Number(triggerPrice);
     }
 
     private getPendingOrderPrice(order: any): number {
-        const orderPrice = order.ordType === 'conditional'
-            ? order.slOrdPx ?? order.tpOrdPx ?? order.ordPx
-            : order.ordPx ?? order.slOrdPx ?? order.tpOrdPx;
+        const candidates = order.ordType === 'conditional'
+            ? [order.slOrdPx, order.tpOrdPx, order.ordPx]
+            : [order.ordPx, order.slOrdPx, order.tpOrdPx];
+        const orderPrice = candidates.find((value) => (
+            value !== undefined && value !== null && String(value).trim() !== ''
+        ));
         const numericOrderPrice = Number(orderPrice);
 
         // OKX uses -1 for a market order after an SL is triggered. Use its

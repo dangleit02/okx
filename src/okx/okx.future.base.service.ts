@@ -313,6 +313,14 @@ export abstract class OkxFutureBaseService {
         return order.ordType === 'conditional' ? 'conditional' : 'trigger';
     }
 
+    private getFuturePendingPrice(order: any, fields: string[]): number | undefined {
+        const value = fields
+            .map((field) => order?.[field])
+            .find((candidate) => candidate !== undefined && candidate !== null && candidate !== '');
+        const price = Number(value);
+        return Number.isFinite(price) ? price : undefined;
+    }
+
     private summarizeFuturePendingOrderTypes(orders: any[]) {
         return orders.reduce((counts, order) => {
             const orderType = this.getFuturePendingOrderType(order);
@@ -397,21 +405,44 @@ export abstract class OkxFutureBaseService {
         ).map((order: any) => ({
             ...order,
             orderType: this.getFuturePendingOrderType(order),
-        }));
+            triggerPrice: this.getFuturePendingPrice(
+                order,
+                ['triggerPx', 'tpTriggerPx', 'slTriggerPx'],
+            ),
+            orderPrice: this.getFuturePendingPrice(
+                order,
+                ['ordPx', 'tpOrdPx', 'slOrdPx'],
+            ),
+        })).sort((left: any, right: any) => (
+            String(left.instId).localeCompare(String(right.instId))
+            || (left.triggerPrice ?? Number.POSITIVE_INFINITY)
+                - (right.triggerPrice ?? Number.POSITIVE_INFINITY)
+            || String(left.orderType).localeCompare(String(right.orderType))
+        ));
         const byCoin = new Map<string, any[]>();
         for (const order of orders) {
             const coin = String(order.instId ?? '').split('-')[0].toUpperCase();
             if (!byCoin.has(coin)) byCoin.set(coin, []);
             byCoin.get(coin)!.push(order);
         }
+        const coinEntries = Array.from(byCoin.entries())
+            .sort(([left], [right]) => left.localeCompare(right));
+        const currentPrices = await Promise.all(coinEntries.map(async ([coin]) => {
+            try {
+                return await this.getTicker(`${coin}-USDT-SWAP`);
+            } catch {
+                return undefined;
+            }
+        }));
         const result = {
             direction,
             intent,
             orderCount: orders.length,
             orderTypeCounts: this.summarizeFuturePendingOrderTypes(orders),
-            coins: Array.from(byCoin.entries()).map(([coin, coinOrders]) => ({
+            coins: coinEntries.map(([coin, coinOrders], index) => ({
                 coin,
                 instId: `${coin}-USDT-SWAP`,
+                currentPrice: currentPrices[index],
                 orderCount: coinOrders.length,
                 orderTypeCounts: this.summarizeFuturePendingOrderTypes(coinOrders),
                 orders: coinOrders,
@@ -1489,6 +1520,7 @@ export abstract class OkxFutureBaseService {
             direction,
             size: Math.abs(signedSize),
             averagePrice: Number(position?.avgPx ?? 0),
+            currentPrice: Number(position?.markPx ?? position?.last ?? 0),
             unrealizedPnl: Number(position?.upl ?? 0),
             unrealizedPnlRatio: Number(position?.uplRatio ?? 0),
         };
@@ -1510,6 +1542,10 @@ export abstract class OkxFutureBaseService {
             if (direction && positionDirection !== direction) return [];
             return [this.normalizePosition(position, positionDirection)];
         });
+        normalized.sort((left: any, right: any) => (
+            left.coin.localeCompare(right.coin)
+            || left.direction.localeCompare(right.direction)
+        ));
         const result = { direction: direction ?? 'all', positionCount: normalized.length, positions: normalized };
         this.logger.log(
             `FUTURE ${this.getPositionMode()} open positions: direction=${result.direction}, count=${result.positionCount}`,

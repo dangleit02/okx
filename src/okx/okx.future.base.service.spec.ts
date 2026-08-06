@@ -3,6 +3,7 @@ jest.mock('src/email/email.service', () => ({ EmailService: class {} }), { virtu
 
 import { OkxFutureBaseService } from './okx.future.base.service';
 import axios from 'axios';
+import { formatFutureOrdersAsTable, formatFuturePositionsAsTable } from './future-table';
 
 class TestFutureService extends OkxFutureBaseService {
   constructor(config: any, logger: any, emailService: any, private readonly hedgeMode = true) {
@@ -102,6 +103,54 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
         orders: [expect.objectContaining({ algoId: '4', orderType: 'conditional' })],
       }),
     ]);
+  });
+
+  it('formats future orders by coin and trigger price with percentages inside price columns', () => {
+    const result = formatFutureOrdersAsTable({
+      direction: 'long',
+      intent: 'close',
+      coins: [
+        {
+          coin: 'ETH',
+          currentPrice: 200,
+          orders: [{ orderType: 'trigger', triggerPrice: 220, orderPrice: 219, sz: '2' }],
+        },
+        {
+          coin: 'BTC',
+          currentPrice: 100,
+          orders: [
+            { orderType: 'conditional', triggerPrice: 110, orderPrice: -1, sz: '1' },
+            { orderType: 'trigger', triggerPrice: 90, orderPrice: 89, sz: '1' },
+          ],
+        },
+      ],
+    });
+
+    expect(result.indexOf('BTC')).toBeLessThan(result.indexOf('ETH'));
+    expect(result).toContain('90 (-10%)');
+    expect(result).toContain('110 (10%)');
+    expect(result).toContain('MARKET');
+    expect(result).not.toContain('PROFIT (%)');
+  });
+
+  it('formats future positions alphabetically with profit inside current price', () => {
+    const result = formatFuturePositionsAsTable({
+      positions: [
+        {
+          coin: 'ETH', direction: 'long', size: 2, averagePrice: 200,
+          currentPrice: 190, unrealizedPnlRatio: -0.05, unrealizedPnl: -20,
+        },
+        {
+          coin: 'BTC', direction: 'long', size: 1, averagePrice: 100,
+          currentPrice: 110, unrealizedPnlRatio: 0.1, unrealizedPnl: 10,
+        },
+      ],
+    });
+
+    expect(result.indexOf('BTC')).toBeLessThan(result.indexOf('ETH'));
+    expect(result).toContain('110 (10%)');
+    expect(result).toContain('190 (-5%)');
+    expect(result).not.toContain('PROFIT (%)');
   });
 
   it('retries pending algo orders while the OKX trading bot engine is upgrading', async () => {

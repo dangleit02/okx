@@ -5,17 +5,17 @@
 curl -X POST 'http://localhost:3030/future-hedge/buy-trigger-from-min-to-max/BTC?direction=long&testing=true&minPrice=60000&maxPrice=62000&numberOfOrders=5&stopLossPrice=57000' \
   -H 'Content-Type: application/json'
 
-# 2. Xem tất cả vị thế LONG đang mở.
-curl -X GET 'http://localhost:3030/future-hedge/spot-bought-coins?direction=long' \
-  -H 'Content-Type: application/json'
+# 2. Xem tất cả vị thế LONG đang mở dạng bảng (dùng format=json để lấy JSON).
+curl -X GET 'http://localhost:3030/future-hedge/spot-bought-coins?direction=long&format=table' \
+  -H 'Content-Type: text/plain'
 
 # 3. Xem entry orders LONG của một coin.
 curl -X GET 'http://localhost:3030/future-hedge/orders-one-coin/BTC?direction=long&intent=open' \
   -H 'Content-Type: application/json'
 
-# 4. Xem close orders LONG của tất cả coin.
-curl -X GET 'http://localhost:3030/future-hedge/orders-all-coins?direction=long&intent=close' \
-  -H 'Content-Type: application/json'
+# 4. Xem close orders LONG của tất cả coin dạng bảng (dùng format=json để lấy JSON).
+curl -X GET 'http://localhost:3030/future-hedge/orders-all-coins?direction=long&intent=close&format=table' \
+  -H 'Content-Type: text/plain'
 
 # 5. Đặt sẵn TAKE PROFIT LONG tại giá cao hơn currentPrice: limit khi trigger.
 curl -X POST 'http://localhost:3030/future-hedge/close-at-price/BTC?direction=long&testing=true&price=65000&percentage=25' \
