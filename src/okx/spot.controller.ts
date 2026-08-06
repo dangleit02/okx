@@ -410,14 +410,14 @@ export class SpotController {
     return results;
   }
 
-  @Post('sell-at-trigger-price/:coin')
-  async sellAtTriggerPrice(
+  @Post('take-profit-at-trigger-price/:coin')
+  async takeProfitAtTriggerPrice(
     @Param('coin') coin: string,
     @Query('price') price: string,
     @Query('percentage') percentage: string,
     @Query('testing') testing?: string,
   ) {
-    return this.okxService.sellAtTriggerPrice(
+    return this.okxService.placeSpotTakeProfitAtTriggerPrice(
       coin,
       Number(price),
       Number(percentage),

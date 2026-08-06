@@ -97,7 +97,7 @@ describe('SpotController buy order total response format', () => {
     cancelPendingSpotOrdersForOneCoin: jest.Mock;
     cancelAllPendingSpotOrders: jest.Mock;
     cancelPendingOrdersByPriceRange: jest.Mock;
-    sellAtTriggerPrice: jest.Mock;
+    placeSpotTakeProfitAtTriggerPrice: jest.Mock;
     ensureSpotStopLoss: jest.Mock;
     placeSpotStopLossAtTriggerPrice: jest.Mock;
     placeSpotStopLossNearCurrentPrice: jest.Mock;
@@ -127,7 +127,7 @@ describe('SpotController buy order total response format', () => {
       cancelPendingOrdersByPriceRange: jest.fn().mockResolvedValue({
         status: 'preview',
       }),
-      sellAtTriggerPrice: jest.fn().mockResolvedValue({ status: 'preview' }),
+      placeSpotTakeProfitAtTriggerPrice: jest.fn().mockResolvedValue({ status: 'preview' }),
       ensureSpotStopLoss: jest.fn().mockResolvedValue({ status: 'preview' }),
       placeSpotStopLossAtTriggerPrice: jest.fn().mockResolvedValue({ status: 'preview' }),
       placeSpotStopLossNearCurrentPrice: jest.fn().mockResolvedValue({ status: 'preview' }),
@@ -401,11 +401,11 @@ describe('SpotController buy order total response format', () => {
 
   it('passes the requested trigger price and defaults to preview mode', async () => {
     await expect(
-      controller.sellAtTriggerPrice('btc', '50000', '25'),
+      controller.takeProfitAtTriggerPrice('btc', '70000', '25'),
     ).resolves.toEqual({ status: 'preview' });
-    expect(okxService.sellAtTriggerPrice).toHaveBeenCalledWith(
+    expect(okxService.placeSpotTakeProfitAtTriggerPrice).toHaveBeenCalledWith(
       'btc',
-      50000,
+      70000,
       25,
       true,
     );

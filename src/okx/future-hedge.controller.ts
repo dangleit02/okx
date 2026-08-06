@@ -159,7 +159,7 @@ export class FutureHedgeController {
     );
   }
 
-  @Post('sell-at-trigger-price/:coin')
+  @Post('close-at-trigger-price/:coin')
   async closeAtTriggerPrice(@Param('coin') coin: string, @Query() query: Record<string, string>) {
     return this.okx.closePositionAtTriggerPrice(
       coin,

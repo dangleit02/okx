@@ -17,6 +17,7 @@ interface BuyTriggerRangeOptions {
 export type PendingOrdersSide = 'buy' | 'sell';
 export type PendingAlgoOrderType = 'trigger' | 'conditional' | 'all';
 export type PendingSpotOrderType = 'trigger' | 'conditional';
+export type SpotConditionType = 'stop_loss' | 'take_profit' | 'unknown';
 
 export interface PendingOrdersTotalOptions {
     minPrice?: number;
@@ -365,6 +366,13 @@ export class OkxService {
         return Number.isFinite(numericOrderPrice) && numericOrderPrice > 0
             ? numericOrderPrice
             : this.getPendingOrderTriggerPrice(order);
+    }
+
+    private getSpotConditionType(order: any): SpotConditionType | undefined {
+        if (order.ordType !== 'conditional') return undefined;
+        if (order.slTriggerPx !== undefined && order.slTriggerPx !== '') return 'stop_loss';
+        if (order.tpTriggerPx !== undefined && order.tpTriggerPx !== '') return 'take_profit';
+        return 'unknown';
     }
 
     private summarizePendingOrders(
@@ -811,6 +819,7 @@ export class OkxService {
                 return {
                     algoId: String(order.algoId),
                     ordType: order.ordType,
+                    conditionType: this.getSpotConditionType(order),
                     triggerPrice,
                     orderPrice,
                     size: Number.isFinite(size) ? size : 0,
@@ -902,6 +911,7 @@ export class OkxService {
                 algoId: String(order.algoId),
                 instId: order.instId,
                 ordType: order.ordType,
+                conditionType: this.getSpotConditionType(order),
                 side: order.side,
                 triggerPrice: this.getPendingOrderTriggerPrice(order),
                 orderPrice: this.getPendingOrderPrice(order),
@@ -1177,6 +1187,7 @@ export class OkxService {
                 algoId: String(order.algoId),
                 instId: order.instId,
                 ordType: order.ordType,
+                conditionType: this.getSpotConditionType(order),
                 side: order.side,
                 triggerPrice: this.getPendingOrderTriggerPrice(order),
                 orderPrice: this.getPendingOrderPrice(order),
@@ -1365,10 +1376,11 @@ export class OkxService {
         return result;
     }
 
-    async sellAtTriggerPrice(
+    private async placeSpotConditionalExitAtTriggerPrice(
         coin: string,
         triggerPrice: number,
         percentage: number,
+        conditionType: Exclude<SpotConditionType, 'unknown'>,
         testing: boolean = true,
     ) {
         const normalizedCoin = coin?.trim().toUpperCase();
@@ -1423,16 +1435,7 @@ export class OkxService {
                 ? 'above_current_price'
                 : 'at_current_price';
 
-        const isStopLoss = triggerPrice <= currentPrice;
-        const orderPriceOffsetRatio = 0.002;
-        const orderPrice = triggerPrice * (1 - orderPriceOffsetRatio);
-        const formattedOrderPrice = Math.min(
-            Number(orderPrice.toFixed(priceToFixed)),
-            Number(formattedTriggerPrice) - 10 ** -priceToFixed,
-        ).toFixed(priceToFixed);
-        if (!isStopLoss && Number(formattedOrderPrice) <= 0) {
-            throw new Error(`Cannot place sell limit below trigger price ${formattedTriggerPrice} for ${normalizedCoin}`);
-        }
+        const isStopLoss = conditionType === 'stop_loss';
         const order = isStopLoss
             ? await this.placeSpotConditionalStopLoss(
                 normalizedCoin,
@@ -1440,12 +1443,10 @@ export class OkxService {
                 formattedTriggerPrice,
                 testing,
             )
-            : await this.placeOneOrder(
+            : await this.placeSpotConditionalTakeProfit(
                 normalizedCoin,
-                'sell',
                 formattedSize,
                 formattedTriggerPrice,
-                formattedOrderPrice,
                 testing,
             );
         const result = {
@@ -1458,10 +1459,11 @@ export class OkxService {
             sizeToSell: formattedSize,
             currentPrice,
             triggerPrice: Number(formattedTriggerPrice),
-            orderPrice: isStopLoss ? -1 : Number(formattedOrderPrice),
-            ordType: isStopLoss ? 'conditional' : 'trigger',
+            orderPrice: -1,
+            ordType: 'conditional',
+            conditionType,
+            executionType: 'market',
             priceDirection,
-            orderPriceOffsetRatio: isStopLoss ? undefined : orderPriceOffsetRatio,
             estimatedValueUsdt: Number((Number(formattedSize) * triggerPrice).toFixed(8)),
             order,
         };
@@ -1496,7 +1498,44 @@ export class OkxService {
                 `Spot stop-loss trigger price ${triggerPrice} must be below current price ${currentPrice}`,
             );
         }
-        return this.sellAtTriggerPrice(normalizedCoin, triggerPrice, percentage, testing);
+        return this.placeSpotConditionalExitAtTriggerPrice(
+            normalizedCoin,
+            triggerPrice,
+            percentage,
+            'stop_loss',
+            testing,
+        );
+    }
+
+    async placeSpotTakeProfitAtTriggerPrice(
+        coin: string,
+        triggerPrice: number,
+        percentage: number = 100,
+        testing: boolean = true,
+    ) {
+        const normalizedCoin = coin?.trim().toUpperCase();
+        if (!normalizedCoin || !/^[A-Z0-9]+$/.test(normalizedCoin)) {
+            throw new Error(`Invalid coin: ${coin}`);
+        }
+        if (!Number.isFinite(triggerPrice) || triggerPrice <= 0) {
+            throw new Error(`Invalid take-profit trigger price: ${triggerPrice}`);
+        }
+        const currentPrice = await this.getTicker(`${normalizedCoin}-USDT`);
+        if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+            throw new Error(`Invalid current price fetched for ${normalizedCoin}-USDT: ${currentPrice}`);
+        }
+        if (triggerPrice <= currentPrice) {
+            throw new Error(
+                `Spot take-profit trigger price ${triggerPrice} must be above current price ${currentPrice}`,
+            );
+        }
+        return this.placeSpotConditionalExitAtTriggerPrice(
+            normalizedCoin,
+            triggerPrice,
+            percentage,
+            'take_profit',
+            testing,
+        );
     }
 
     private validateSellPercentage(percentage: number) {
@@ -2128,6 +2167,62 @@ export class OkxService {
             await this.emailService.sendEmail(
                 process.env.EMAIL_TO,
                 `[SPOT] Conditional stop-loss ${normalizedCoin}`,
+                { coin: normalizedCoin, size: sz, triggerPx, order: body, response: responseData },
+            );
+        }
+        return { data: responseData, body };
+    }
+
+    async placeSpotConditionalTakeProfit(
+        coin: string,
+        sz: string,
+        triggerPx: string,
+        testing: boolean = true,
+    ) {
+        const normalizedCoin = coin.toUpperCase();
+        if (!Number.isFinite(Number(sz)) || Number(sz) <= 0) {
+            throw new Error(`Invalid spot take-profit size: ${sz}`);
+        }
+        if (!Number.isFinite(Number(triggerPx)) || Number(triggerPx) <= 0) {
+            throw new Error(`Invalid spot take-profit trigger price: ${triggerPx}`);
+        }
+
+        const timestamp = new Date().toISOString();
+        const requestPath = '/api/v5/trade/order-algo';
+        const body = {
+            instId: `${normalizedCoin}-USDT`,
+            tdMode: 'cash',
+            side: 'sell',
+            ordType: 'conditional',
+            sz,
+            tpTriggerPx: triggerPx,
+            tpTriggerPxType: 'last',
+            tpOrdPx: '-1',
+        };
+        const bodyString = JSON.stringify(body);
+        const headers = this.buildHeaders(timestamp, 'POST', requestPath, bodyString);
+        let responseData: any;
+        if (!testing) {
+            const response = await axios.post(
+                this.config.get<string>('okx.baseUrl') + requestPath,
+                bodyString,
+                { headers },
+            );
+            responseData = response.data;
+            const rejectedItem = responseData?.data?.find((item: any) => item.sCode && String(item.sCode) !== '0');
+            if (String(responseData?.code) !== '0' || rejectedItem) {
+                throw new Error(`OKX rejected spot conditional take-profit: ${JSON.stringify(responseData)}`);
+            }
+        }
+        this.logger.log(
+            `SPOT conditional take-profit: coin=${normalizedCoin}, testing=${testing}, size=${sz}, triggerPx=${triggerPx}, tpOrdPx=-1, result=${JSON.stringify(responseData ?? { preview: true })}`,
+            null,
+            normalizedCoin,
+        );
+        if (!testing) {
+            await this.emailService.sendEmail(
+                process.env.EMAIL_TO,
+                `[SPOT] Conditional take-profit ${normalizedCoin}`,
                 { coin: normalizedCoin, size: sz, triggerPx, order: body, response: responseData },
             );
         }

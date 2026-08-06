@@ -144,7 +144,7 @@ export class FutureOneWayController {
     return this.okx.getOpenFuturePositions(direction === undefined ? undefined : this.parseDirection(direction));
   }
 
-  @Post('sell-at-trigger-price/:coin')
+  @Post('close-at-trigger-price/:coin')
   async closeAtTriggerPrice(@Param('coin') coin: string, @Query() query: Record<string, string>) {
     return this.okx.closePositionAtTriggerPrice(coin, this.parseDirection(query.direction), Number(query.price), query.percentage ? Number(query.percentage) : 100, query.testing !== 'false');
   }

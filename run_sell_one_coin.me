@@ -19,28 +19,28 @@ curl -X POST 'http://localhost:3030/stop-loss-near-current-price/DOT?percentage=
     curl -X POST 'http://localhost:3030/stop-loss-near-current-price/ALGO?percentage=100&testing=false' \
       -H "Content-Type: application/json"
 
-# Legacy generic API: price <= current tạo conditional market SL; price > current tạo trigger limit sell.
-    curl -X POST 'http://localhost:3030/sell-at-trigger-price/XRP?price=1.1758&percentage=80&testing=false' \
+# Take-profit SPOT: giá phải cao hơn current, market khi conditional TP được trigger.
+    curl -X POST 'http://localhost:3030/take-profit-at-trigger-price/XRP?price=1.1758&percentage=80&testing=false' \
         -H "Content-Type: application/json"
-    curl -X POST 'http://localhost:3030/sell-at-trigger-price/SUI?price=0.7502&percentage=80&testing=false' \
+    curl -X POST 'http://localhost:3030/take-profit-at-trigger-price/SUI?price=0.7502&percentage=80&testing=false' \
         -H "Content-Type: application/json"
-    curl -X POST 'http://localhost:3030/sell-at-trigger-price/XLM?price=0.2181&percentage=80&testing=false' \
+    curl -X POST 'http://localhost:3030/take-profit-at-trigger-price/XLM?price=0.2181&percentage=80&testing=false' \
         -H "Content-Type: application/json"
-    curl -X POST 'http://localhost:3030/sell-at-trigger-price/NEAR?price=1.932&percentage=30&testing=false' \
+    curl -X POST 'http://localhost:3030/take-profit-at-trigger-price/NEAR?price=1.932&percentage=30&testing=false' \
         -H "Content-Type: application/json"
-    curl -X POST 'http://localhost:3030/sell-at-trigger-price/ALGO?price=0.087&percentage=80&testing=false' \
+    curl -X POST 'http://localhost:3030/take-profit-at-trigger-price/ALGO?price=0.087&percentage=80&testing=false' \
         -H "Content-Type: application/json"
-    curl -X POST 'http://localhost:3030/sell-at-trigger-price/ETH?price=2000&percentage=50&testing=false' \
+    curl -X POST 'http://localhost:3030/take-profit-at-trigger-price/ETH?price=2000&percentage=50&testing=false' \
       -H "Content-Type: application/json"
-    curl -X POST 'http://localhost:3030/sell-at-trigger-price/ADA?price=0.1900&percentage=50&testing=false' \
+    curl -X POST 'http://localhost:3030/take-profit-at-trigger-price/ADA?price=0.1900&percentage=50&testing=false' \
       -H "Content-Type: application/json"
-    curl -X POST 'http://localhost:3030/sell-at-trigger-price/DOGE?price=0.076&percentage=80&testing=false' \
+    curl -X POST 'http://localhost:3030/take-profit-at-trigger-price/DOGE?price=0.076&percentage=80&testing=false' \
       -H "Content-Type: application/json"
-    curl -X POST 'http://localhost:3030/sell-at-trigger-price/DOT?price=0.794&percentage=80&testing=false' \
+    curl -X POST 'http://localhost:3030/take-profit-at-trigger-price/DOT?price=0.794&percentage=80&testing=false' \
       -H "Content-Type: application/json"
-    curl -X POST 'http://localhost:3030/sell-at-trigger-price/ETC?price=7.04&percentage=80&testing=false' \
+    curl -X POST 'http://localhost:3030/take-profit-at-trigger-price/ETC?price=7.04&percentage=80&testing=false' \
       -H "Content-Type: application/json"
-    curl -X POST 'http://localhost:3030/sell-at-trigger-price/LTC?price=47.72&percentage=80&testing=false' \
+    curl -X POST 'http://localhost:3030/take-profit-at-trigger-price/LTC?price=47.72&percentage=80&testing=false' \
       -H "Content-Type: application/json"
 
 

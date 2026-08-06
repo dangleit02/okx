@@ -586,7 +586,10 @@ describe('OkxService cancel pending spot algo orders for one coin', () => {
       testing: true,
       matchedOrderCount: 2,
     }));
-    expect(result.orders.map((order: any) => order.ordType)).toEqual(['trigger', 'conditional']);
+    expect(result.orders.map((order: any) => [order.ordType, order.conditionType])).toEqual([
+      ['trigger', undefined],
+      ['conditional', 'stop_loss'],
+    ]);
   });
 });
 
@@ -1208,7 +1211,7 @@ describe('OkxService sell percentage at a requested trigger price', () => {
     const { service } = createService();
     const placeStopLoss = jest.spyOn(service, 'placeSpotConditionalStopLoss');
 
-    const result = await service.sellAtTriggerPrice('BTC', 50000, 25);
+    const result = await service.placeSpotStopLossAtTriggerPrice('BTC', 50000, 25);
 
     expect(result).toEqual(
       expect.objectContaining({
@@ -1219,6 +1222,8 @@ describe('OkxService sell percentage at a requested trigger price', () => {
         triggerPrice: 50000,
         orderPrice: -1,
         ordType: 'conditional',
+        conditionType: 'stop_loss',
+        executionType: 'market',
         priceDirection: 'below_current_price',
       }),
     );
@@ -1230,38 +1235,65 @@ describe('OkxService sell percentage at a requested trigger price', () => {
     );
   });
 
-  it('sets orderPx below triggerPx when the sell price is above current price', async () => {
+  it('uses a conditional market take-profit when the sell price is above current price', async () => {
     const { service } = createService();
-    const placeOneOrder = jest.spyOn(service, 'placeOneOrder').mockResolvedValue({
+    const placeTakeProfit = jest.spyOn(service, 'placeSpotConditionalTakeProfit').mockResolvedValue({
       data: { code: '0', data: [{ algoId: '123' }] },
-      body: { ordType: 'trigger' },
+      body: {
+        ordType: 'conditional',
+        tpTriggerPx: '70000.00',
+        tpOrdPx: '-1',
+      },
     } as any);
 
-    const result = await service.sellAtTriggerPrice('BTC', 70000, 25, false);
+    const result = await service.placeSpotTakeProfitAtTriggerPrice('BTC', 70000, 25, false);
 
     expect(result).toEqual(
       expect.objectContaining({
         status: 'submitted',
         triggerPrice: 70000,
-        orderPrice: 69860,
+        orderPrice: -1,
+        ordType: 'conditional',
+        conditionType: 'take_profit',
+        executionType: 'market',
         priceDirection: 'above_current_price',
       }),
     );
-    expect(placeOneOrder).toHaveBeenCalledWith(
+    expect(placeTakeProfit).toHaveBeenCalledWith(
       'BTC',
-      'sell',
       '0.3086',
       '70000.00',
-      '69860.00',
       false,
     );
+  });
+
+  it('builds a conditional take-profit payload with market execution', async () => {
+    const { service } = createService();
+
+    const result = await service.placeSpotConditionalTakeProfit(
+      'BTC',
+      '0.25',
+      '70000.00',
+      true,
+    );
+
+    expect(result.body).toEqual({
+      instId: 'BTC-USDT',
+      tdMode: 'cash',
+      side: 'sell',
+      ordType: 'conditional',
+      sz: '0.25',
+      tpTriggerPx: '70000.00',
+      tpTriggerPxType: 'last',
+      tpOrdPx: '-1',
+    });
   });
 
   it('rejects a missing or invalid requested price before reading the balance', async () => {
     const { service } = createService();
 
-    await expect(service.sellAtTriggerPrice('BTC', Number.NaN, 25)).rejects.toThrow(
-      'Invalid price',
+    await expect(service.placeSpotTakeProfitAtTriggerPrice('BTC', Number.NaN, 25)).rejects.toThrow(
+      'Invalid take-profit trigger price',
     );
     expect(service.getAccountBalance).not.toHaveBeenCalled();
   });
@@ -1269,10 +1301,10 @@ describe('OkxService sell percentage at a requested trigger price', () => {
   it('rejects a percentage outside the 0 to 100 range', async () => {
     const { service } = createService();
 
-    await expect(service.sellAtTriggerPrice('BTC', 50000, 0)).rejects.toThrow(
+    await expect(service.placeSpotTakeProfitAtTriggerPrice('BTC', 70000, 0)).rejects.toThrow(
       'Invalid percentage',
     );
-    await expect(service.sellAtTriggerPrice('BTC', 50000, 101)).rejects.toThrow(
+    await expect(service.placeSpotTakeProfitAtTriggerPrice('BTC', 70000, 101)).rejects.toThrow(
       'Invalid percentage',
     );
   });
@@ -1357,6 +1389,14 @@ describe('OkxService conditional spot stop-loss coverage', () => {
     await expect(
       service.placeSpotStopLossAtTriggerPrice('BTC', 110, 100, true),
     ).rejects.toThrow('must be below current price');
+  });
+
+  it('rejects a manual spot take-profit at or below current price', async () => {
+    const { service } = createService();
+
+    await expect(
+      service.placeSpotTakeProfitAtTriggerPrice('BTC', 90, 100, true),
+    ).rejects.toThrow('must be above current price');
   });
 });
 
