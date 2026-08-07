@@ -1,5 +1,9 @@
 import { SpotController } from './spot.controller';
-import { AllPendingOrdersTotal, AllSpotBoughtCoins, PendingBuyOrdersTotalResponse } from './okx.service';
+import {
+  AllPendingOrdersTotal,
+  AllSpotBoughtCoins,
+  PendingBuyOrdersTotalResponse,
+} from './okx.service';
 
 describe('SpotController buy order total response format', () => {
   const response: PendingBuyOrdersTotalResponse = {
@@ -101,6 +105,7 @@ describe('SpotController buy order total response format', () => {
     ensureSpotStopLoss: jest.Mock;
     placeSpotStopLossAtTriggerPrice: jest.Mock;
     placeSpotStopLossNearCurrentPrice: jest.Mock;
+    placeSpotBuyNearCurrentPrice: jest.Mock;
     sellOneCoin: jest.Mock;
     sellAtPriceAllCoins: jest.Mock;
     cleanSellOrdersForOneCoin: jest.Mock;
@@ -110,30 +115,49 @@ describe('SpotController buy order total response format', () => {
   beforeEach(() => {
     logger = { log: jest.fn() };
     okxService = {
-      getPendingOrdersTotalForCoin: jest.fn().mockImplementation(
-        (_coin, side) => Promise.resolve({
-          ...response,
-          side,
-          coin: side === 'sell' ? 'ETH' : 'BTC',
-          instId: side === 'sell' ? 'ETH-USDT' : 'BTC-USDT',
-        }),
-      ),
-      getPendingOrdersTotalForAllCoins: jest.fn().mockResolvedValue(allCoinsResponse),
+      getPendingOrdersTotalForCoin: jest
+        .fn()
+        .mockImplementation((_coin, side) =>
+          Promise.resolve({
+            ...response,
+            side,
+            coin: side === 'sell' ? 'ETH' : 'BTC',
+            instId: side === 'sell' ? 'ETH-USDT' : 'BTC-USDT',
+          }),
+        ),
+      getPendingOrdersTotalForAllCoins: jest
+        .fn()
+        .mockResolvedValue(allCoinsResponse),
       getAllSpotBoughtCoins: jest.fn().mockResolvedValue(boughtCoinsResponse),
       validateBuyTriggerPriceDirection: jest.fn().mockResolvedValue(50),
       buyTriggerFromMinPriceToMaxPrice: jest.fn().mockResolvedValue([]),
-      cancelPendingSpotOrdersForOneCoin: jest.fn().mockResolvedValue({ status: 'preview' }),
-      cancelAllPendingSpotOrders: jest.fn().mockResolvedValue({ status: 'preview' }),
+      cancelPendingSpotOrdersForOneCoin: jest
+        .fn()
+        .mockResolvedValue({ status: 'preview' }),
+      cancelAllPendingSpotOrders: jest
+        .fn()
+        .mockResolvedValue({ status: 'preview' }),
       cancelPendingOrdersByPriceRange: jest.fn().mockResolvedValue({
         status: 'preview',
       }),
-      placeSpotTakeProfitAtTriggerPrice: jest.fn().mockResolvedValue({ status: 'preview' }),
+      placeSpotTakeProfitAtTriggerPrice: jest
+        .fn()
+        .mockResolvedValue({ status: 'preview' }),
       ensureSpotStopLoss: jest.fn().mockResolvedValue({ status: 'preview' }),
-      placeSpotStopLossAtTriggerPrice: jest.fn().mockResolvedValue({ status: 'preview' }),
-      placeSpotStopLossNearCurrentPrice: jest.fn().mockResolvedValue({ status: 'preview' }),
+      placeSpotStopLossAtTriggerPrice: jest
+        .fn()
+        .mockResolvedValue({ status: 'preview' }),
+      placeSpotStopLossNearCurrentPrice: jest
+        .fn()
+        .mockResolvedValue({ status: 'preview' }),
+      placeSpotBuyNearCurrentPrice: jest
+        .fn()
+        .mockResolvedValue({ status: 'preview' }),
       sellOneCoin: jest.fn().mockResolvedValue(undefined),
       sellAtPriceAllCoins: jest.fn().mockResolvedValue([]),
-      cleanSellOrdersForOneCoin: jest.fn().mockResolvedValue({ status: 'preview' }),
+      cleanSellOrdersForOneCoin: jest
+        .fn()
+        .mockResolvedValue({ status: 'preview' }),
       cleanSellOrdersForAllCoins: jest.fn().mockResolvedValue([]),
     };
     controller = new SpotController(
@@ -172,7 +196,7 @@ describe('SpotController buy order total response format', () => {
       ],
     });
 
-    const result = await controller.getAllSpotBoughtCoins() as string;
+    const result = (await controller.getAllSpotBoughtCoins()) as string;
 
     expect(result.indexOf('ADA')).toBeLessThan(result.indexOf('ETH'));
   });
@@ -249,8 +273,12 @@ describe('SpotController buy order total response format', () => {
     );
     expect(result).toContain('ADA  | TRIGGER    | 0.5');
     expect(result).toContain('BTC  | TRIGGER    | 51000');
-    expect(result).toMatch(/ADA\s+\| TRIGGER\s+\| 0\.5\s+\|\s+\| 0\.4\s+\| 0\.45\s+\|/);
-    expect(result).toMatch(/BTC\s+\| TRIGGER\s+\| 51000 \(2%\)\s+\| 50000\s+\| 45000 \(-10%\)\s+\| 50000 \(0%\)/);
+    expect(result).toMatch(
+      /ADA\s+\| TRIGGER\s+\| 0\.5\s+\|\s+\| 0\.4\s+\| 0\.45\s+\|/,
+    );
+    expect(result).toMatch(
+      /BTC\s+\| TRIGGER\s+\| 51000 \(2%\)\s+\| 50000\s+\| 45000 \(-10%\)\s+\| 50000 \(0%\)/,
+    );
     expect(result).toMatch(/ADA\s+\|[^\n]+\| 2\s+\| 425\s+\| 0\s+\|\s*$/m);
     expect(result).toMatch(/BTC\s+\|[^\n]+\| 1\s+\| 910\s+\| 5100\s+\|\s*$/m);
     expect(result).not.toContain('Summary:');
@@ -320,35 +348,35 @@ describe('SpotController buy order total response format', () => {
       ],
     });
 
-    const table = await controller.getOrdersTotalForAllCoins(
+    const table = (await controller.getOrdersTotalForAllCoins(
       'sell',
       undefined,
       undefined,
       '1',
-    ) as string;
+    )) as string;
     const detailRows = table
       .split('TABLE DETAIL')[1]
       .split('\n')
       .filter((line) => line.startsWith('BTC'));
 
-    expect(detailRows.map((line) => parseFloat(line.split('|')[2].trim()))).toEqual([
-      0.15,
-      0.1967,
-      0.2,
-    ]);
+    expect(
+      detailRows.map((line) => parseFloat(line.split('|')[2].trim())),
+    ).toEqual([0.15, 0.1967, 0.2]);
   });
 
   it('shows buy detail profit relative to current price for each order-count step', async () => {
     okxService.getPendingOrdersTotalForAllCoins.mockResolvedValueOnce({
       ...allCoinsResponse,
       filter: { step: 2 },
-      coins: [{
-        ...allCoinsResponse.coins[1],
-        ranges: [
-          { fromPrice: 40000, toPrice: 41000, amount: 810 },
-          { fromPrice: 49000, toPrice: 50000, amount: 990 },
-        ],
-      }],
+      coins: [
+        {
+          ...allCoinsResponse.coins[1],
+          ranges: [
+            { fromPrice: 40000, toPrice: 41000, amount: 810 },
+            { fromPrice: 49000, toPrice: 50000, amount: 990 },
+          ],
+        },
+      ],
     });
 
     const result = await controller.getOrdersTotalForAllCoins(
@@ -362,8 +390,12 @@ describe('SpotController buy order total response format', () => {
     expect(result).toMatch(
       /COIN \| ORDER TYPE \| FROM PRICE\s+\| TO PRICE\s+\| AMOUNT \(USDT\)/,
     );
-    expect(result).toMatch(/BTC\s+\| TRIGGER\s+\| 40000 \(-21\.57%\)\s+\| 41000 \(-19\.61%\)\s+\| 810/);
-    expect(result).toMatch(/BTC\s+\| TRIGGER\s+\| 49000 \(-3\.92%\)\s+\| 50000 \(-1\.96%\)\s+\| 990/);
+    expect(result).toMatch(
+      /BTC\s+\| TRIGGER\s+\| 40000 \(-21\.57%\)\s+\| 41000 \(-19\.61%\)\s+\| 810/,
+    );
+    expect(result).toMatch(
+      /BTC\s+\| TRIGGER\s+\| 49000 \(-3\.92%\)\s+\| 50000 \(-1\.96%\)\s+\| 990/,
+    );
   });
 
   it('returns and logs an ASCII table when format=table', async () => {
@@ -504,6 +536,24 @@ describe('SpotController buy order total response format', () => {
     );
   });
 
+  it('exposes the near-current trigger market buy API in preview mode by default', async () => {
+    await expect(controller.buyNearCurrentPrice('btc', '25')).resolves.toEqual({
+      status: 'preview',
+    });
+    expect(okxService.placeSpotBuyNearCurrentPrice).toHaveBeenCalledWith(
+      'btc',
+      25,
+      true,
+    );
+
+    await controller.buyNearCurrentPrice('eth', undefined, 'false');
+    expect(okxService.placeSpotBuyNearCurrentPrice).toHaveBeenCalledWith(
+      'eth',
+      undefined,
+      false,
+    );
+  });
+
   it('delegates all-coins selling to the shared service flow', async () => {
     await expect(
       controller.sellAtPriceAllCoins(
@@ -544,9 +594,13 @@ describe('SpotController buy order total response format', () => {
 
   it('uses the shared daily-task flow to clean all coins', async () => {
     await expect(controller.cleanSellOrdersForAllCoins()).resolves.toEqual([]);
-    expect(okxService.cleanSellOrdersForAllCoins).toHaveBeenLastCalledWith(true);
+    expect(okxService.cleanSellOrdersForAllCoins).toHaveBeenLastCalledWith(
+      true,
+    );
 
     await controller.cleanSellOrdersForAllCoins('false');
-    expect(okxService.cleanSellOrdersForAllCoins).toHaveBeenLastCalledWith(false);
+    expect(okxService.cleanSellOrdersForAllCoins).toHaveBeenLastCalledWith(
+      false,
+    );
   });
 });

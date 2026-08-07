@@ -1,5 +1,20 @@
-import { BadRequestException, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
-import { AllPendingOrdersTotal, AllSpotBoughtCoins, OkxService, PendingAlgoOrderType, PendingOrdersSide, PendingOrdersTotalResponse } from './okx.service';
+import {
+  BadRequestException,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
+import {
+  AllPendingOrdersTotal,
+  AllSpotBoughtCoins,
+  OkxService,
+  PendingAlgoOrderType,
+  PendingOrdersSide,
+  PendingOrdersTotalResponse,
+} from './okx.service';
 import { ConfigService } from '@nestjs/config';
 import { AppLogger } from '../logger/logger.service';
 import * as _ from 'lodash';
@@ -11,12 +26,18 @@ export class SpotController {
     private readonly okxService: OkxService,
     private config: ConfigService,
     private readonly logger: AppLogger,
-  ) { }
+  ) {}
 
   private parseAlgoOrderType(value?: string): PendingAlgoOrderType {
     const ordType = value ?? 'all';
-    if (ordType !== 'trigger' && ordType !== 'conditional' && ordType !== 'all') {
-      throw new BadRequestException('ordType must be trigger, conditional or all');
+    if (
+      ordType !== 'trigger' &&
+      ordType !== 'conditional' &&
+      ordType !== 'all'
+    ) {
+      throw new BadRequestException(
+        'ordType must be trigger, conditional or all',
+      );
     }
     return ordType;
   }
@@ -29,9 +50,7 @@ export class SpotController {
   }
 
   @Get('spot-bought-coins')
-  async getAllSpotBoughtCoins(
-    @Query('format') format: string = 'table',
-  ) {
+  async getAllSpotBoughtCoins(@Query('format') format: string = 'table') {
     const result = await this.okxService.getAllSpotBoughtCoins();
 
     if (format.toLowerCase() === 'json') {
@@ -55,12 +74,12 @@ export class SpotController {
     const rows = [...result.coins]
       .sort((left, right) => left.coin.localeCompare(right.coin))
       .map((coin) => [
-      coin.coin,
-      String(coin.numberOfCoins),
-      String(coin.amountUsdt),
-      String(coin.averageCost),
-      `${coin.currentPrice} (${coin.profitPercentage}%)`,
-      String(coin.profitUsdt),
+        coin.coin,
+        String(coin.numberOfCoins),
+        String(coin.amountUsdt),
+        String(coin.averageCost),
+        `${coin.currentPrice} (${coin.profitPercentage}%)`,
+        String(coin.profitUsdt),
       ]);
     const widths = headers.map((header, index) =>
       Math.max(header.length, ...rows.map((row) => row[index].length)),
@@ -69,11 +88,7 @@ export class SpotController {
       row.map((value, index) => value.padEnd(widths[index])).join(' | ');
     const separator = widths.map((width) => '-'.repeat(width)).join('-+-');
 
-    return [
-      formatRow(headers),
-      separator,
-      ...rows.map(formatRow),
-    ].join('\n');
+    return [formatRow(headers), separator, ...rows.map(formatRow)].join('\n');
   }
 
   @Get('orders-one-coin/:coin')
@@ -89,15 +104,23 @@ export class SpotController {
       throw new BadRequestException('side must be buy or sell');
     }
 
-    const result = await this.okxService.getPendingOrdersTotalForCoin(coin, side, {
-      minPrice: minPrice ? Number(minPrice) : undefined,
-      maxPrice: maxPrice ? Number(maxPrice) : undefined,
-      step: step ? Number(step) : undefined,
-    });
+    const result = await this.okxService.getPendingOrdersTotalForCoin(
+      coin,
+      side,
+      {
+        minPrice: minPrice ? Number(minPrice) : undefined,
+        maxPrice: maxPrice ? Number(maxPrice) : undefined,
+        step: step ? Number(step) : undefined,
+      },
+    );
 
     if (format.toLowerCase() === 'table') {
       const table = this.formatPendingOrdersAsTable(result, side);
-      this.logger.log(table, `Pending ${side} orders table`, coin.toUpperCase());
+      this.logger.log(
+        table,
+        `Pending ${side} orders table`,
+        coin.toUpperCase(),
+      );
       return table;
     }
 
@@ -113,7 +136,11 @@ export class SpotController {
     result: PendingOrdersTotalResponse,
     side: PendingOrdersSide,
   ): string {
-    const headers = ['FROM PRICE', 'TO PRICE', `AMOUNT (${result.quoteCurrency})`];
+    const headers = [
+      'FROM PRICE',
+      'TO PRICE',
+      `AMOUNT (${result.quoteCurrency})`,
+    ];
     const rows = (result.ranges ?? []).map((range) => [
       String(range.fromPrice),
       String(range.toPrice),
@@ -152,14 +179,18 @@ export class SpotController {
       throw new BadRequestException('side must be buy or sell');
     }
 
-    const boughtCoinsPromise = format.toLowerCase() === 'json'
-      ? undefined
-      : this.okxService.getAllSpotBoughtCoins();
-    const result = await this.okxService.getPendingOrdersTotalForAllCoins(side, {
-      minPrice: minPrice ? Number(minPrice) : undefined,
-      maxPrice: maxPrice ? Number(maxPrice) : undefined,
-      step: step ? Number(step) : undefined,
-    });
+    const boughtCoinsPromise =
+      format.toLowerCase() === 'json'
+        ? undefined
+        : this.okxService.getAllSpotBoughtCoins();
+    const result = await this.okxService.getPendingOrdersTotalForAllCoins(
+      side,
+      {
+        minPrice: minPrice ? Number(minPrice) : undefined,
+        maxPrice: maxPrice ? Number(maxPrice) : undefined,
+        step: step ? Number(step) : undefined,
+      },
+    );
 
     if (format.toLowerCase() === 'json') {
       this.logger.log(
@@ -205,11 +236,13 @@ export class SpotController {
     averageCostByCoin: Map<string, number>,
   ): string {
     const hasRanges = result.filter.step !== undefined;
-    const sortedCoins = [...result.coins].sort((left, right) => (
-      left.coin.localeCompare(right.coin)
-      || (left.minPrice ?? Number.POSITIVE_INFINITY) - (right.minPrice ?? Number.POSITIVE_INFINITY)
-      || left.orderType.localeCompare(right.orderType)
-    ));
+    const sortedCoins = [...result.coins].sort(
+      (left, right) =>
+        left.coin.localeCompare(right.coin) ||
+        (left.minPrice ?? Number.POSITIVE_INFINITY) -
+          (right.minPrice ?? Number.POSITIVE_INFINITY) ||
+        left.orderType.localeCompare(right.orderType),
+    );
     const formatTable = (headers: string[], rows: string[][]) => {
       const widths = headers.map((header, index) =>
         Math.max(header.length, ...rows.map((row) => row[index].length)),
@@ -224,23 +257,26 @@ export class SpotController {
       referencePrice: number | undefined,
     ) => {
       if (
-        price === undefined
-        || referencePrice === undefined
-        || !Number.isFinite(price)
-        || !Number.isFinite(referencePrice)
-        || referencePrice <= 0
+        price === undefined ||
+        referencePrice === undefined ||
+        !Number.isFinite(price) ||
+        !Number.isFinite(referencePrice) ||
+        referencePrice <= 0
       ) {
         return '';
       }
 
-      return String(Number((((price - referencePrice) / referencePrice) * 100).toFixed(2)));
+      return String(
+        Number((((price - referencePrice) / referencePrice) * 100).toFixed(2)),
+      );
     };
     const formatPriceWithProfit = (
       price: number | undefined,
       profitPercentage: string | number | undefined,
     ) => {
       if (price === undefined) return '';
-      if (profitPercentage === undefined || profitPercentage === '') return String(price);
+      if (profitPercentage === undefined || profitPercentage === '')
+        return String(price);
       return `${price} (${profitPercentage}%)`;
     };
     const summaryHeaders = [
@@ -284,10 +320,7 @@ export class SpotController {
       String(totalBoughtUsdtByCoin.get(coin.coin.toUpperCase()) ?? 0),
       coin.error ?? '',
     ]);
-    const tables = [
-      'TABLE SUMMARY',
-      formatTable(summaryHeaders, summaryRows),
-    ];
+    const tables = ['TABLE SUMMARY', formatTable(summaryHeaders, summaryRows)];
 
     if (hasRanges) {
       const detailHeaders = [
@@ -297,33 +330,37 @@ export class SpotController {
         'TO PRICE',
         'AMOUNT (USDT)',
       ];
-      const detailItems = sortedCoins.flatMap((coin) =>
-        (coin.ranges ?? []).map((range) => ({ coin, range })),
-      ).sort((left, right) => (
-        left.coin.coin.localeCompare(right.coin.coin)
-        || left.range.fromPrice - right.range.fromPrice
-        || left.coin.orderType.localeCompare(right.coin.orderType)
-        || left.range.toPrice - right.range.toPrice
-      ));
+      const detailItems = sortedCoins
+        .flatMap((coin) =>
+          (coin.ranges ?? []).map((range) => ({ coin, range })),
+        )
+        .sort(
+          (left, right) =>
+            left.coin.coin.localeCompare(right.coin.coin) ||
+            left.range.fromPrice - right.range.fromPrice ||
+            left.coin.orderType.localeCompare(right.coin.orderType) ||
+            left.range.toPrice - right.range.toPrice,
+        );
       const detailRows = detailItems.map(({ coin, range }) => {
-          const profitReferencePrice = result.side === 'buy'
+        const profitReferencePrice =
+          result.side === 'buy'
             ? coin.currentPrice
             : averageCostByCoin.get(coin.coin.toUpperCase());
 
-          return [
-            coin.coin,
-            coin.orderType.toUpperCase(),
-            formatPriceWithProfit(
-              range.fromPrice,
-              formatProfitPercentage(range.fromPrice, profitReferencePrice),
-            ),
-            formatPriceWithProfit(
-              range.toPrice,
-              formatProfitPercentage(range.toPrice, profitReferencePrice),
-            ),
-            String(range.amount),
-          ];
-        });
+        return [
+          coin.coin,
+          coin.orderType.toUpperCase(),
+          formatPriceWithProfit(
+            range.fromPrice,
+            formatProfitPercentage(range.fromPrice, profitReferencePrice),
+          ),
+          formatPriceWithProfit(
+            range.toPrice,
+            formatProfitPercentage(range.toPrice, profitReferencePrice),
+          ),
+          String(range.amount),
+        ];
+      });
       tables.push('', 'TABLE DETAIL', formatTable(detailHeaders, detailRows));
     }
 
@@ -339,7 +376,13 @@ export class SpotController {
   ) {
     const results = [];
     const isTesting = testing !== 'false';
-    await this.okxService.buyOneCoin(isTesting, removeExistingBuyOrders, coin, results, autobuy);
+    await this.okxService.buyOneCoin(
+      isTesting,
+      removeExistingBuyOrders,
+      coin,
+      results,
+      autobuy,
+    );
     return results;
   }
 
@@ -349,10 +392,14 @@ export class SpotController {
     @Query('removeExistingBuyOrders') removeExistingBuyOrders: string, // 'true' or 'false' remove existing buy orders before placing new ones
     @Query('autobuy') autobuy: string,
   ) {
-    this.logger.log(`Starting to place all orders for all coins, testing mode: ${testing}`);
+    this.logger.log(
+      `Starting to place all orders for all coins, testing mode: ${testing}`,
+    );
     let coins = this.config.get<any>(`coinsForBuy`);
     if (!coins) {
-      throw new Error(`No configuration found for coins: ${JSON.stringify(coins)}`);
+      throw new Error(
+        `No configuration found for coins: ${JSON.stringify(coins)}`,
+      );
     }
     coins = _.uniq(coins);
     this.logger.log(`Coins to process: ${JSON.stringify(coins)}`);
@@ -360,7 +407,13 @@ export class SpotController {
     const results = [];
     for await (const coin of coins) {
       this.logger.log(`Processing coin: ${coin.toUpperCase()}`);
-      await this.okxService.buyOneCoin(isTesting, removeExistingBuyOrders, coin, results, autobuy);
+      await this.okxService.buyOneCoin(
+        isTesting,
+        removeExistingBuyOrders,
+        coin,
+        results,
+        autobuy,
+      );
     }
     return results;
   }
@@ -389,8 +442,16 @@ export class SpotController {
     );
 
     if (!isTesting && parseBool(query.removeExistingBuyOrders)) {
-      const res = await this.okxService.cancelPendingSpotOrdersForOneCoin(coin, 'buy', 'trigger', false);
-      this.logger.log('Cancel existing buy orders:', JSON.stringify(res, null, 2));
+      const res = await this.okxService.cancelPendingSpotOrdersForOneCoin(
+        coin,
+        'buy',
+        'trigger',
+        false,
+      );
+      this.logger.log(
+        'Cancel existing buy orders:',
+        JSON.stringify(res, null, 2),
+      );
       results.push({ coin, action: 'cancel_existing_buy_orders', result: res });
     }
 
@@ -401,23 +462,45 @@ export class SpotController {
       isTesting,
       {
         numberOfOrders: numberOfOrders ? Number(numberOfOrders) : undefined,
-        buyWithoutCheckAvarageCost: query.buyWithoutCheckAvarageCost === undefined
-          ? true
-          : parseBool(query.buyWithoutCheckAvarageCost),
+        buyWithoutCheckAvarageCost:
+          query.buyWithoutCheckAvarageCost === undefined
+            ? true
+            : parseBool(query.buyWithoutCheckAvarageCost),
         direction,
         currentPrice,
       },
     );
-    this.logger.log('Place trigger buy orders from min to max:', JSON.stringify(res, null, 2), coin);
-    results.push({ coin, action: 'place_trigger_buy_orders_from_min_to_max', result: res });
+    this.logger.log(
+      'Place trigger buy orders from min to max:',
+      JSON.stringify(res, null, 2),
+      coin,
+    );
+    results.push({
+      coin,
+      action: 'place_trigger_buy_orders_from_min_to_max',
+      result: res,
+    });
     return results;
+  }
+
+  @Post('buy-near-current-price/:coin')
+  async buyNearCurrentPrice(
+    @Param('coin') coin: string,
+    @Query('amountUsdt') amountUsdt?: string,
+    @Query('testing') testing?: string,
+  ) {
+    return this.okxService.placeSpotBuyNearCurrentPrice(
+      coin,
+      amountUsdt === undefined ? undefined : Number(amountUsdt),
+      testing !== 'false',
+    );
   }
 
   @Post('sell-at-price/:coin')
   async sellAtPrice(
     @Param('coin') coin: string,
     @Query('testing') testing: string,
-    @Query('removeExistingSellOrders') removeExistingSellOrders: string, // 'true' or 'false' remove existing sell orders before placing new ones 
+    @Query('removeExistingSellOrders') removeExistingSellOrders: string, // 'true' or 'false' remove existing sell orders before placing new ones
     @Query('addSellStopLoss') addSellStopLoss: string, // 'true' or 'false' add stop loss order
     @Query('addSellTakeProfit') addSellTakeProfit: string, // 'true' or 'false' add take profit order
     @Query('onlyForDown') onlyForDown: string, // 'true' or 'false' only add sell orders for down strategy
@@ -425,7 +508,16 @@ export class SpotController {
   ) {
     const isTesting = testing !== 'false';
     const results = [];
-    await this.okxService.sellOneCoin({ coin, isTesting, removeExistingSellOrders, addSellStopLoss, addSellTakeProfit, onlyForDown, justOneOrder, results });
+    await this.okxService.sellOneCoin({
+      coin,
+      isTesting,
+      removeExistingSellOrders,
+      addSellStopLoss,
+      addSellTakeProfit,
+      onlyForDown,
+      justOneOrder,
+      results,
+    });
     return results;
   }
 
@@ -483,7 +575,7 @@ export class SpotController {
   @Post('sell-at-price-all-coins')
   async sellAtPriceAllCoins(
     @Query('testing') testing: string,
-    @Query('removeExistingSellOrders') removeExistingSellOrders: string, // 'true' or 'false' remove existing sell orders before placing new ones 
+    @Query('removeExistingSellOrders') removeExistingSellOrders: string, // 'true' or 'false' remove existing sell orders before placing new ones
     @Query('addSellStopLoss') addSellStopLoss: string, // 'true' or 'false' add stop loss order
     @Query('addSellTakeProfit') addSellTakeProfit: string, // 'true' or 'false' add take profit order
     @Query('onlyForDown') onlyForDown: string, // 'true' or 'false' only add sell orders for down strategy
@@ -491,7 +583,9 @@ export class SpotController {
   ) {
     const isTesting = testing !== 'false';
 
-    this.logger.log(`Starting to place all orders for all coins, testing mode: ${testing}`);
+    this.logger.log(
+      `Starting to place all orders for all coins, testing mode: ${testing}`,
+    );
     return this.okxService.sellAtPriceAllCoins({
       isTesting,
       removeExistingSellOrders,
@@ -535,19 +629,12 @@ export class SpotController {
     @Param('coin') coin: string,
     @Query('testing') testing?: string,
   ) {
-    return this.okxService.cleanSellOrdersForOneCoin(
-      coin,
-      testing !== 'false',
-    );
+    return this.okxService.cleanSellOrdersForOneCoin(coin, testing !== 'false');
   }
 
   @Post('clean-sell-orders-all-coins')
-  async cleanSellOrdersForAllCoins(
-    @Query('testing') testing?: string,
-  ) {
-    return this.okxService.cleanSellOrdersForAllCoins(
-      testing !== 'false',
-    );
+  async cleanSellOrdersForAllCoins(@Query('testing') testing?: string) {
+    return this.okxService.cleanSellOrdersForAllCoins(testing !== 'false');
   }
 
   @Delete('cancel-orders-one-coin/:coin')
@@ -612,7 +699,6 @@ export class SpotController {
   //   return this.okxService.placeMultipleSellOrdersForDown(coin, isTesting);
   // }
 
-
   // @Post('buy-rebound-one/:coin')
   // async buyRebound(
   //   @Param('coin') coin: string,
@@ -625,7 +711,7 @@ export class SpotController {
   //   const instId = `${coin.toUpperCase()}-USDT`;
   //   const triggerPxLow = Number(low);
   //   const triggerPxHigh = Number(high);
-  //   this.tradingOneService.start(instId, sz, triggerPxLow, triggerPxHigh, isTesting);    
+  //   this.tradingOneService.start(instId, sz, triggerPxLow, triggerPxHigh, isTesting);
   //   return { message: `Monitoring ${instId} for rebound strategy...` };
   // }
 
@@ -648,7 +734,7 @@ export class SpotController {
   //   @Query('testing') testing: string
   // ) {
   //   const isTesting = testing !== 'false';
-  //   this.tradingMultipleService.start(coin, isTesting);    
+  //   this.tradingMultipleService.start(coin, isTesting);
   //   return { message: `Monitoring ${coin.toUpperCase()} for rebound strategy...` };
   // }
 

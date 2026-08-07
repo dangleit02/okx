@@ -1,6 +1,15 @@
 # FUTURE ONEWAY - LONG
 # Dùng testing=true để preview trước khi đổi sang testing=false.
 
+# Mở LONG market khi giá tăng khoảng 0.2% so với currentPrice.
+# Không truyền stopLossPrice: tự tính theo stopLossBuyPriceRatio.
+curl -X POST 'http://localhost:3030/future-oneway/open-near-current-price/BTC?direction=long&amountUsdt=25&testing=true' \
+  -H 'Content-Type: application/json'
+
+# Có thể chỉ định stop-loss thủ công (phải thấp hơn giá entry).
+# curl -X POST 'http://localhost:3030/future-oneway/open-near-current-price/BTC?direction=long&amountUsdt=25&stopLossPrice=58000&testing=true' \
+#   -H 'Content-Type: application/json'
+
 # 1. Đặt sẵn ladder mở LONG. Mỗi entry luôn có attached stop-loss.
 curl -X POST 'http://localhost:3030/future-oneway/buy-trigger-from-min-to-max/BTC?direction=long&testing=true&minPrice=60000&maxPrice=62000&numberOfOrders=5&stopLossPrice=57000' \
   -H 'Content-Type: application/json'

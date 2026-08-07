@@ -1,6 +1,15 @@
 # FUTURE HEDGE - SHORT
 # Dùng testing=true để preview trước khi đổi sang testing=false.
 
+# Mở SHORT market khi giá giảm khoảng 0.2% so với currentPrice.
+# Không truyền stopLossPrice: tự tính theo stopLossBuyPriceRatio.
+curl -X POST 'http://localhost:3030/future-hedge/open-near-current-price/BTC?direction=short&amountUsdt=25&testing=true' \
+  -H 'Content-Type: application/json'
+
+# Có thể chỉ định stop-loss thủ công (phải cao hơn giá entry).
+# curl -X POST 'http://localhost:3030/future-hedge/open-near-current-price/BTC?direction=short&amountUsdt=25&stopLossPrice=65000&testing=true' \
+#   -H 'Content-Type: application/json'
+
 # 1. Đặt sẵn ladder mở SHORT. Mỗi entry luôn có attached stop-loss.
 curl -X POST 'http://localhost:3030/future-hedge/buy-trigger-from-min-to-max/BTC?direction=short&testing=true&minPrice=60000&maxPrice=62000&numberOfOrders=5&stopLossPrice=65000' \
   -H 'Content-Type: application/json'
