@@ -279,6 +279,13 @@ export class SpotController {
         return String(price);
       return `${price} (${profitPercentage}%)`;
     };
+    const formatCoinWithCurrentProfit = (coin: string) => {
+      const profitPercentage = currentProfitPercentageByCoin.get(
+        coin.toUpperCase(),
+      );
+      if (!Number.isFinite(profitPercentage)) return coin;
+      return `${coin} (${profitPercentage.toFixed(2)}%)`;
+    };
     const summaryHeaders = [
       'COIN',
       'ORDER TYPE',
@@ -348,7 +355,9 @@ export class SpotController {
             : averageCostByCoin.get(coin.coin.toUpperCase());
 
         return [
-          coin.coin,
+          result.side === 'sell'
+            ? formatCoinWithCurrentProfit(coin.coin)
+            : coin.coin,
           coin.orderType.toUpperCase(),
           formatPriceWithProfit(
             range.fromPrice,

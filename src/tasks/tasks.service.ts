@@ -9,6 +9,8 @@ import { OkxFutureHedgeService } from "../okx/okx.future.hedge.service";
 import { OkxFutureOneWayService } from "../okx/okx.future.oneway.service";
 @Injectable()
 export class TasksService {
+    private spotOrderMaintenanceQueue: Promise<void> = Promise.resolve();
+
     constructor(
         private config: ConfigService,
         private readonly logger: AppLogger,
@@ -16,6 +18,20 @@ export class TasksService {
         private okxFutureHedgeService: OkxFutureHedgeService,
         private okxFutureOneWayService: OkxFutureOneWayService,
     ) {
+    }
+
+    private async runSpotOrderMaintenanceExclusive<T>(operation: () => Promise<T>): Promise<T> {
+        const previous = this.spotOrderMaintenanceQueue;
+        let release!: () => void;
+        this.spotOrderMaintenanceQueue = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        await previous;
+        try {
+            return await operation();
+        } finally {
+            release();
+        }
     }
 
     private async refreshFutureOrders(
@@ -129,14 +145,16 @@ export class TasksService {
                 addSellTakeProfit = 'true',
                 onlyForDown = 'false',
                 justOneOrder = 'false';
-            const results = await this.okxService.sellAtPriceAllCoins({
-                isTesting,
-                removeExistingSellOrders,
-                addSellStopLoss,
-                addSellTakeProfit,
-                onlyForDown,
-                justOneOrder,
-            });
+            const results = await this.runSpotOrderMaintenanceExclusive(() =>
+                this.okxService.sellAtPriceAllCoins({
+                    isTesting,
+                    removeExistingSellOrders,
+                    addSellStopLoss,
+                    addSellTakeProfit,
+                    onlyForDown,
+                    justOneOrder,
+                }),
+            );
             
             this.logger.log(`Auto sell results: ${JSON.stringify(results, null, 2)}`);
 
@@ -157,9 +175,18 @@ export class TasksService {
                 return;
             }
 
-            const results = await this.okxService.cleanSellOrdersForAllCoins(false);
+            const results = await this.runSpotOrderMaintenanceExclusive(() =>
+                this.okxService.cleanSellOrdersForAllCoins(false),
+            );
             this.logger.log(`Clean sell orders results: ${JSON.stringify(results, null, 2)}`);
-            this.logger.log(`✅ Successfully cleaned sell orders ${moment().format('YYYY/MM/DD HH:mm:ss')}`);
+            const failedCoins = results
+                .filter(({ result }: any) => result?.status === 'failed')
+                .map(({ coin }: any) => String(coin).toUpperCase());
+            if (failedCoins.length > 0) {
+                this.logger.log(`⚠️ Clean sell orders completed with failures for ${failedCoins.join(', ')} ${moment().format('YYYY/MM/DD HH:mm:ss')}`);
+            } else {
+                this.logger.log(`✅ Successfully cleaned sell orders ${moment().format('YYYY/MM/DD HH:mm:ss')}`);
+            }
         } catch (error) {
             this.logger.log(`⚠️ Error cleaning sell orders ${moment().format('YYYY/MM/DD HH:mm:ss')}, ${error.message}`);
             throw error;

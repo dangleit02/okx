@@ -1205,6 +1205,34 @@ describe('OkxService clean excess sell orders', () => {
       'near-rounded-size',
     ]);
   });
+
+  it('retries an OKX 429 response with backoff and logs to the coin clean file', async () => {
+    const { service, logger } = createService();
+    const rateLimitError = Object.assign(new Error('Too Many Requests'), {
+      response: { status: 429, data: { code: '50011' }, headers: {} },
+      config: { url: '/api/v5/market/ticker?instId=ETC-USDT' },
+    });
+    const getTicker = (service as any).getTicker as jest.Mock;
+    getTicker
+      .mockRejectedValueOnce(rateLimitError)
+      .mockRejectedValueOnce(rateLimitError)
+      .mockResolvedValueOnce(100);
+    const sleep = jest
+      .spyOn(service as any, 'sleep')
+      .mockResolvedValue(undefined);
+
+    await expect(service.cleanSellOrdersForOneCoin('ETC')).resolves.toEqual(
+      expect.objectContaining({ status: 'preview', coin: 'ETC' }),
+    );
+
+    expect(getTicker).toHaveBeenCalledTimes(3);
+    expect(sleep.mock.calls).toEqual([[1000], [2000]]);
+    expect(logger.log).toHaveBeenCalledWith(
+      expect.stringContaining('Too Many Requests'),
+      'Clean sell orders request failed',
+      'ETC_clean',
+    );
+  });
 });
 
 describe('OkxService place spot stop loss near current price', () => {
@@ -1923,6 +1951,9 @@ describe('OkxService sell all configured bought coins', () => {
 
   it('cleans every configured bought coin through the one-coin cleanup flow', async () => {
     const { service } = createService();
+    const sleep = jest
+      .spyOn(service as any, 'sleep')
+      .mockResolvedValue(undefined);
     jest.spyOn(service, 'getAllSpotBoughtCoins').mockResolvedValue({
       quoteCurrency: 'USDT',
       coinCount: 2,
@@ -1960,5 +1991,67 @@ describe('OkxService sell all configured bought coins', () => {
       ['btc', false],
       ['ETH', false],
     ]);
+    expect(sleep).toHaveBeenCalledWith(1100);
+  });
+
+  it('continues cleaning later coins when one coin still fails', async () => {
+    const { service, logger } = createService();
+    jest.spyOn(service, 'getAllSpotBoughtCoins').mockResolvedValue({
+      quoteCurrency: 'USDT',
+      coinCount: 2,
+      totalProfitUsdt: 0,
+      coins: [
+        {
+          coin: 'BTC',
+          numberOfCoins: 0.1,
+          amountUsdt: 1,
+          averageCost: 1,
+          currentPrice: 1,
+          profitPercentage: 0,
+          profitUsdt: 0,
+        },
+        {
+          coin: 'ETH',
+          numberOfCoins: 1,
+          amountUsdt: 1,
+          averageCost: 1,
+          currentPrice: 1,
+          profitPercentage: 0,
+          profitUsdt: 0,
+        },
+      ],
+    });
+    const rateLimitError = Object.assign(new Error('Too Many Requests'), {
+      response: { status: 429, data: { code: '50011' } },
+      config: { url: '/api/v5/trade/orders-algo-pending' },
+    });
+    const cleanOneCoin = jest
+      .spyOn(service, 'cleanSellOrdersForOneCoin')
+      .mockRejectedValueOnce(rateLimitError)
+      .mockResolvedValueOnce({ status: 'clean', coin: 'ETH' } as any);
+    jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+
+    const results = await service.cleanSellOrdersForAllCoins(false);
+
+    expect(cleanOneCoin.mock.calls).toEqual([
+      ['btc', false],
+      ['ETH', false],
+    ]);
+    expect(results).toEqual([
+      {
+        coin: 'btc',
+        result: expect.objectContaining({
+          status: 'failed',
+          coin: 'BTC',
+          responseStatus: 429,
+        }),
+      },
+      { coin: 'ETH', result: { status: 'clean', coin: 'ETH' } },
+    ]);
+    expect(logger.log).toHaveBeenCalledWith(
+      expect.stringContaining('Too Many Requests'),
+      'Clean sell orders failed; continuing with next coin',
+      'BTC_clean',
+    );
   });
 });

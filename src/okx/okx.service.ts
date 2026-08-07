@@ -1208,18 +1208,74 @@ export class OkxService {
     );
   }
 
+  private isRateLimitError(error: any) {
+    return Number(error?.response?.status) === 429;
+  }
+
+  private getRateLimitRetryDelayMs(error: any, attempt: number) {
+    const retryAfter = Number(error?.response?.headers?.['retry-after']);
+    return Number.isFinite(retryAfter) && retryAfter > 0
+      ? retryAfter * 1000
+      : attempt * 1000;
+  }
+
   async cleanSellOrdersForOneCoin(coin: string, testing: boolean = true) {
+    const normalizedCoin = coin.trim().toUpperCase();
+    const maxAttempts = 3;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await this.cleanSellOrdersForOneCoinAttempt(
+          normalizedCoin,
+          testing,
+        );
+      } catch (error: any) {
+        const status = Number(error?.response?.status);
+        const responseData = error?.response?.data;
+        const requestUrl = error?.config?.url;
+        this.logger.log(
+          JSON.stringify({
+            coin: normalizedCoin,
+            attempt,
+            maxAttempts,
+            status: Number.isFinite(status) ? status : undefined,
+            requestUrl,
+            message: error?.message ?? String(error),
+            responseData,
+          }),
+          'Clean sell orders request failed',
+          `${normalizedCoin}_clean`,
+        );
+
+        if (!this.isRateLimitError(error) || attempt === maxAttempts) {
+          throw error;
+        }
+        const retryDelayMs = this.getRateLimitRetryDelayMs(error, attempt);
+        this.logger.log(
+          `OKX rate limit for ${normalizedCoin}; retry ${attempt + 1}/${maxAttempts} after ${retryDelayMs}ms`,
+          'Clean sell orders retry',
+          `${normalizedCoin}_clean`,
+        );
+        await this.sleep(retryDelayMs);
+      }
+    }
+  }
+
+  private async cleanSellOrdersForOneCoinAttempt(
+    coin: string,
+    testing: boolean,
+  ) {
     const normalizedCoin = coin.trim().toUpperCase();
     if (!normalizedCoin || !/^[A-Z0-9]+$/.test(normalizedCoin)) {
       throw new Error(`Invalid coin: ${coin}`);
     }
 
     const instId = `${normalizedCoin}-USDT`;
-    const [currentPrice, pendingOrders, balanceData] = await Promise.all([
-      this.getTicker(instId),
-      this.getPendingTriggerSpotOrders(normalizedCoin),
-      this.getAccountBalance(normalizedCoin),
-    ]);
+    // Keep these calls sequential to avoid a burst against OKX account/algo APIs.
+    const currentPrice = await this.getTicker(instId);
+    const pendingOrders =
+      await this.getPendingTriggerSpotOrders(normalizedCoin);
+    const balanceData = await this.getAccountBalance(normalizedCoin);
     if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
       throw new Error(
         `Invalid current price fetched for ${instId}: ${currentPrice}`,
@@ -3025,14 +3081,35 @@ export class OkxService {
     const coins = await this.getBoughtCoinsForTakeProfit();
     const results = [];
 
-    for (const coin of coins) {
+    for (const [index, coin] of coins.entries()) {
       this.logger.log(
         `Cleaning sell orders for coin: ${coin.toUpperCase()}`,
         null,
         coin,
       );
-      const result = await this.cleanSellOrdersForOneCoin(coin, testing);
-      results.push({ coin, result });
+      try {
+        const result = await this.cleanSellOrdersForOneCoin(coin, testing);
+        results.push({ coin, result });
+      } catch (error: any) {
+        const result = {
+          status: 'failed',
+          coin: String(coin).toUpperCase(),
+          responseStatus: error?.response?.status,
+          requestUrl: error?.config?.url,
+          error: error?.message ?? String(error),
+          responseData: error?.response?.data,
+        };
+        this.logger.log(
+          JSON.stringify(result),
+          'Clean sell orders failed; continuing with next coin',
+          `${String(coin).toUpperCase()}_clean`,
+        );
+        results.push({ coin, result });
+      }
+
+      if (index < coins.length - 1) {
+        await this.sleep(1100);
+      }
     }
 
     return results;

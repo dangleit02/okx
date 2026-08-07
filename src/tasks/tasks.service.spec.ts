@@ -66,6 +66,74 @@ describe('TasksService autoSellSpotForDown', () => {
     expect(okxService.cleanSellOrdersForAllCoins).toHaveBeenCalledWith(false);
     expect(okxService.sellAtPriceAllCoins).not.toHaveBeenCalled();
   });
+
+  it('reports partial cleanup failures after continuing through the batch', async () => {
+    const config = {
+      get: jest.fn((key: string) => key === 'runSpotTaskForClean'),
+    };
+    const logger = { log: jest.fn() };
+    const okxService = {
+      cleanSellOrdersForAllCoins: jest.fn().mockResolvedValue([
+        { coin: 'DOGE', result: { status: 'clean' } },
+        { coin: 'ETC', result: { status: 'failed' } },
+        { coin: 'XLM', result: { status: 'clean' } },
+      ]),
+    };
+    const service = new TasksService(
+      config as any,
+      logger as any,
+      okxService as any,
+      {} as any,
+      {} as any,
+    );
+
+    await service.cleanSellOrdersDaily();
+
+    expect(logger.log).toHaveBeenCalledWith(
+      expect.stringContaining('completed with failures for ETC'),
+    );
+    expect(logger.log).not.toHaveBeenCalledWith(
+      expect.stringContaining('Successfully cleaned sell orders'),
+    );
+  });
+
+  it('waits for auto-sell to finish before starting cleanup', async () => {
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'runSpotTaskForSell' || key === 'runSpotTaskForClean') return true;
+        if (key === 'runSpotTaskHavingStopLoss') return false;
+        return undefined;
+      }),
+    };
+    let finishSell!: () => void;
+    const sellInProgress = new Promise<any[]>((resolve) => {
+      finishSell = () => resolve([]);
+    });
+    const okxService = {
+      sellAtPriceAllCoins: jest.fn().mockReturnValue(sellInProgress),
+      cleanSellOrdersForAllCoins: jest.fn().mockResolvedValue([]),
+    };
+    const service = new TasksService(
+      config as any,
+      { log: jest.fn() } as any,
+      okxService as any,
+      {} as any,
+      {} as any,
+    );
+
+    const sellTask = service.autoSellSpotForDown();
+    await Promise.resolve();
+    const cleanTask = service.cleanSellOrdersDaily();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(okxService.sellAtPriceAllCoins).toHaveBeenCalledTimes(1);
+    expect(okxService.cleanSellOrdersForAllCoins).not.toHaveBeenCalled();
+
+    finishSell();
+    await Promise.all([sellTask, cleanTask]);
+    expect(okxService.cleanSellOrdersForAllCoins).toHaveBeenCalledWith(false);
+  });
 });
 
 describe('TasksService future long/short refresh', () => {
