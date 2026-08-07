@@ -367,12 +367,11 @@ export class SpotController {
     return tables.join('\n');
   }
 
-  @Post('buy-at-price/:coin')
-  async buyAtPrice(
+  @Post('auto-buy/:coin')
+  async autoBuy(
     @Param('coin') coin: string,
     @Query('testing') testing: string,
     @Query('removeExistingBuyOrders') removeExistingBuyOrders: string, // 'true' or 'false' remove existing buy orders before placing new ones
-    @Query('autobuy') autobuy: string,
   ) {
     const results = [];
     const isTesting = testing !== 'false';
@@ -381,16 +380,15 @@ export class SpotController {
       removeExistingBuyOrders,
       coin,
       results,
-      autobuy,
+      'true',
     );
     return results;
   }
 
-  @Post('buy-at-price-all-coins')
-  async buyAtPriceForAllCoins(
+  @Post('auto-buy-all-coins')
+  async autoBuyAllCoins(
     @Query('testing') testing: string,
     @Query('removeExistingBuyOrders') removeExistingBuyOrders: string, // 'true' or 'false' remove existing buy orders before placing new ones
-    @Query('autobuy') autobuy: string,
   ) {
     this.logger.log(
       `Starting to place all orders for all coins, testing mode: ${testing}`,
@@ -412,7 +410,7 @@ export class SpotController {
         removeExistingBuyOrders,
         coin,
         results,
-        autobuy,
+        'true',
       );
     }
     return results;
@@ -496,8 +494,8 @@ export class SpotController {
     );
   }
 
-  @Post('sell-at-price/:coin')
-  async sellAtPrice(
+  @Post('auto-sell/:coin')
+  async autoSell(
     @Param('coin') coin: string,
     @Query('testing') testing: string,
     @Query('removeExistingSellOrders') removeExistingSellOrders: string, // 'true' or 'false' remove existing sell orders before placing new ones
@@ -572,8 +570,8 @@ export class SpotController {
     );
   }
 
-  @Post('sell-at-price-all-coins')
-  async sellAtPriceAllCoins(
+  @Post('auto-sell-all-coins')
+  async autoSellAllCoins(
     @Query('testing') testing: string,
     @Query('removeExistingSellOrders') removeExistingSellOrders: string, // 'true' or 'false' remove existing sell orders before placing new ones
     @Query('addSellStopLoss') addSellStopLoss: string, // 'true' or 'false' add stop loss order

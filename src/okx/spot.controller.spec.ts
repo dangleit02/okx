@@ -98,6 +98,7 @@ describe('SpotController buy order total response format', () => {
     getAllSpotBoughtCoins: jest.Mock;
     validateBuyTriggerPriceDirection: jest.Mock;
     buyTriggerFromMinPriceToMaxPrice: jest.Mock;
+    buyOneCoin: jest.Mock;
     cancelPendingSpotOrdersForOneCoin: jest.Mock;
     cancelAllPendingSpotOrders: jest.Mock;
     cancelPendingOrdersByPriceRange: jest.Mock;
@@ -131,6 +132,7 @@ describe('SpotController buy order total response format', () => {
       getAllSpotBoughtCoins: jest.fn().mockResolvedValue(boughtCoinsResponse),
       validateBuyTriggerPriceDirection: jest.fn().mockResolvedValue(50),
       buyTriggerFromMinPriceToMaxPrice: jest.fn().mockResolvedValue([]),
+      buyOneCoin: jest.fn().mockResolvedValue(undefined),
       cancelPendingSpotOrdersForOneCoin: jest
         .fn()
         .mockResolvedValue({ status: 'preview' }),
@@ -554,9 +556,55 @@ describe('SpotController buy order total response format', () => {
     );
   });
 
+  it('exposes the single-coin ladder strategy as auto-buy without an autobuy flag', async () => {
+    await expect(controller.autoBuy('btc', undefined, 'true')).resolves.toEqual(
+      [],
+    );
+    expect(okxService.buyOneCoin).toHaveBeenCalledWith(
+      true,
+      'true',
+      'btc',
+      [],
+      'true',
+    );
+
+    await controller.autoBuy('eth', 'false', 'false');
+    expect(okxService.buyOneCoin).toHaveBeenCalledWith(
+      false,
+      'false',
+      'eth',
+      [],
+      'true',
+    );
+  });
+
+  it('exposes the single-coin sell strategy as auto-sell', async () => {
+    await expect(
+      controller.autoSell(
+        'btc',
+        undefined,
+        'true',
+        'false',
+        'true',
+        'false',
+        'true',
+      ),
+    ).resolves.toEqual([]);
+    expect(okxService.sellOneCoin).toHaveBeenCalledWith({
+      coin: 'btc',
+      isTesting: true,
+      removeExistingSellOrders: 'true',
+      addSellStopLoss: 'false',
+      addSellTakeProfit: 'true',
+      onlyForDown: 'false',
+      justOneOrder: 'true',
+      results: [],
+    });
+  });
+
   it('delegates all-coins selling to the shared service flow', async () => {
     await expect(
-      controller.sellAtPriceAllCoins(
+      controller.autoSellAllCoins(
         'false',
         'true',
         'true',

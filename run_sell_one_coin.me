@@ -11,7 +11,7 @@ curl -X POST 'http://localhost:3030/stop-loss-at-trigger-price/BTC?price=50000&p
   -H 'Content-Type: application/json'
 
 # Near-current SPOT SL: tự đặt conditional market SL khoảng 0.2% dưới current.
-curl -X POST 'http://localhost:3030/stop-loss-near-current-price/DOT?percentage=100&testing=false' \
+curl -X POST 'http://localhost:3030/stop-loss-near-current-price/LTC?percentage=100&testing=false' \
   -H 'Content-Type: application/json'
 
 # Near-current SPOT SL cho ALGO: đặt conditional market SL cho một phần available balance.
@@ -24,7 +24,7 @@ curl -X POST 'http://localhost:3030/stop-loss-near-current-price/DOT?percentage=
         -H "Content-Type: application/json"
     curl -X POST 'http://localhost:3030/take-profit-at-trigger-price/SUI?price=0.7502&percentage=80&testing=false' \
         -H "Content-Type: application/json"
-    curl -X POST 'http://localhost:3030/take-profit-at-trigger-price/XLM?price=0.2181&percentage=80&testing=false' \
+    curl -X POST 'http://localhost:3030/take-profit-at-trigger-price/XLM?price=0.1967&percentage=80&testing=false' \
         -H "Content-Type: application/json"
     curl -X POST 'http://localhost:3030/take-profit-at-trigger-price/NEAR?price=1.932&percentage=30&testing=false' \
         -H "Content-Type: application/json"
@@ -46,19 +46,19 @@ curl -X POST 'http://localhost:3030/stop-loss-near-current-price/DOT?percentage=
 
 # autosell for one coin
   # preview
-    curl -X POST "http://localhost:3030/sell-at-price/ETH?\
+    curl -X POST "http://localhost:3030/auto-sell/ETH?\
     testing=true&\
     removeExistingSellOrders=false&\
     addSellTakeProfit=true"
   
   # WARNING: autosell for one coin
-    curl -X POST "http://localhost:3030/sell-at-price/ETH?\
+    curl -X POST "http://localhost:3030/auto-sell/ETH?\
     testing=false&\
     removeExistingSellOrders=false&\
     addSellTakeProfit=true"
 
 # sell when down for one coin (to take profit but when down like stop loss)
-  curl -X POST "http://localhost:3030/sell-at-price/ETH?\
+  curl -X POST "http://localhost:3030/auto-sell/ETH?\
   testing=false&\
   removeExistingSellOrders=true&\
   addSellTakeProfit=true&\
@@ -67,7 +67,7 @@ curl -X POST 'http://localhost:3030/stop-loss-near-current-price/DOT?percentage=
     -H "Content-Type: application/json"
 
 # Global conditional stop-loss qua flow sell cũ.
-  curl -X POST "http://localhost:3030/sell-at-price/LINK?\
+  curl -X POST "http://localhost:3030/auto-sell/LINK?\
   testing=false&\
   removeExistingSellOrders=true&\
   addSellStopLoss=true&\

@@ -5,7 +5,7 @@ bán giá cao nhất tháng
 # autosell for all coin
   
   # WARNING
-curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
+curl -X POST "http://localhost:3030/auto-sell-all-coins?\
 testing=false&\
 removeExistingSellOrders=false&\
 addSellTakeProfit=true&\
@@ -14,7 +14,7 @@ justOneOrder=false" \
 -H "Content-Type: application/json"
 
 # sell and cancel
-  curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
+  curl -X POST "http://localhost:3030/auto-sell-all-coins?\
   testing=false&\
   removeExistingSellOrders=true&\
   addSellTakeProfit=true"
@@ -22,7 +22,7 @@ justOneOrder=false" \
 
 # sell when down for all coinsSpotForTakeProfit (to take profit but when down like stop loss)
   # one order
-    curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
+    curl -X POST "http://localhost:3030/auto-sell-all-coins?\
     testing=false&\
     removeExistingSellOrders=true&\
     addSellTakeProfit=true&\
@@ -31,7 +31,7 @@ justOneOrder=false" \
       -H "Content-Type: application/json"
 
   # multiple orders
-    curl -X POST "http://localhost:3030/sell-at-price-all-coins?\
+    curl -X POST "http://localhost:3030/auto-sell-all-coins?\
     testing=false&\
     removeExistingSellOrders=true&\
     addSellStopLoss=true&\

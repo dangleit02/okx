@@ -78,15 +78,13 @@ curl -X POST 'http://localhost:3030/buy-near-current-price/BTC?amountUsdt=25&tes
         -H 'Content-Type: application/json'
 
 # preview autobuy for one coin
-  curl -X POST "http://localhost:3030/buy-at-price/ETH?\
+  curl -X POST "http://localhost:3030/auto-buy/ETH?\
   testing=true&\
-  removeExistingBuyOrders=true&\
-  autobuy=true" \
+  removeExistingBuyOrders=true" \
     -H "Content-Type: application/json"
   
   # autobuy for one coin
-    curl -X POST "http://localhost:3030/buy-at-price/ADA?\
+    curl -X POST "http://localhost:3030/auto-buy/ADA?\
     testing=false&\
-    removeExistingBuyOrders=true&\
-    autobuy=true" \
+    removeExistingBuyOrders=true" \
       -H "Content-Type: application/json"
