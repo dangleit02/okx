@@ -1061,7 +1061,7 @@ describe('OkxService clean excess sell orders', () => {
       data: [
         {
           details: [
-            { ccy: 'ETC', cashBal: '4', availBal: '1', openAvgPx: '80' },
+            { ccy: 'ETC', cashBal: '100', availBal: '4', openAvgPx: '80' },
           ],
         },
       ],
@@ -1069,7 +1069,7 @@ describe('OkxService clean excess sell orders', () => {
     return { service, logger };
   };
 
-  it('keeps highest-priced sell orders within the bought amount in preview mode', async () => {
+  it('uses availBal, not cashBal, to cap sell orders', async () => {
     const { service } = createService();
     const cancelAlgoOrders = jest.spyOn(service as any, 'cancelAlgoOrders');
     const conditionalStopLossOrders = jest.spyOn(
@@ -1083,12 +1083,12 @@ describe('OkxService clean excess sell orders', () => {
       expect.objectContaining({
         status: 'preview',
         currentPrice: 100,
-        boughtCoinAmount: 4,
+        sellableBalance: '4',
         eligibleOrderCount: 3,
         keptOrderCount: 1,
-        keptSize: 2,
+        keptSize: '2',
         cancelOrderCount: 2,
-        cancelSize: 4,
+        cancelSize: '4',
       }),
     );
     expect(result.keptOrders.map((order) => order.algoId)).toEqual(['high']);
@@ -1143,23 +1143,26 @@ describe('OkxService clean excess sell orders', () => {
         failedOrderCount: 0,
       }),
     );
-    const cleanupTableCall = logger.log.mock.calls.find(
+    const cleanupSummaryCall = logger.log.mock.calls.find(
       ([, context, coin]) =>
-        context === 'Sell order cleanup table' && coin === 'ETC_clean',
+        context === 'Sell order cleanup summary' && coin === 'ETC_clean',
     );
-    expect(cleanupTableCall).toBeDefined();
-    expect(cleanupTableCall[0]).toContain(
-      '\nSTATUS  | ALGO ID | CURRENT PRICE | CURRENT PROFIT (%) | CREATED AT          | CLEANED AT          | TRIGGER PRICE | ORDER PRICE | ORDER PROFIT (%)',
-    );
-    expect(cleanupTableCall[0]).toMatch(
-      /CLEANED\s+\| low\s+\| 100\s+\| 25\s+\| 2026-07-28 19:00:00\s+\| \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\s+\| 70\s+\| 69\s+\| -13\.75/,
-    );
-    expect(cleanupTableCall[0]).toMatch(
-      /CLEANED\s+\| middle\s+\| 100\s+\| 25\s+\| 2026-07-28 19:30:00\s+\| \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\s+\| 80\s+\| 79\s+\| -1\.25/,
-    );
-    expect(cleanupTableCall[0]).toMatch(
-      /KEPT\s+\| high\s+\| 100\s+\| 25\s+\| 2026-07-28 20:00:00\s+\|\s+\| 90\s+\| 89\s+\| 11\.25/,
-    );
+    expect(cleanupSummaryCall).toBeDefined();
+    expect(JSON.parse(cleanupSummaryCall[0])).toEqual({
+      status: 'cleaned',
+      coin: 'ETC',
+      sellableBalance: '4',
+      currentPrice: 100,
+      keptOrderCount: 1,
+      cancelOrderCount: 2,
+      cancelledOrderCount: 2,
+      failedOrderCount: 0,
+      cancelledOrderIds: ['low', 'middle'],
+      failedOrderIds: [],
+    });
+    expect(cleanupSummaryCall[0]).not.toContain('responses');
+    expect(cleanupSummaryCall[0]).not.toContain('keptOrders');
+    expect(cleanupSummaryCall[0]).not.toContain('ordersToCancel');
   });
 
   it('keeps an order whose rounded size is within half a coin size unit of the balance', async () => {
@@ -1188,7 +1191,17 @@ describe('OkxService clean excess sell orders', () => {
         },
       ]);
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
-      data: [{ details: [{ ccy: 'NEAR', cashBal: '6.6806832388' }] }],
+      data: [
+        {
+          details: [
+            {
+              ccy: 'NEAR',
+              cashBal: '100',
+              availBal: '6.6806832388',
+            },
+          ],
+        },
+      ],
     });
 
     const result = await service.cleanSellOrdersForOneCoin('near');
@@ -1196,13 +1209,144 @@ describe('OkxService clean excess sell orders', () => {
     expect(result).toEqual(
       expect.objectContaining({
         status: 'preview',
-        boughtCoinAmount: 6.6806832388,
+        sellableBalance: '6.6806832388',
         keptOrderCount: 1,
         cancelOrderCount: 0,
       }),
     );
     expect(result.keptOrders.map((order) => order.algoId)).toEqual([
       'near-rounded-size',
+    ]);
+  });
+
+  it('fails safely when an existing balance row has no availBal', async () => {
+    const { service } = createService();
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [{ details: [{ ccy: 'ETC', cashBal: '100', eq: '100' }] }],
+    });
+
+    await expect(service.cleanSellOrdersForOneCoin('ETC')).rejects.toThrow(
+      'Missing OKX availBal for ETC',
+    );
+  });
+
+  it('adds crypto quantities exactly without binary floating-point drift', async () => {
+    const { service } = createService();
+    jest
+      .spyOn(service as any, 'getPendingTriggerSpotOrders')
+      .mockResolvedValue([
+        {
+          algoId: 'decimal-one',
+          instId: 'ETC-USDT',
+          side: 'sell',
+          triggerPx: '90',
+          ordPx: '89',
+          sz: '0.1',
+        },
+        {
+          algoId: 'decimal-two',
+          instId: 'ETC-USDT',
+          side: 'sell',
+          triggerPx: '80',
+          ordPx: '79',
+          sz: '0.2',
+        },
+      ]);
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [{ details: [{ ccy: 'ETC', availBal: '0.3' }] }],
+    });
+
+    await expect(service.cleanSellOrdersForOneCoin('ETC')).resolves.toEqual(
+      expect.objectContaining({
+        sellableBalance: '0.3',
+        keptSize: '0.3',
+        cancelSize: '0',
+        cancelOrderCount: 0,
+      }),
+    );
+  });
+
+  it('returns nothing_to_cancel when live cleanup has no excess sell orders', async () => {
+    const { service } = createService();
+    jest
+      .spyOn(service as any, 'getPendingTriggerSpotOrders')
+      .mockResolvedValue([]);
+    const cancelAlgoOrders = jest.spyOn(service as any, 'cancelAlgoOrders');
+
+    await expect(
+      service.cleanSellOrdersForOneCoin('ETC', false),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        status: 'nothing_to_cancel',
+        cancelOrderCount: 0,
+        cancelledOrderCount: 0,
+      }),
+    );
+    expect(cancelAlgoOrders).not.toHaveBeenCalled();
+  });
+
+  it('cleans trigger and conditional sell orders when the coin balance is zero', async () => {
+    const { service } = createService();
+    jest.spyOn(service as any, 'getTicker').mockResolvedValue(Number.NaN);
+    jest
+      .spyOn(service as any, 'getPendingTriggerSpotOrders')
+      .mockResolvedValue([
+        {
+          algoId: 'near-trigger',
+          instId: 'NEAR-USDT',
+          side: 'sell',
+          triggerPx: '1.9',
+          ordPx: '1.89',
+          sz: '10',
+        },
+      ]);
+    jest
+      .spyOn(service as any, 'getPendingConditionalSpotOrders')
+      .mockResolvedValue([
+        {
+          algoId: 'near-stop-loss',
+          instId: 'NEAR-USDT',
+          side: 'sell',
+          sz: '10',
+          slTriggerPx: '1.4',
+          slOrdPx: '-1',
+        },
+      ]);
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [{ details: [] }],
+    });
+    const cancelAlgoOrders = jest
+      .spyOn(service as any, 'cancelAlgoOrders')
+      .mockResolvedValue({
+        responses: [
+          {
+            code: '0',
+            data: [
+              { algoId: 'near-trigger', sCode: '0' },
+              { algoId: 'near-stop-loss', sCode: '0' },
+            ],
+          },
+        ],
+        cancelledOrderCount: 2,
+        failedOrderCount: 0,
+      });
+
+    const result = await service.cleanSellOrdersForOneCoin('NEAR', false);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'cleaned',
+        sellableBalance: '0',
+        currentPrice: 0,
+        cleanupScope: 'all_sell_orders_no_balance',
+        eligibleOrderCount: 2,
+        conditionalOrderCount: 1,
+        cancelledOrderCount: 2,
+      }),
+    );
+    expect(cancelAlgoOrders).toHaveBeenCalledWith([
+      { algoId: 'near-stop-loss', instId: 'NEAR-USDT' },
+      { algoId: 'near-trigger', instId: 'NEAR-USDT' },
     ]);
   });
 
@@ -1413,9 +1557,9 @@ describe('OkxService place spot buy near current price', () => {
         slOrdPx: '-1',
       }),
     );
-    expect(Number(result.sizeToBuy) * result.triggerPrice).toBeGreaterThanOrEqual(
-      result.amountUsdt,
-    );
+    expect(
+      Number(result.sizeToBuy) * result.triggerPrice,
+    ).toBeGreaterThanOrEqual(result.amountUsdt);
   });
 
   it('uses configured amount and rejects invalid requested amounts', async () => {
@@ -1566,7 +1710,7 @@ describe('OkxService buy trigger range direction', () => {
       minSz: 0.0001,
     });
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
-      data: [{ details: [{ availBal: '1', openAvgPx: '50' }] }],
+      data: [{ details: [{ ccy: 'BTC', availBal: '1', openAvgPx: '50' }] }],
     });
     const placeOneOrder = jest.spyOn(service, 'placeOneOrder');
 
@@ -1604,7 +1748,7 @@ describe('OkxService buy trigger range direction', () => {
       minSz: 0.0001,
     });
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
-      data: [{ details: [{ availBal: '0', openAvgPx: '0' }] }],
+      data: [{ details: [{ ccy: 'BTC', availBal: '0', openAvgPx: '0' }] }],
     });
     const placeBuy = jest.spyOn(service, 'placeOneOrder').mockResolvedValue({
       data: undefined,
@@ -1677,7 +1821,11 @@ describe('OkxService auto sell size and profit logging', () => {
   it('does not submit a sell order whose size rounds to zero', async () => {
     const { service, logger } = createService();
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
-      data: [{ details: [{ availBal: '0.00001', openAvgPx: '0' }] }],
+      data: [
+        {
+          details: [{ ccy: 'ALGO', availBal: '0.00001', openAvgPx: '0' }],
+        },
+      ],
     });
     const placeOneOrder = jest.spyOn(service, 'placeOneOrder');
 
@@ -1701,7 +1849,11 @@ describe('OkxService auto sell size and profit logging', () => {
       minSz: 0.01,
     });
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
-      data: [{ details: [{ availBal: '0.000001', openAvgPx: '0' }] }],
+      data: [
+        {
+          details: [{ ccy: 'DOT', availBal: '0.000001', openAvgPx: '0' }],
+        },
+      ],
     });
     const placeOneOrder = jest.spyOn(service, 'placeOneOrder');
 
@@ -1720,7 +1872,7 @@ describe('OkxService auto sell size and profit logging', () => {
   it('logs N/A profit when the average cost is unavailable', async () => {
     const { service, logger } = createService();
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
-      data: [{ details: [{ availBal: '1', openAvgPx: '0' }] }],
+      data: [{ details: [{ ccy: 'ALGO', availBal: '1', openAvgPx: '0' }] }],
     });
     const placeOneOrder = jest
       .spyOn(service, 'placeOneOrder')
@@ -2087,19 +2239,50 @@ describe('OkxService sell all configured bought coins', () => {
         },
       ],
     });
+    jest
+      .spyOn(service as any, 'getPendingSpotOrdersByType')
+      .mockResolvedValue([]);
     const cleanOneCoin = jest
       .spyOn(service, 'cleanSellOrdersForOneCoin')
-      .mockImplementation(async (coin) => ({ status: 'clean', coin }) as any);
+      .mockImplementation(
+        async (coin) => ({ status: 'nothing_to_cancel', coin }) as any,
+      );
 
     await expect(service.cleanSellOrdersForAllCoins(false)).resolves.toEqual([
-      { coin: 'btc', result: { status: 'clean', coin: 'btc' } },
-      { coin: 'ETH', result: { status: 'clean', coin: 'ETH' } },
+      { coin: 'BTC', result: { status: 'nothing_to_cancel', coin: 'BTC' } },
+      { coin: 'ETH', result: { status: 'nothing_to_cancel', coin: 'ETH' } },
     ]);
     expect(cleanOneCoin.mock.calls).toEqual([
-      ['btc', false],
+      ['BTC', false],
       ['ETH', false],
     ]);
     expect(sleep).toHaveBeenCalledWith(1100);
+  });
+
+  it('includes a zero-balance coin that only has pending conditional sell orders', async () => {
+    const { service } = createService();
+    jest.spyOn(service, 'getAllSpotBoughtCoins').mockResolvedValue({
+      quoteCurrency: 'USDT',
+      coinCount: 0,
+      totalProfitUsdt: 0,
+      coins: [],
+    });
+    jest.spyOn(service as any, 'getPendingSpotOrdersByType').mockResolvedValue([
+      {
+        algoId: 'near-condition',
+        instId: 'NEAR-USDT',
+        side: 'sell',
+        ordType: 'conditional',
+      },
+    ]);
+    const cleanOneCoin = jest
+      .spyOn(service, 'cleanSellOrdersForOneCoin')
+      .mockResolvedValue({ status: 'cleaned', coin: 'NEAR' } as any);
+
+    await expect(service.cleanSellOrdersForAllCoins(false)).resolves.toEqual([
+      { coin: 'NEAR', result: { status: 'cleaned', coin: 'NEAR' } },
+    ]);
+    expect(cleanOneCoin).toHaveBeenCalledWith('NEAR', false);
   });
 
   it('continues cleaning later coins when one coin still fails', async () => {
@@ -2129,6 +2312,9 @@ describe('OkxService sell all configured bought coins', () => {
         },
       ],
     });
+    jest
+      .spyOn(service as any, 'getPendingSpotOrdersByType')
+      .mockResolvedValue([]);
     const rateLimitError = Object.assign(new Error('Too Many Requests'), {
       response: { status: 429, data: { code: '50011' } },
       config: { url: '/api/v5/trade/orders-algo-pending' },
@@ -2136,25 +2322,31 @@ describe('OkxService sell all configured bought coins', () => {
     const cleanOneCoin = jest
       .spyOn(service, 'cleanSellOrdersForOneCoin')
       .mockRejectedValueOnce(rateLimitError)
-      .mockResolvedValueOnce({ status: 'clean', coin: 'ETH' } as any);
+      .mockResolvedValueOnce({
+        status: 'nothing_to_cancel',
+        coin: 'ETH',
+      } as any);
     jest.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
 
     const results = await service.cleanSellOrdersForAllCoins(false);
 
     expect(cleanOneCoin.mock.calls).toEqual([
-      ['btc', false],
+      ['BTC', false],
       ['ETH', false],
     ]);
     expect(results).toEqual([
       {
-        coin: 'btc',
+        coin: 'BTC',
         result: expect.objectContaining({
           status: 'failed',
           coin: 'BTC',
           responseStatus: 429,
         }),
       },
-      { coin: 'ETH', result: { status: 'clean', coin: 'ETH' } },
+      {
+        coin: 'ETH',
+        result: { status: 'nothing_to_cancel', coin: 'ETH' },
+      },
     ]);
     expect(logger.log).toHaveBeenCalledWith(
       expect.stringContaining('Too Many Requests'),

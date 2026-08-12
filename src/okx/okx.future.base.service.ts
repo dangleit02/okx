@@ -1,10 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 import { AppLogger } from 'src/logger/logger.service';
 import { TradeOneCoinParams } from 'src/interfaces/interface';
 import { EmailService } from 'src/email/email.service';
+import Decimal from 'decimal.js';
+import {
+  OkxAlgoOrder,
+  OkxApiResponse,
+  OkxCancelResponse,
+  OkxInstrument,
+  OkxPosition,
+} from './okx.types';
 
 export type FutureDirection = 'long' | 'short';
 export type FutureOrderIntent = 'open' | 'close' | 'all';
@@ -20,6 +28,23 @@ export interface FutureNearCurrentOptions {
   amountUsdt?: number;
   stopLossPrice?: number;
   testing?: boolean;
+}
+
+interface FutureCoinConfig {
+  minClosePriceRatio?: number;
+  maxClosePriceRatio?: number;
+}
+
+interface FutureCleanupLogResult {
+  status: string;
+  coin: string;
+  direction: FutureDirection;
+  positionSize: string;
+  currentPrice: number | null;
+  keptOrderCount: number;
+  cancelOrderCount: number;
+  cancelledOrderCount?: number;
+  failedOrderCount?: number;
 }
 
 /**
@@ -50,6 +75,31 @@ export abstract class OkxFutureBaseService {
     coin: string = 'ALL',
   ) {
     return `${coin.toUpperCase()}_${direction ?? 'all'}_${this.getPositionMode()}`;
+  }
+
+  private logFutureCleanupSummary(
+    result: FutureCleanupLogResult,
+    logFileKey: string,
+    cancelledOrderIds: string[] = [],
+    failedOrderIds: string[] = [],
+  ) {
+    this.logger.log(
+      JSON.stringify({
+        status: result.status,
+        coin: result.coin,
+        direction: result.direction,
+        positionSize: result.positionSize,
+        currentPrice: result.currentPrice,
+        keptOrderCount: result.keptOrderCount,
+        cancelOrderCount: result.cancelOrderCount,
+        cancelledOrderCount: result.cancelledOrderCount ?? 0,
+        failedOrderCount: result.failedOrderCount ?? 0,
+        cancelledOrderIds,
+        failedOrderIds,
+      }),
+      'Future protective close cleanup summary',
+      logFileKey,
+    );
   }
 
   private async sendFutureEmail(subject: string, data: any) {
@@ -123,17 +173,19 @@ export abstract class OkxFutureBaseService {
 
   // ---------- instrument cache & helpers ----------
   // cache instId => instrument data
-  private instrumentCache: Map<string, any> = new Map();
+  private instrumentCache = new Map<string, OkxInstrument>();
   private stopLossReconcileInFlight: Map<string, Promise<any>> = new Map();
 
-  protected async fetchInstrument(instId: string) {
+  protected async fetchInstrument(
+    instId: string,
+  ): Promise<OkxInstrument | null> {
     // use cached if available
     const key = instId;
     if (this.instrumentCache.has(key)) return this.instrumentCache.get(key);
 
     try {
       const url = `${this.config.get<string>('okx.baseUrl')}/api/v5/public/instruments?instId=${encodeURIComponent(instId)}&instType=SWAP`;
-      const res = await axios.get(url);
+      const res = await axios.get<OkxApiResponse<OkxInstrument>>(url);
       const inst = res.data?.data?.[0] || null;
       if (inst) {
         // normalize numeric fields
@@ -175,6 +227,15 @@ export abstract class OkxFutureBaseService {
     const s = String(x);
     if (s.indexOf('.') >= 0) return s.split('.')[1].length;
     return 0;
+  }
+
+  private parseDecimal(value: unknown): Decimal | null {
+    try {
+      const decimal = new Decimal(String(value));
+      return decimal.isFinite() ? decimal : null;
+    } catch {
+      return null;
+    }
   }
 
   // format size: floor to lot size multiple, ensure >= minSz
@@ -240,14 +301,14 @@ export abstract class OkxFutureBaseService {
   async getPendingTriggerOrdersForCoin(
     coin: string,
     instType: 'SWAP' | 'SPOT' = 'SWAP',
-  ) {
+  ): Promise<OkxAlgoOrder[]> {
     return this.getPendingAlgoOrdersForCoin(coin, 'trigger', instType);
   }
 
   async getPendingConditionalOrdersForCoin(
     coin: string,
     instType: 'SWAP' | 'SPOT' = 'SWAP',
-  ) {
+  ): Promise<OkxAlgoOrder[]> {
     return this.getPendingAlgoOrdersForCoin(coin, 'conditional', instType);
   }
 
@@ -255,13 +316,13 @@ export abstract class OkxFutureBaseService {
     coin: string,
     ordType: 'trigger' | 'conditional',
     instType: 'SWAP' | 'SPOT' = 'SWAP',
-  ) {
+  ): Promise<OkxAlgoOrder[]> {
     const timestamp = new Date().toISOString();
     const instId = `${coin.toUpperCase()}-USDT-${instType}`;
     const getPath = `/api/v5/trade/orders-algo-pending?instType=${instType}&ordType=${ordType}&instId=${instId}`;
     const getSign = this.sign(timestamp, 'GET', getPath);
 
-    const res = await axios.get(
+    const res = await axios.get<OkxApiResponse<OkxAlgoOrder>>(
       this.config.get<string>('okx.baseUrl') + getPath,
       {
         headers: {
@@ -284,11 +345,15 @@ export abstract class OkxFutureBaseService {
     return res.data?.data || [];
   }
 
-  async getAllPendingTriggerOrders(instType: 'SWAP' | 'SPOT' = 'SWAP') {
+  async getAllPendingTriggerOrders(
+    instType: 'SWAP' | 'SPOT' = 'SWAP',
+  ): Promise<OkxAlgoOrder[]> {
     return this.getAllPendingAlgoOrders('trigger', instType);
   }
 
-  async getAllPendingConditionalOrders(instType: 'SWAP' | 'SPOT' = 'SWAP') {
+  async getAllPendingConditionalOrders(
+    instType: 'SWAP' | 'SPOT' = 'SWAP',
+  ): Promise<OkxAlgoOrder[]> {
     return this.getAllPendingAlgoOrders('conditional', instType);
   }
 
@@ -296,7 +361,7 @@ export abstract class OkxFutureBaseService {
     coin: string,
     ordType: FutureAlgoOrderType,
     instType: 'SWAP' | 'SPOT' = 'SWAP',
-  ) {
+  ): Promise<OkxAlgoOrder[]> {
     if (ordType === 'trigger')
       return this.getPendingTriggerOrdersForCoin(coin, instType);
     if (ordType === 'conditional')
@@ -311,7 +376,7 @@ export abstract class OkxFutureBaseService {
   private async getAllPendingOrdersByType(
     ordType: FutureAlgoOrderType,
     instType: 'SWAP' | 'SPOT' = 'SWAP',
-  ) {
+  ): Promise<OkxAlgoOrder[]> {
     if (ordType === 'trigger') return this.getAllPendingTriggerOrders(instType);
     if (ordType === 'conditional')
       return this.getAllPendingConditionalOrders(instType);
@@ -325,8 +390,8 @@ export abstract class OkxFutureBaseService {
   private async getAllPendingAlgoOrders(
     ordType: 'trigger' | 'conditional',
     instType: 'SWAP' | 'SPOT' = 'SWAP',
-  ) {
-    const orders: any[] = [];
+  ): Promise<OkxAlgoOrder[]> {
+    const orders: OkxAlgoOrder[] = [];
     let after: string | undefined;
 
     while (true) {
@@ -340,13 +405,13 @@ export abstract class OkxFutureBaseService {
         .join('&');
       const getPath = `/api/v5/trade/orders-algo-pending?${query}`;
       const maxAttempts = 3;
-      let getRes: any;
+      let getRes!: AxiosResponse<OkxApiResponse<OkxAlgoOrder>>;
 
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const timestamp = new Date().toISOString();
         const getSign = this.sign(timestamp, 'GET', getPath);
 
-        getRes = await axios.get(
+        getRes = await axios.get<OkxApiResponse<OkxAlgoOrder>>(
           this.config.get<string>('okx.baseUrl') + getPath,
           {
             headers: {
@@ -396,7 +461,7 @@ export abstract class OkxFutureBaseService {
   }
 
   private getFuturePendingOrderType(
-    order: any,
+    order: OkxAlgoOrder,
   ): 'trigger' | 'conditional' | 'stop_loss' {
     if (order.ordType === 'conditional' && order.slTriggerPx) {
       return 'stop_loss';
@@ -405,8 +470,8 @@ export abstract class OkxFutureBaseService {
   }
 
   private getFuturePendingPrice(
-    order: any,
-    fields: string[],
+    order: OkxAlgoOrder,
+    fields: Array<keyof OkxAlgoOrder>,
   ): number | undefined {
     const value = fields
       .map((field) => order?.[field])
@@ -418,7 +483,7 @@ export abstract class OkxFutureBaseService {
     return Number.isFinite(price) ? price : undefined;
   }
 
-  private summarizeFuturePendingOrderTypes(orders: any[]) {
+  private summarizeFuturePendingOrderTypes(orders: OkxAlgoOrder[]) {
     return orders.reduce(
       (counts, order) => {
         const orderType = this.getFuturePendingOrderType(order);
@@ -437,7 +502,7 @@ export abstract class OkxFutureBaseService {
   }
 
   private getOrderIntent(
-    order: any,
+    order: OkxAlgoOrder,
     direction: FutureDirection,
   ): 'open' | 'close' {
     const openSide = direction === 'long' ? 'buy' : 'sell';
@@ -445,10 +510,10 @@ export abstract class OkxFutureBaseService {
   }
 
   private filterOrdersByDirectionAndIntent(
-    orders: any[],
+    orders: OkxAlgoOrder[],
     direction: FutureDirection,
     intent: FutureOrderIntent = 'all',
-  ) {
+  ): OkxAlgoOrder[] {
     const posSideOrders = this.includePosSide()
       ? orders.filter((order) => !order.posSide || order.posSide === direction)
       : orders;
@@ -493,11 +558,11 @@ export abstract class OkxFutureBaseService {
       this.getAllPendingConditionalOrders('SWAP'),
     ]);
     const allOrders = [
-      ...triggerOrders.map((order: any) => ({
+      ...triggerOrders.map((order) => ({
         ...order,
         ordType: order.ordType ?? 'trigger',
       })),
-      ...conditionalOrders.map((order: any) => ({
+      ...conditionalOrders.map((order) => ({
         ...order,
         ordType: order.ordType ?? 'conditional',
       })),
@@ -507,7 +572,7 @@ export abstract class OkxFutureBaseService {
       direction,
       intent,
     )
-      .map((order: any) => ({
+      .map((order) => ({
         ...order,
         orderType: this.getFuturePendingOrderType(order),
         triggerPrice: this.getFuturePendingPrice(order, [
@@ -707,6 +772,44 @@ export abstract class OkxFutureBaseService {
     return result;
   }
 
+  async getProtectiveCloseCleanupCoins(
+    direction: FutureDirection,
+    configuredCoins: string[] = [],
+  ) {
+    const [pendingOrders, positionResponse] = await Promise.all([
+      this.getAllPendingOrdersByType('all', 'SWAP'),
+      this.getOpenPosition(''),
+    ]);
+    if (
+      positionResponse?.code !== undefined &&
+      String(positionResponse.code) !== '0'
+    ) {
+      throw new Error(
+        `OKX rejected positions request: ${JSON.stringify(positionResponse)}`,
+      );
+    }
+
+    const closeOrderCoins = this.filterOrdersByDirectionAndIntent(
+      pendingOrders,
+      direction,
+      'close',
+    ).map((order) => String(order.instId ?? '').split('-')[0]);
+    const positionCoins = (positionResponse?.data ?? []).flatMap((position) => {
+      if (!this.selectPositionForDirection([position], direction)) return [];
+      const size = Math.abs(Number(position.pos ?? 0));
+      if (!Number.isFinite(size) || size <= 0) return [];
+      return [String(position.instId ?? '').split('-')[0]];
+    });
+
+    return Array.from(
+      new Set(
+        [...configuredCoins, ...closeOrderCoins, ...positionCoins]
+          .map((coin) => String(coin).trim().toUpperCase())
+          .filter((coin) => /^[A-Z0-9]+$/.test(coin)),
+      ),
+    ).sort();
+  }
+
   async cleanProtectiveCloseByPriceStepsOrdersForOneCoin(
     coin: string,
     direction: FutureDirection,
@@ -718,16 +821,12 @@ export abstract class OkxFutureBaseService {
     }
     const instId = `${normalizedCoin}-USDT-SWAP`;
     const logFileKey = this.getFutureLogFileKey(direction, normalizedCoin);
-    const [currentPrice, positionResponse, pendingTriggerOrders, inst] =
+    const [positionResponse, pendingTriggerOrders, pendingConditionalOrders] =
       await Promise.all([
-        this.getTicker(instId),
         this.getOpenPosition(instId),
         this.getPendingTriggerOrdersForCoin(normalizedCoin, 'SWAP'),
-        this.fetchInstrument(instId),
+        this.getPendingConditionalOrdersForCoin(normalizedCoin, 'SWAP'),
       ]);
-    if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
-      throw new Error(`Invalid current price for ${instId}: ${currentPrice}`);
-    }
     if (
       positionResponse?.code !== undefined &&
       String(positionResponse.code) !== '0'
@@ -736,66 +835,101 @@ export abstract class OkxFutureBaseService {
         `OKX rejected position request for ${instId}: ${JSON.stringify(positionResponse)}`,
       );
     }
-    if (!inst) throw new Error(`Instrument info not available for ${instId}`);
 
     const position = this.selectPositionForDirection(
       positionResponse?.data ?? [],
       direction,
     );
-    const positionSize = Math.abs(Number(position?.pos ?? 0));
-    const normalizedPositionSize = Number.isFinite(positionSize)
-      ? positionSize
-      : 0;
-    const protectiveCloseOrders = this.filterOrdersByDirectionAndIntent(
-      pendingTriggerOrders,
+    const positionSize = this.parseDecimal(position?.pos ?? '0');
+    const normalizedPositionSize = positionSize?.abs() ?? new Decimal(0);
+    const pendingCloseOrders: OkxAlgoOrder[] = [
+      ...pendingTriggerOrders.map((order) => ({
+        ...order,
+        ordType: order.ordType ?? 'trigger',
+      })),
+      ...pendingConditionalOrders.map((order) => ({
+        ...order,
+        ordType: order.ordType ?? 'conditional',
+      })),
+    ];
+    const orphanedCloseOrders = this.filterOrdersByDirectionAndIntent(
+      pendingCloseOrders,
       direction,
       'close',
     )
-      .filter((order: any) => {
-        const triggerPrice = Number(order.triggerPx);
-        const size = Number(order.sz);
-        const isProtectiveCloseSide =
-          direction === 'long'
-            ? triggerPrice < currentPrice
-            : triggerPrice > currentPrice;
+      .filter((order) => {
+        const size = this.parseDecimal(order.sz);
         return (
           order.instId === instId &&
           Boolean(order.algoId) &&
-          Number.isFinite(triggerPrice) &&
-          isProtectiveCloseSide &&
-          Number.isFinite(size) &&
-          size > 0
+          (normalizedPositionSize.isZero() || Boolean(size?.greaterThan(0)))
         );
       })
-      .map((order: any) => ({
+      .map((order) => ({
         algoId: String(order.algoId),
         instId,
-        triggerPrice: Number(order.triggerPx),
-        orderPrice: Number(order.ordPx ?? order.orderPx),
-        size: Number(order.sz),
+        ordType: order.ordType,
+        triggerPrice: Number(
+          order.triggerPx ?? order.slTriggerPx ?? order.tpTriggerPx,
+        ),
+        orderPrice: Number(
+          order.ordPx ?? order.orderPx ?? order.slOrdPx ?? order.tpOrdPx,
+        ),
+        size: this.parseDecimal(order.sz)?.toFixed() ?? '0',
+        sizeDecimal: this.parseDecimal(order.sz) ?? new Decimal(0),
         raw: order,
-      }))
-      .sort((left, right) =>
-        direction === 'long'
-          ? right.triggerPrice - left.triggerPrice
-          : left.triggerPrice - right.triggerPrice,
-      );
+      }));
+
+    // With no position, every close order is orphaned. Do not require ticker or
+    // instrument metadata here: delisted instruments are exactly the case that
+    // still needs cleanup.
+    let currentPrice: number | null = null;
+    let inst: OkxInstrument | null = null;
+    let protectiveCloseOrders = orphanedCloseOrders;
+    if (normalizedPositionSize.greaterThan(0)) {
+      [currentPrice, inst] = await Promise.all([
+        this.getTicker(instId),
+        this.fetchInstrument(instId),
+      ]);
+      if (!Number.isFinite(currentPrice) || Number(currentPrice) <= 0) {
+        throw new Error(`Invalid current price for ${instId}: ${currentPrice}`);
+      }
+      if (!inst) throw new Error(`Instrument info not available for ${instId}`);
+
+      protectiveCloseOrders = orphanedCloseOrders.filter((order) => {
+        if (order.ordType !== 'trigger') return false;
+        if (!Number.isFinite(order.triggerPrice)) return false;
+        return direction === 'long'
+          ? order.triggerPrice < Number(currentPrice)
+          : order.triggerPrice > Number(currentPrice);
+      });
+    }
+    protectiveCloseOrders = protectiveCloseOrders.sort((left, right) =>
+      direction === 'long'
+        ? right.triggerPrice - left.triggerPrice
+        : left.triggerPrice - right.triggerPrice,
+    );
 
     const totalProtectiveCloseSize = protectiveCloseOrders.reduce(
-      (total, order) => total + order.size,
-      0,
+      (total, order) => total.plus(order.sizeDecimal),
+      new Decimal(0),
     );
-    const sizeTolerance = Number(inst.lotSz || inst.minSz || 1) * 0.5;
+    const sizeTolerance = normalizedPositionSize.greaterThan(0)
+      ? new Decimal(String(inst.lotSz || inst.minSz || 1)).div(2)
+      : new Decimal(0);
     const ordersToCancel: typeof protectiveCloseOrders = [];
     let remainingProtectiveCloseSize = totalProtectiveCloseSize;
     for (const order of [...protectiveCloseOrders].reverse()) {
       if (
-        remainingProtectiveCloseSize <=
-        normalizedPositionSize + sizeTolerance
+        remainingProtectiveCloseSize.lessThanOrEqualTo(
+          normalizedPositionSize.plus(sizeTolerance),
+        )
       )
         break;
       ordersToCancel.push(order);
-      remainingProtectiveCloseSize -= order.size;
+      remainingProtectiveCloseSize = remainingProtectiveCloseSize.minus(
+        order.sizeDecimal,
+      );
     }
     const cancelledIds = new Set(ordersToCancel.map(({ algoId }) => algoId));
     const keptOrders = protectiveCloseOrders.filter(
@@ -807,46 +941,48 @@ export abstract class OkxFutureBaseService {
       direction,
       testing,
       currentPrice,
-      positionSize: normalizedPositionSize,
+      positionSize: normalizedPositionSize.toFixed(),
+      orphanedCloseOrderCleanup: normalizedPositionSize.isZero(),
       protectiveCloseByPriceStepsOrderCount: protectiveCloseOrders.length,
-      totalProtectiveCloseByPriceStepsSize: totalProtectiveCloseSize,
+      totalProtectiveCloseByPriceStepsSize: totalProtectiveCloseSize.toFixed(),
       keptOrderCount: keptOrders.length,
-      keptSize: keptOrders.reduce((total, order) => total + order.size, 0),
+      keptSize: keptOrders
+        .reduce((total, order) => total.plus(order.sizeDecimal), new Decimal(0))
+        .toFixed(),
       cancelOrderCount: ordersToCancel.length,
-      cancelSize: ordersToCancel.reduce(
-        (total, order) => total + order.size,
-        0,
+      cancelSize: ordersToCancel
+        .reduce((total, order) => total.plus(order.sizeDecimal), new Decimal(0))
+        .toFixed(),
+      keptOrders: keptOrders.map(({ raw, sizeDecimal, ...order }) => order),
+      ordersToCancel: ordersToCancel.map(
+        ({ raw, sizeDecimal, ...order }) => order,
       ),
-      keptOrders: keptOrders.map(({ raw, ...order }) => order),
-      ordersToCancel: ordersToCancel.map(({ raw, ...order }) => order),
     };
 
     if (testing) return { status: 'preview', ...baseResult };
     if (ordersToCancel.length === 0) {
       const result = {
-        status: 'clean',
+        status: 'nothing_to_cancel',
         ...baseResult,
         cancelledOrderCount: 0,
         failedOrderCount: 0,
         responses: [],
       };
-      this.logger.log(
-        JSON.stringify(result, null, 2),
-        'Clean future protective close by price steps orders',
-        logFileKey,
-      );
+      this.logFutureCleanupSummary(result, logFileKey);
       return result;
     }
 
     const responses = await this.cancelOrdersFromList({
       orders: ordersToCancel.map(({ raw }) => raw),
     });
-    const responseList = Array.isArray(responses) ? responses : [];
+    const responseList: OkxCancelResponse[] = Array.isArray(responses)
+      ? responses
+      : [];
     const responseItems = responseList.flatMap(
-      (response: any) => response?.data ?? [],
+      (response) => response?.data ?? [],
     );
     const cancelledOrderCount = responseItems.filter(
-      (item: any) => String(item.sCode) === '0',
+      (item) => String(item.sCode) === '0',
     ).length;
     const failedOrderCount = ordersToCancel.length - cancelledOrderCount;
     const result = {
@@ -856,10 +992,20 @@ export abstract class OkxFutureBaseService {
       failedOrderCount,
       responses,
     };
-    this.logger.log(
-      JSON.stringify(result, null, 2),
-      'Clean future protective close by price steps orders',
+    const successfullyCancelledIds = new Set(
+      responseItems
+        .filter((item) => String(item.sCode) === '0')
+        .map((item) => String(item.algoId)),
+    );
+    const cancelledOrderIds = Array.from(successfullyCancelledIds);
+    const failedOrderIds = ordersToCancel
+      .map(({ algoId }) => algoId)
+      .filter((algoId) => !successfullyCancelledIds.has(algoId));
+    this.logFutureCleanupSummary(
+      result,
       logFileKey,
+      cancelledOrderIds,
+      failedOrderIds,
     );
     await this.sendFutureEmail(
       `Clean ${direction} protective close by price steps orders ${normalizedCoin}`,
@@ -905,7 +1051,7 @@ export abstract class OkxFutureBaseService {
     partialCloseOnRetrace = false,
     autoTrade = false,
   }: {
-    orders: any[];
+    orders: OkxAlgoOrder[];
     direction?: 'long' | 'short';
     enableTakeProfit?: boolean;
     partialCloseOnRetrace?: boolean;
@@ -967,7 +1113,7 @@ export abstract class OkxFutureBaseService {
       instId: o.instId,
     }));
     const chunks = this.chunk(payloadItems, 20);
-    const results: any[] = [];
+    const results: OkxCancelResponse[] = [];
 
     for (const chunk of chunks) {
       const bodyString = JSON.stringify(chunk);
@@ -980,7 +1126,7 @@ export abstract class OkxFutureBaseService {
         bodyString,
       );
 
-      const cancelRes = await axios.post(
+      const cancelRes = await axios.post<OkxCancelResponse>(
         this.config.get<string>('okx.baseUrl') + cancelPath,
         bodyString,
         { headers: headersCancel },
@@ -1293,7 +1439,9 @@ export abstract class OkxFutureBaseService {
   }
 
   // ---------- open position abstraction used by autoOpenPosition ----------
-  protected async getOpenPosition(instId: string) {
+  protected async getOpenPosition(
+    instId: string,
+  ): Promise<OkxApiResponse<OkxPosition>> {
     const method = 'GET';
     const requestPath = instId
       ? `/api/v5/account/positions?instId=${instId}`
@@ -1316,15 +1464,17 @@ export abstract class OkxFutureBaseService {
     };
 
     const url = this.config.get<string>('okx.baseUrl') + requestPath;
-    const response = await axios.get(url, { headers });
+    const response = await axios.get<OkxApiResponse<OkxPosition>>(url, {
+      headers,
+    });
 
     return response.data;
   }
 
   protected selectPositionForDirection(
-    positions: any[],
+    positions: OkxPosition[],
     direction: FutureDirection,
-  ) {
+  ): OkxPosition | undefined {
     if (this.includePosSide()) {
       return positions.find((position) => position.posSide === direction);
     }
@@ -1493,12 +1643,12 @@ export abstract class OkxFutureBaseService {
   }
 
   private getPositionStopLossOrders(
-    conditionalOrders: any[],
+    conditionalOrders: OkxAlgoOrder[],
     direction: FutureDirection,
     instId: string,
   ) {
     const closeSide = direction === 'long' ? 'sell' : 'buy';
-    return conditionalOrders.filter((order: any) => {
+    return conditionalOrders.filter((order) => {
       const matchesDirection =
         !this.includePosSide() || order.posSide === direction;
       const hasMarketStopLoss =
@@ -1516,7 +1666,7 @@ export abstract class OkxFutureBaseService {
   private getReconciledStopLossPrice(
     direction: FutureDirection,
     currentPrice: number,
-    stopLossOrders: any[],
+    stopLossOrders: OkxAlgoOrder[],
   ) {
     const stopLossRatio = Number(
       this.config.get<number>('stopLossBuyPriceRatio'),
@@ -1533,7 +1683,7 @@ export abstract class OkxFutureBaseService {
         ? currentPrice * (1 - stopLossRatio)
         : currentPrice * (1 + stopLossRatio);
     const validExistingPrices = stopLossOrders
-      .map((order: any) => Number(order.slTriggerPx))
+      .map((order) => Number(order.slTriggerPx))
       .filter(
         (price: number) =>
           Number.isFinite(price) &&
@@ -1546,7 +1696,7 @@ export abstract class OkxFutureBaseService {
       : Math.min(fallbackPrice, ...validExistingPrices);
   }
 
-  private async cancelStopLossOrders(orders: any[], testing: boolean) {
+  private async cancelStopLossOrders(orders: OkxAlgoOrder[], testing: boolean) {
     if (orders.length === 0) return [];
     if (testing) {
       return orders.map((order) => ({
@@ -1555,17 +1705,18 @@ export abstract class OkxFutureBaseService {
         instId: order.instId,
       }));
     }
-    const responses: any = await this.cancelOrdersFromList({ orders });
-    const responseList = Array.isArray(responses) ? responses : [responses];
+    const responses = await this.cancelOrdersFromList({ orders });
+    if (!Array.isArray(responses)) {
+      throw new Error('Unexpected empty cancellation response');
+    }
+    const responseList = responses;
     const rejectedResponse = responseList.find(
-      (response: any) =>
+      (response) =>
         response?.code !== undefined && String(response.code) !== '0',
     );
     const rejectedItem = responseList
-      .flatMap((response: any) => response?.data ?? [])
-      .find(
-        (item: any) => item.sCode !== undefined && String(item.sCode) !== '0',
-      );
+      .flatMap((response) => response?.data ?? [])
+      .find((item) => item.sCode !== undefined && String(item.sCode) !== '0');
     if (rejectedResponse || rejectedItem) {
       throw new Error(
         `OKX rejected stop-loss cancellation: ${JSON.stringify(responses)}`,
@@ -1578,13 +1729,13 @@ export abstract class OkxFutureBaseService {
     normalizedCoin: string,
     direction: FutureDirection,
     positionSize: number,
-    stopLossOrders: any[],
+    stopLossOrders: OkxAlgoOrder[],
     testing: boolean,
   ) {
     const instId = `${normalizedCoin}-USDT-SWAP`;
     const wholePositionOrders = stopLossOrders
-      .filter((order: any) => String(order.closeFraction ?? '') === '1')
-      .sort((left: any, right: any) =>
+      .filter((order) => String(order.closeFraction ?? '') === '1')
+      .sort((left, right) =>
         direction === 'long'
           ? Number(right.slTriggerPx) - Number(left.slTriggerPx)
           : Number(left.slTriggerPx) - Number(right.slTriggerPx),
@@ -1616,7 +1767,7 @@ export abstract class OkxFutureBaseService {
     if (wholePositionOrders.length > 0) {
       const keptOrder = wholePositionOrders[0];
       const ordersToCancel = stopLossOrders.filter(
-        (order: any) => order.algoId !== keptOrder.algoId,
+        (order) => order.algoId !== keptOrder.algoId,
       );
       const cancellations = await this.cancelStopLossOrders(
         ordersToCancel,
@@ -1682,7 +1833,7 @@ export abstract class OkxFutureBaseService {
     normalizedCoin: string,
     direction: FutureDirection,
     positionSize: number,
-    stopLossOrders: any[],
+    stopLossOrders: OkxAlgoOrder[],
     testing: boolean,
   ) {
     const instId = `${normalizedCoin}-USDT-SWAP`;
@@ -1714,7 +1865,7 @@ export abstract class OkxFutureBaseService {
     const lotSize = Number(inst.lotSz || inst.minSz || 1);
     const sizeTolerance = lotSize * 0.5;
     const sizedOrders = stopLossOrders
-      .map((order: any) => ({
+      .map((order) => ({
         order,
         size: Number(order.sz),
         triggerPrice: Number(order.slTriggerPx),
@@ -1726,7 +1877,7 @@ export abstract class OkxFutureBaseService {
           : left.triggerPrice - right.triggerPrice,
       );
     const keptOrders: typeof sizedOrders = [];
-    const ordersToCancel: any[] = [];
+    const ordersToCancel: OkxAlgoOrder[] = [];
     let keptSize = 0;
     for (const item of sizedOrders) {
       if (keptSize + item.size <= positionSize + sizeTolerance) {
@@ -1738,9 +1889,7 @@ export abstract class OkxFutureBaseService {
     }
     const sizedOrderIds = new Set(sizedOrders.map(({ order }) => order.algoId));
     ordersToCancel.push(
-      ...stopLossOrders.filter(
-        (order: any) => !sizedOrderIds.has(order.algoId),
-      ),
+      ...stopLossOrders.filter((order) => !sizedOrderIds.has(order.algoId)),
     );
     const missingSize = Math.max(0, positionSize - keptSize);
     const formattedMissingSize =
@@ -2178,7 +2327,9 @@ export abstract class OkxFutureBaseService {
   }
 
   private getClosePriceRatios(coin: string) {
-    const coinConfig = this.config.get<any>(`coin.${coin.toUpperCase()}`);
+    const coinConfig = this.config.get<FutureCoinConfig>(
+      `coin.${coin.toUpperCase()}`,
+    );
     const minClosePriceRatio = Number(
       coinConfig?.minClosePriceRatio ??
         this.config.get<number>('minClosePriceRatio'),

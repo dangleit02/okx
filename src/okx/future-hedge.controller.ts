@@ -84,6 +84,11 @@ export class FutureHedgeController {
     return coins;
   }
 
+  private configuredCoinsForCleanup(direction: FutureDirection) {
+    const key = direction === 'long' ? 'coinsForLong' : 'coinsForShort';
+    return _.uniq(this.config.get<string[]>(key) || []);
+  }
+
   private protectiveCloseOnly(query: Record<string, string>) {
     return parseBool(query.protectiveCloseOnly ?? query.partialCloseOnRetrace);
   }
@@ -430,7 +435,11 @@ export class FutureHedgeController {
     const direction = this.parseDirection(query.direction);
     const testing = query.testing !== 'false';
     const results = [];
-    for (const coin of this.configuredCoins(direction)) {
+    const coins = await this.okx.getProtectiveCloseCleanupCoins(
+      direction,
+      this.configuredCoinsForCleanup(direction),
+    );
+    for (const coin of coins) {
       results.push({
         coin,
         direction,

@@ -697,19 +697,17 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
 
   it('logs and emails a live cancellation only when matching orders exist', async () => {
     const { service, logger, emailService } = createService();
-    jest
-      .spyOn(service, 'getPendingTriggerOrdersForCoin')
-      .mockResolvedValue([
-        {
-          algoId: '1',
-          instId: 'BTC-USDT-SWAP',
-          posSide: 'long',
-          side: 'buy',
-          triggerPx: '100',
-          ordPx: '101',
-          sz: '1',
-        },
-      ]);
+    jest.spyOn(service, 'getPendingTriggerOrdersForCoin').mockResolvedValue([
+      {
+        algoId: '1',
+        instId: 'BTC-USDT-SWAP',
+        posSide: 'long',
+        side: 'buy',
+        triggerPx: '100',
+        ordPx: '101',
+        sz: '1',
+      },
+    ]);
     jest
       .spyOn(service, 'cancelOrdersFromList')
       .mockResolvedValue([{ code: '0' }] as any);
@@ -736,17 +734,15 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
 
   it('previews trigger and conditional future cancellations together', async () => {
     const { service, emailService } = createService();
-    jest
-      .spyOn(service, 'getPendingTriggerOrdersForCoin')
-      .mockResolvedValue([
-        {
-          algoId: 'open-1',
-          instId: 'BTC-USDT-SWAP',
-          ordType: 'trigger',
-          posSide: 'long',
-          side: 'buy',
-        },
-      ]);
+    jest.spyOn(service, 'getPendingTriggerOrdersForCoin').mockResolvedValue([
+      {
+        algoId: 'open-1',
+        instId: 'BTC-USDT-SWAP',
+        ordType: 'trigger',
+        posSide: 'long',
+        side: 'buy',
+      },
+    ]);
     jest
       .spyOn(service, 'getPendingConditionalOrdersForCoin')
       .mockResolvedValue([
@@ -908,7 +904,7 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
   });
 
   it('emails the stop-loss coverage details after a live submission', async () => {
-    const { service, emailService } = createService(true);
+    const { service, logger, emailService } = createService(true);
     jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
       data: [
         { instId: 'BTC-USDT-SWAP', posSide: 'long', pos: '2', avgPx: '100' },
@@ -1114,6 +1110,9 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
         sz: '5',
       },
     ]);
+    jest
+      .spyOn(service, 'getPendingConditionalOrdersForCoin')
+      .mockResolvedValue([]);
 
     const result: any =
       await service.cleanProtectiveCloseByPriceStepsOrdersForOneCoin(
@@ -1125,7 +1124,7 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
     expect(result).toEqual(
       expect.objectContaining({
         status: 'preview',
-        positionSize: 1,
+        positionSize: '1',
         protectiveCloseByPriceStepsOrderCount: 2,
         cancelOrderCount: 1,
       }),
@@ -1165,6 +1164,9 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
         sz: '5',
       },
     ]);
+    jest
+      .spyOn(service, 'getPendingConditionalOrdersForCoin')
+      .mockResolvedValue([]);
 
     const result: any =
       await service.cleanProtectiveCloseByPriceStepsOrdersForOneCoin(
@@ -1175,6 +1177,196 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
 
     expect(result.keptOrders.map((order) => order.algoId)).toEqual(['near']);
     expect(result.ordersToCancel.map((order) => order.algoId)).toEqual(['far']);
+  });
+
+  it('returns nothing_to_cancel when live futures cleanup has no excess close orders', async () => {
+    const { service, logger, emailService } = createService(true);
+    jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
+      data: [
+        { instId: 'BTC-USDT-SWAP', posSide: 'long', pos: '1', avgPx: '0' },
+      ],
+    });
+    jest.spyOn(service, 'getPendingTriggerOrdersForCoin').mockResolvedValue([]);
+    jest
+      .spyOn(service, 'getPendingConditionalOrdersForCoin')
+      .mockResolvedValue([]);
+    const cancelOrders = jest.spyOn(service, 'cancelOrdersFromList');
+
+    await expect(
+      service.cleanProtectiveCloseByPriceStepsOrdersForOneCoin(
+        'BTC',
+        'long',
+        false,
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        status: 'nothing_to_cancel',
+        cancelOrderCount: 0,
+        cancelledOrderCount: 0,
+      }),
+    );
+    expect(cancelOrders).not.toHaveBeenCalled();
+    expect(emailService.sendEmail).not.toHaveBeenCalled();
+    const summaryCall = logger.log.mock.calls.find(
+      ([, context]) => context === 'Future protective close cleanup summary',
+    );
+    expect(JSON.parse(summaryCall[0])).toEqual(
+      expect.objectContaining({
+        status: 'nothing_to_cancel',
+        coin: 'BTC',
+        keptOrderCount: 0,
+        cancelOrderCount: 0,
+        cancelledOrderIds: [],
+        failedOrderIds: [],
+      }),
+    );
+  });
+
+  it('logs only a compact futures cleanup summary after cancellation', async () => {
+    const { service, logger } = createService(true);
+    jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
+      code: '0',
+      data: [],
+    });
+    jest.spyOn(service, 'getPendingTriggerOrdersForCoin').mockResolvedValue([
+      {
+        algoId: 'orphan-close',
+        instId: 'NEAR-USDT-SWAP',
+        posSide: 'long',
+        side: 'sell',
+        triggerPx: '10',
+        ordPx: '-1',
+        sz: '2',
+      },
+    ]);
+    jest
+      .spyOn(service, 'getPendingConditionalOrdersForCoin')
+      .mockResolvedValue([]);
+    jest.spyOn(service, 'cancelOrdersFromList').mockResolvedValue([
+      {
+        code: '0',
+        data: [{ algoId: 'orphan-close', sCode: '0' }],
+      },
+    ]);
+
+    await service.cleanProtectiveCloseByPriceStepsOrdersForOneCoin(
+      'NEAR',
+      'long',
+      false,
+    );
+
+    const summaryCall = logger.log.mock.calls.find(
+      ([, context]) => context === 'Future protective close cleanup summary',
+    );
+    expect(JSON.parse(summaryCall[0])).toEqual(
+      expect.objectContaining({
+        status: 'cleaned',
+        coin: 'NEAR',
+        cancelledOrderIds: ['orphan-close'],
+        failedOrderIds: [],
+      }),
+    );
+    expect(summaryCall[0]).not.toContain('responses');
+    expect(summaryCall[0]).not.toContain('keptOrders');
+    expect(summaryCall[0]).not.toContain('ordersToCancel');
+  });
+
+  it('cleans trigger and conditional close orders without ticker metadata when the position is gone', async () => {
+    const { service } = createService(true);
+    jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
+      code: '0',
+      data: [],
+    });
+    jest.spyOn(service, 'getPendingTriggerOrdersForCoin').mockResolvedValue([
+      {
+        algoId: 'trigger-close',
+        instId: 'NEAR-USDT-SWAP',
+        posSide: 'long',
+        side: 'sell',
+        triggerPx: '10',
+        ordPx: '-1',
+        sz: '2',
+      },
+      {
+        algoId: 'entry',
+        instId: 'NEAR-USDT-SWAP',
+        posSide: 'long',
+        side: 'buy',
+        triggerPx: '5',
+        ordPx: '-1',
+        sz: '2',
+      },
+    ]);
+    jest
+      .spyOn(service, 'getPendingConditionalOrdersForCoin')
+      .mockResolvedValue([
+        {
+          algoId: 'conditional-close',
+          instId: 'NEAR-USDT-SWAP',
+          posSide: 'long',
+          side: 'sell',
+          closeFraction: '1',
+          slTriggerPx: '4',
+          slOrdPx: '-1',
+        },
+      ]);
+
+    const result: any =
+      await service.cleanProtectiveCloseByPriceStepsOrdersForOneCoin(
+        'NEAR',
+        'long',
+        true,
+      );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'preview',
+        currentPrice: null,
+        positionSize: '0',
+        orphanedCloseOrderCleanup: true,
+        cancelOrderCount: 2,
+      }),
+    );
+    expect(result.ordersToCancel.map((order) => order.algoId).sort()).toEqual([
+      'conditional-close',
+      'trigger-close',
+    ]);
+    expect((service as any).getTicker).not.toHaveBeenCalled();
+    expect((service as any).fetchInstrument).not.toHaveBeenCalled();
+  });
+
+  it('discovers cleanup coins from config, open positions, and pending conditional close orders', async () => {
+    const { service } = createService(true);
+    jest.spyOn(service, 'getAllPendingTriggerOrders').mockResolvedValue([
+      {
+        algoId: 'entry',
+        instId: 'SOL-USDT-SWAP',
+        posSide: 'long',
+        side: 'buy',
+      },
+    ]);
+    jest.spyOn(service, 'getAllPendingConditionalOrders').mockResolvedValue([
+      {
+        algoId: 'orphan-close',
+        instId: 'NEAR-USDT-SWAP',
+        posSide: 'long',
+        side: 'sell',
+      },
+    ]);
+    jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
+      code: '0',
+      data: [
+        {
+          instId: 'ETH-USDT-SWAP',
+          posSide: 'long',
+          pos: '1',
+        },
+      ],
+    });
+
+    await expect(
+      service.getProtectiveCloseCleanupCoins('long', ['btc']),
+    ).resolves.toEqual(['BTC', 'ETH', 'NEAR']);
   });
 
   it('builds distinct hedge and oneway log filename keys', () => {

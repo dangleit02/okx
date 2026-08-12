@@ -1,11 +1,49 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 import { AppLogger } from '../logger/logger.service';
 import * as _ from 'lodash';
 import { EmailService } from '../email/email.service';
 import * as moment from 'moment';
+import Decimal from 'decimal.js';
+import {
+  OkxAccountBalanceResponse,
+  OkxAlgoOrder,
+  OkxApiResponse,
+  OkxBalanceDetail,
+  OkxCancelBatchResult,
+  OkxCancelItem,
+  OkxCancelResponse,
+  OkxInstrument,
+  OkxTicker,
+  SellOrderCleanupOrder,
+  SellOrderCleanupResult,
+} from './okx.types';
+
+interface EligibleSellOrder extends SellOrderCleanupOrder {
+  sizeDecimal: Decimal;
+}
+
+interface SpotCoinConfig {
+  szToFixed: number;
+  priceToFixed: number;
+  amountOfUsdtPerStep?: number;
+  riskPerTrade?: number;
+  minBuyPriceRatio?: number;
+  maxBuyPriceRatio?: number;
+  minClosePriceRatio?: number;
+  maxClosePriceRatio?: number;
+}
+
+interface HttpErrorLike {
+  response?: {
+    status?: number;
+    data?: unknown;
+    headers?: Record<string, unknown>;
+  };
+  config?: { url?: string };
+}
 
 interface BuyTriggerRangeOptions {
   numberOfOrders?: number;
@@ -106,7 +144,7 @@ export interface SellAtPriceAllCoinsOptions {
 
 @Injectable()
 export class OkxService {
-  private spotInstrumentCache: Map<string, any> = new Map();
+  private spotInstrumentCache = new Map<string, OkxInstrument>();
 
   constructor(
     private config: ConfigService,
@@ -173,12 +211,23 @@ export class OkxService {
     return normalized.split('.')[1]?.length ?? 0;
   }
 
-  protected async fetchSpotInstrument(instId: string) {
+  private parseDecimal(value: unknown): Decimal | null {
+    try {
+      const decimal = new Decimal(String(value));
+      return decimal.isFinite() ? decimal : null;
+    } catch {
+      return null;
+    }
+  }
+
+  protected async fetchSpotInstrument(
+    instId: string,
+  ): Promise<OkxInstrument | null> {
     if (this.spotInstrumentCache.has(instId)) {
       return this.spotInstrumentCache.get(instId);
     }
     const url = `${this.config.get<string>('okx.baseUrl')}/api/v5/public/instruments?instId=${encodeURIComponent(instId)}&instType=SPOT`;
-    const response = await axios.get(url);
+    const response = await axios.get<OkxApiResponse<OkxInstrument>>(url);
     const rawInstrument = response.data?.data?.[0];
     if (!rawInstrument) return null;
     const instrument = {
@@ -201,22 +250,27 @@ export class OkxService {
   }
 
   private normalizeSpotSize(
-    rawSize: number,
-    instrument: any,
+    rawSize: Decimal.Value,
+    instrument: OkxInstrument,
     rounding: 'floor' | 'ceil',
   ) {
-    const lotSize = Number(instrument.lotSz);
-    const minimumSize = Number(instrument.minSz);
-    const units =
-      rounding === 'ceil'
-        ? Math.ceil(rawSize / lotSize - 1e-10)
-        : Math.floor(rawSize / lotSize + 1e-10);
-    const value = units * lotSize;
-    const formatted = value.toFixed(this.decimalPlaces(lotSize));
+    const lotSizeDecimal = new Decimal(String(instrument.lotSz));
+    const minimumSizeDecimal = new Decimal(String(instrument.minSz));
+    const units = new Decimal(rawSize)
+      .div(lotSizeDecimal)
+      .toDecimalPlaces(
+        0,
+        rounding === 'ceil' ? Decimal.ROUND_CEIL : Decimal.ROUND_FLOOR,
+      );
+    const valueDecimal = units.mul(lotSizeDecimal);
+    const formatted = valueDecimal.toFixed(lotSizeDecimal.decimalPlaces());
+    const value = valueDecimal.toNumber();
+    const lotSize = lotSizeDecimal.toNumber();
+    const minimumSize = minimumSizeDecimal.toNumber();
     return {
       value,
       formatted,
-      meetsMinimum: value >= minimumSize,
+      meetsMinimum: valueDecimal.greaterThanOrEqualTo(minimumSizeDecimal),
       lotSize,
       minimumSize,
     };
@@ -225,9 +279,9 @@ export class OkxService {
   private async cancelAlgoOrders(
     orders: Array<{ algoId: string; instId: string }>,
     maxAttempts: number = 3,
-  ) {
+  ): Promise<OkxCancelBatchResult> {
     const cancelPath = '/api/v5/trade/cancel-algos';
-    const responses: any[] = [];
+    const responses: OkxCancelResponse[] = [];
     const succeededAlgoIds = new Set<string>();
     const failedAlgoIds = new Set<string>();
     let requestCount = 0;
@@ -255,7 +309,7 @@ export class OkxService {
           cancelPath,
           bodyString,
         );
-        const response = await axios.post(
+        const response = await axios.post<OkxCancelResponse>(
           this.config.get<string>('okx.baseUrl') + cancelPath,
           bodyString,
           { headers },
@@ -263,14 +317,14 @@ export class OkxService {
         responses.push(response.data);
 
         const responseItems = response.data?.data ?? [];
-        const responseItemsByAlgoId = new Map(
-          responseItems.map((item: any) => [String(item.algoId), item]),
+        const responseItemsByAlgoId = new Map<string, OkxCancelItem>(
+          responseItems.map((item) => [String(item.algoId), item]),
         );
         const topLevelRateLimited = String(response.data?.code) === '50011';
         const nextRetry: Array<{ algoId: string; instId: string }> = [];
 
         for (const order of ordersToRetry) {
-          const item: any = responseItemsByAlgoId.get(String(order.algoId));
+          const item = responseItemsByAlgoId.get(String(order.algoId));
           const itemCode = String(item?.sCode ?? '');
 
           if (itemCode === '0') {
@@ -306,29 +360,30 @@ export class OkxService {
 
   private async getSpotTickers(): Promise<Map<string, number>> {
     const url = `${this.config.get<string>('okx.baseUrl')}/api/v5/market/tickers?instType=SPOT`;
-    const response = await axios.get(url);
+    const response = await axios.get<OkxApiResponse<OkxTicker>>(url);
     return new Map(
       (response.data?.data ?? [])
-        .map(
-          (ticker: any) =>
-            [String(ticker.instId), Number(ticker.last)] as const,
-        )
+        .map((ticker) => [String(ticker.instId), Number(ticker.last)] as const)
         .filter(([, price]) => Number.isFinite(price) && price > 0),
     );
   }
 
-  private async getPendingTriggerSpotOrders(coin?: string) {
+  private async getPendingTriggerSpotOrders(
+    coin?: string,
+  ): Promise<OkxAlgoOrder[]> {
     return this.getPendingSpotAlgoOrders('trigger', coin);
   }
 
-  private async getPendingConditionalSpotOrders(coin?: string) {
+  private async getPendingConditionalSpotOrders(
+    coin?: string,
+  ): Promise<OkxAlgoOrder[]> {
     return this.getPendingSpotAlgoOrders('conditional', coin);
   }
 
   private async getPendingSpotOrdersByType(
     ordType: PendingAlgoOrderType,
     coin?: string,
-  ) {
+  ): Promise<OkxAlgoOrder[]> {
     if (ordType === 'trigger') return this.getPendingTriggerSpotOrders(coin);
     if (ordType === 'conditional')
       return this.getPendingConditionalSpotOrders(coin);
@@ -342,8 +397,8 @@ export class OkxService {
   private async getPendingSpotAlgoOrders(
     ordType: 'trigger' | 'conditional',
     coin?: string,
-  ) {
-    const orders: any[] = [];
+  ): Promise<OkxAlgoOrder[]> {
+    const orders: OkxAlgoOrder[] = [];
     const normalizedCoin = coin?.toUpperCase();
     const instId = normalizedCoin ? `${normalizedCoin}-USDT` : undefined;
     let after: string | undefined;
@@ -360,12 +415,12 @@ export class OkxService {
         .join('&');
       const getPath = `/api/v5/trade/orders-algo-pending?${query}`;
       const maxAttempts = 3;
-      let response: any;
+      let response!: AxiosResponse<OkxApiResponse<OkxAlgoOrder>>;
 
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const timestamp = new Date().toISOString();
         const getSign = this.sign(timestamp, 'GET', getPath);
-        response = await axios.get(
+        response = await axios.get<OkxApiResponse<OkxAlgoOrder>>(
           this.config.get<string>('okx.baseUrl') + getPath,
           {
             headers: {
@@ -415,7 +470,7 @@ export class OkxService {
     return orders;
   }
 
-  private getPendingOrderTriggerPrice(order: any): number {
+  private getPendingOrderTriggerPrice(order: OkxAlgoOrder): number {
     const candidates =
       order.ordType === 'conditional'
         ? [order.slTriggerPx, order.tpTriggerPx, order.triggerPx]
@@ -427,7 +482,7 @@ export class OkxService {
     return Number(triggerPrice);
   }
 
-  private getPendingOrderPrice(order: any): number {
+  private getPendingOrderPrice(order: OkxAlgoOrder): number {
     const candidates =
       order.ordType === 'conditional'
         ? [order.slOrdPx, order.tpOrdPx, order.ordPx]
@@ -445,7 +500,9 @@ export class OkxService {
       : this.getPendingOrderTriggerPrice(order);
   }
 
-  private getSpotConditionType(order: any): SpotConditionType | undefined {
+  private getSpotConditionType(
+    order: OkxAlgoOrder,
+  ): SpotConditionType | undefined {
     if (order.ordType !== 'conditional') return undefined;
     if (order.slTriggerPx !== undefined && order.slTriggerPx !== '')
       return 'stop_loss';
@@ -455,14 +512,14 @@ export class OkxService {
   }
 
   private summarizePendingOrders(
-    orders: any[],
+    orders: OkxAlgoOrder[],
     instId: string,
     side: PendingOrdersSide,
     options: PendingOrdersTotalOptions = {},
     orderType: PendingSpotOrderType = 'trigger',
   ): PendingBuyOrdersTotal {
     const matchingOrders = orders.filter(
-      (order: any) =>
+      (order) =>
         order.side === side &&
         order.instId === instId &&
         this.isOrderWithinPriceRange(order, options),
@@ -522,7 +579,7 @@ export class OkxService {
   }
 
   private isOrderWithinPriceRange(
-    order: any,
+    order: OkxAlgoOrder,
     options: PendingOrdersTotalOptions,
   ): boolean {
     if (options.minPrice === undefined && options.maxPrice === undefined) {
@@ -583,13 +640,13 @@ export class OkxService {
   }
 
   private getTriggerPriceRange(
-    orders: any[],
+    orders: OkxAlgoOrder[],
     instId: string,
     side: PendingOrdersSide,
   ) {
     const prices = orders
-      .filter((order: any) => order.side === side && order.instId === instId)
-      .map((order: any) => this.getPendingOrderTriggerPrice(order))
+      .filter((order) => order.side === side && order.instId === instId)
+      .map((order) => this.getPendingOrderTriggerPrice(order))
       .filter((price: number) => Number.isFinite(price) && price > 0);
 
     if (prices.length === 0) {
@@ -603,7 +660,7 @@ export class OkxService {
   }
 
   private summarizePendingOrdersByStep(
-    orders: any[],
+    orders: OkxAlgoOrder[],
     instId: string,
     side: PendingOrdersSide,
     minPrice: number,
@@ -623,7 +680,7 @@ export class OkxService {
           ? maxPrice
           : Number((minPrice + (index + 1) * interval).toPrecision(15));
       const maxPriceInclusive = index === rangeCount - 1;
-      const rangeOrders = orders.filter((order: any) => {
+      const rangeOrders = orders.filter((order) => {
         if (order.side !== side || order.instId !== instId) {
           return false;
         }
@@ -658,7 +715,7 @@ export class OkxService {
   }
 
   private summarizePendingOrdersByOrderCount(
-    orders: any[],
+    orders: OkxAlgoOrder[],
     instId: string,
     side: PendingOrdersSide,
     options: PendingOrdersTotalOptions,
@@ -666,7 +723,7 @@ export class OkxService {
   ): PendingBuyOrdersRangeTotal[] {
     const matchingOrders = orders
       .filter(
-        (order: any) =>
+        (order) =>
           order.side === side &&
           order.instId === instId &&
           this.isOrderWithinPriceRange(order, options) &&
@@ -674,7 +731,7 @@ export class OkxService {
           this.getPendingOrderTriggerPrice(order) > 0,
       )
       .sort(
-        (left: any, right: any) =>
+        (left, right) =>
           this.getPendingOrderTriggerPrice(left) -
           this.getPendingOrderTriggerPrice(right),
       );
@@ -682,10 +739,10 @@ export class OkxService {
 
     for (let index = 0; index < matchingOrders.length; index += ordersPerStep) {
       const rangeOrders = matchingOrders.slice(index, index + ordersPerStep);
-      const triggerPrices = rangeOrders.map((order: any) =>
+      const triggerPrices = rangeOrders.map((order) =>
         this.getPendingOrderTriggerPrice(order),
       );
-      const totalAmount = rangeOrders.reduce((total: number, order: any) => {
+      const totalAmount = rangeOrders.reduce((total: number, order) => {
         const orderPrice = this.getPendingOrderPrice(order);
         const size = Number(order.sz);
 
@@ -792,7 +849,7 @@ export class OkxService {
       { orderType: 'trigger' as const, result: triggerResult },
       { orderType: 'conditional' as const, result: conditionalResult },
     ];
-    const orders: any[] = [];
+    const orders: OkxAlgoOrder[] = [];
     const orderErrors: Array<{
       coin: string;
       orderType: PendingSpotOrderType;
@@ -802,7 +859,7 @@ export class OkxService {
     for (const source of sourceResults) {
       if (source.result.status === 'fulfilled') {
         orders.push(
-          ...source.result.value.map((order: any) => ({
+          ...source.result.value.map((order) => ({
             ...order,
             ordType: order.ordType ?? source.orderType,
           })),
@@ -822,7 +879,7 @@ export class OkxService {
                 ...(this.config.get<string[]>('coinsForBuy') ?? []),
                 ...(this.config.get<string[]>('coinsSpotForTakeProfit') ?? []),
                 ...orders
-                  .map((order: any) => String(order.instId ?? '').split('-')[0])
+                  .map((order) => String(order.instId ?? '').split('-')[0])
                   .filter(Boolean),
               ]
                 .map((coin) => String(coin).trim().toUpperCase())
@@ -851,8 +908,11 @@ export class OkxService {
                 ? await this.getPendingTriggerSpotOrders(coin)
                 : await this.getPendingConditionalSpotOrders(coin);
             return { coin, orders: coinOrders };
-          } catch (error: any) {
-            return { coin, error: String(error?.message ?? error) };
+          } catch (error: unknown) {
+            return {
+              coin,
+              error: error instanceof Error ? error.message : String(error),
+            };
           }
         }),
       );
@@ -866,7 +926,7 @@ export class OkxService {
           });
         } else {
           orders.push(
-            ...(coinResult.orders ?? []).map((order: any) => ({
+            ...(coinResult.orders ?? []).map((order) => ({
               ...order,
               ordType: order.ordType ?? source.orderType,
             })),
@@ -878,12 +938,10 @@ export class OkxService {
       new Set(
         orders
           .filter(
-            (order: any) =>
+            (order) =>
               order.side === side && String(order.instId).endsWith('-USDT'),
           )
-          .map(
-            (order: any) => `${String(order.instId)}|${String(order.ordType)}`,
-          ),
+          .map((order) => `${String(order.instId)}|${String(order.ordType)}`),
       ),
     ).sort();
     const coins = groups
@@ -893,8 +951,7 @@ export class OkxService {
           PendingSpotOrderType,
         ];
         const groupOrders = orders.filter(
-          (order: any) =>
-            order.instId === instId && order.ordType === orderType,
+          (order) => order.instId === instId && order.ordType === orderType,
         );
         const inferredRange = this.getTriggerPriceRange(
           groupOrders,
@@ -994,7 +1051,7 @@ export class OkxService {
       normalizedCoin,
     );
     const matchedOrders = pendingOrders
-      .filter((order: any) => {
+      .filter((order) => {
         const triggerPrice = this.getPendingOrderTriggerPrice(order);
         return (
           order.side === side &&
@@ -1005,7 +1062,7 @@ export class OkxService {
           triggerPrice <= maxPrice
         );
       })
-      .map((order: any) => {
+      .map((order) => {
         const triggerPrice = this.getPendingOrderTriggerPrice(order);
         const orderPrice = this.getPendingOrderPrice(order);
         const size = Number(order.sz);
@@ -1096,12 +1153,12 @@ export class OkxService {
       normalizedCoin,
     );
     const ordersBySide = pendingOrders.filter(
-      (order: any) =>
+      (order) =>
         order.instId === instId &&
         (!side || order.side === side) &&
         Boolean(order.algoId),
     );
-    const ordersToCancel = ordersBySide.map((o: any) => ({
+    const ordersToCancel = ordersBySide.map((o) => ({
       algoId: o.algoId,
       instId: o.instId,
     }));
@@ -1113,7 +1170,7 @@ export class OkxService {
       ordType,
       testing,
       matchedOrderCount: ordersToCancel.length,
-      orders: ordersBySide.map((order: any) => ({
+      orders: ordersBySide.map((order) => ({
         algoId: String(order.algoId),
         instId: order.instId,
         ordType: order.ordType,
@@ -1157,85 +1214,43 @@ export class OkxService {
     return result;
   }
 
-  private formatSellOrderCleanupTable(
-    keptOrders: Array<{
-      algoId: string;
-      createdAt: string;
-      triggerPrice: number;
-      orderPrice: number;
-    }>,
-    ordersToCancel: Array<{
-      algoId: string;
-      createdAt: string;
-      triggerPrice: number;
-      orderPrice: number;
-    }>,
-    successfullyCleanedOrderIds: Set<string>,
-    cleanedAt: string,
-    currentPrice: number,
-    averageCost: number,
-  ): string {
-    const formatProfitPercentage = (price: number) =>
-      Number.isFinite(averageCost) && averageCost > 0
-        ? String(
-            Number((((price - averageCost) / averageCost) * 100).toFixed(2)),
-          )
-        : '';
-    const headers = [
-      'STATUS',
-      'ALGO ID',
-      'CURRENT PRICE',
-      'CURRENT PROFIT (%)',
-      'CREATED AT',
-      'CLEANED AT',
-      'TRIGGER PRICE',
-      'ORDER PRICE',
-      'ORDER PROFIT (%)',
-    ];
-    const cleanedRows = ordersToCancel.map((order) => {
-      const cleaned = successfullyCleanedOrderIds.has(order.algoId);
-      return [
-        cleaned ? 'CLEANED' : 'CLEAN_FAILED',
-        order.algoId,
-        String(currentPrice),
-        formatProfitPercentage(currentPrice),
-        order.createdAt,
-        cleaned ? cleanedAt : '',
-        String(order.triggerPrice),
-        String(order.orderPrice),
-        formatProfitPercentage(order.orderPrice),
-      ];
-    });
-    const keptRows = keptOrders.map((order) => [
-      'KEPT',
-      order.algoId,
-      String(currentPrice),
-      formatProfitPercentage(currentPrice),
-      order.createdAt,
-      '',
-      String(order.triggerPrice),
-      String(order.orderPrice),
-      formatProfitPercentage(order.orderPrice),
-    ]);
-    const rows = [...cleanedRows, ...keptRows];
-    const widths = headers.map((header, index) =>
-      Math.max(header.length, ...rows.map((row) => row[index].length)),
-    );
-    const formatRow = (row: string[]) =>
-      row.map((value, index) => value.padEnd(widths[index])).join(' | ');
-    const separator = widths.map((width) => '-'.repeat(width)).join('-+-');
-
-    return ['', formatRow(headers), separator, ...rows.map(formatRow)].join(
-      '\n',
+  private logSellOrderCleanupSummary(
+    result: SellOrderCleanupResult,
+    cancelledOrderIds: string[] = [],
+    failedOrderIds: string[] = [],
+  ) {
+    this.logger.log(
+      JSON.stringify({
+        status: result.status,
+        coin: result.coin,
+        sellableBalance: result.sellableBalance,
+        currentPrice: result.currentPrice,
+        keptOrderCount: result.keptOrderCount,
+        cancelOrderCount: result.cancelOrderCount,
+        cancelledOrderCount: result.cancelledOrderCount ?? 0,
+        failedOrderCount: result.failedOrderCount ?? 0,
+        cancelledOrderIds,
+        failedOrderIds,
+      }),
+      'Sell order cleanup summary',
+      `${result.coin}_clean`,
     );
   }
 
-  private isRateLimitError(error: any) {
-    return Number(error?.response?.status) === 429;
+  private getHttpError(error: unknown): HttpErrorLike | undefined {
+    return typeof error === 'object' && error !== null
+      ? (error as HttpErrorLike)
+      : undefined;
   }
 
-  private getRateLimitRetryDelayMs(error: any, attempt: number) {
-    const retryAfter = Number(error?.response?.headers?.['retry-after']);
+  private isRateLimitError(error: unknown) {
+    return Number(this.getHttpError(error)?.response?.status) === 429;
+  }
+
+  private getRateLimitRetryDelayMs(error: unknown, attempt: number) {
+    const retryAfter = Number(
+      this.getHttpError(error)?.response?.headers?.['retry-after'],
+    );
     return Number.isFinite(retryAfter) && retryAfter > 0
       ? retryAfter * 1000
       : attempt * 1000;
@@ -1251,10 +1266,11 @@ export class OkxService {
           normalizedCoin,
           testing,
         );
-      } catch (error: any) {
-        const status = Number(error?.response?.status);
-        const responseData = error?.response?.data;
-        const requestUrl = error?.config?.url;
+      } catch (error: unknown) {
+        const httpError = this.getHttpError(error);
+        const status = Number(httpError?.response?.status);
+        const responseData = httpError?.response?.data;
+        const requestUrl = httpError?.config?.url;
         this.logger.log(
           JSON.stringify({
             coin: normalizedCoin,
@@ -1262,7 +1278,7 @@ export class OkxService {
             maxAttempts,
             status: Number.isFinite(status) ? status : undefined,
             requestUrl,
-            message: error?.message ?? String(error),
+            message: error instanceof Error ? error.message : String(error),
             responseData,
           }),
           'Clean sell orders request failed',
@@ -1286,7 +1302,7 @@ export class OkxService {
   private async cleanSellOrdersForOneCoinAttempt(
     coin: string,
     testing: boolean,
-  ) {
+  ): Promise<SellOrderCleanupResult> {
     const normalizedCoin = coin.trim().toUpperCase();
     if (!normalizedCoin || !/^[A-Z0-9]+$/.test(normalizedCoin)) {
       throw new Error(`Invalid coin: ${coin}`);
@@ -1298,124 +1314,153 @@ export class OkxService {
     const pendingOrders =
       await this.getPendingTriggerSpotOrders(normalizedCoin);
     const balanceData = await this.getAccountBalance(normalizedCoin);
-    if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
-      throw new Error(
-        `Invalid current price fetched for ${instId}: ${currentPrice}`,
-      );
-    }
-
-    const balance = (balanceData?.data?.[0]?.details ?? []).find(
-      (detail: any) => String(detail.ccy).toUpperCase() === normalizedCoin,
+    const balance = this.getSpotBalanceDetail(balanceData, normalizedCoin);
+    const sellableBalance = new Decimal(
+      this.getSpotSellableBalanceValue(balance, normalizedCoin),
     );
-    const boughtCoinAmount = Number(
-      balance?.cashBal ?? balance?.eq ?? balance?.availBal ?? 0,
-    );
-    if (!Number.isFinite(boughtCoinAmount) || boughtCoinAmount < 0) {
-      throw new Error(
-        `Invalid bought coin amount for ${normalizedCoin}: ${boughtCoinAmount}`,
-      );
-    }
-    const averageCost = Number(balance?.openAvgPx ?? 0);
     const configuredSizeDecimals = Number(
-      this.config.get<any>(`coin.${normalizedCoin}`)?.szToFixed,
+      this.config.get<SpotCoinConfig>(`coin.${normalizedCoin}`)?.szToFixed,
     );
     const sizeDecimals =
       Number.isInteger(configuredSizeDecimals) && configuredSizeDecimals >= 0
         ? configuredSizeDecimals
         : 8;
-    const sizeTolerance = 0.5 * 10 ** -sizeDecimals;
+    const sizeTolerance = new Decimal(10).pow(-sizeDecimals).div(2);
+    const cleanAllSellOrders = sellableBalance.lessThanOrEqualTo(sizeTolerance);
+    if (
+      !cleanAllSellOrders &&
+      (!Number.isFinite(currentPrice) || currentPrice <= 0)
+    ) {
+      throw new Error(
+        `Invalid current price fetched for ${instId}: ${currentPrice}`,
+      );
+    }
+    const cleanupCurrentPrice =
+      Number.isFinite(currentPrice) && currentPrice > 0 ? currentPrice : 0;
+    const conditionalOrders = cleanAllSellOrders
+      ? await this.getPendingConditionalSpotOrders(normalizedCoin)
+      : [];
+    const allPendingOrders: OkxAlgoOrder[] = cleanAllSellOrders
+      ? [
+          ...pendingOrders.map((order) => ({
+            ...order,
+            ordType: order.ordType ?? 'trigger',
+          })),
+          ...conditionalOrders.map((order) => ({
+            ...order,
+            ordType: order.ordType ?? 'conditional',
+          })),
+        ]
+      : pendingOrders.map((order) => ({
+          ...order,
+          ordType: order.ordType ?? 'trigger',
+        }));
 
-    const eligibleOrders = pendingOrders
-      .filter((order: any) => {
-        const triggerPrice = Number(order.triggerPx);
-        const size = Number(order.sz);
+    const eligibleOrders = allPendingOrders
+      .filter((order) => {
+        const triggerPrice = this.getPendingOrderTriggerPrice(order);
+        const size = this.parseDecimal(order.sz);
+        const isConditional = order.ordType === 'conditional';
         return (
           order.instId === instId &&
           order.side === 'sell' &&
           Boolean(order.algoId) &&
           Number.isFinite(triggerPrice) &&
-          triggerPrice < currentPrice &&
-          Number.isFinite(size) &&
-          size > 0
+          (cleanAllSellOrders ||
+            (!isConditional && triggerPrice < cleanupCurrentPrice)) &&
+          Boolean(size?.greaterThan(0))
         );
       })
-      .map((order: any) => ({
-        algoId: String(order.algoId),
-        instId,
-        createdAt: Number.isFinite(Number(order.cTime))
-          ? moment(Number(order.cTime)).format('YYYY-MM-DD HH:mm:ss')
-          : '',
-        triggerPrice: Number(order.triggerPx),
-        orderPrice: Number(order.ordPx),
-        size: Number(order.sz),
-      }))
+      .map(
+        (order): EligibleSellOrder => ({
+          algoId: String(order.algoId),
+          instId,
+          createdAt: Number.isFinite(Number(order.cTime))
+            ? moment(Number(order.cTime)).format('YYYY-MM-DD HH:mm:ss')
+            : '',
+          triggerPrice: this.getPendingOrderTriggerPrice(order),
+          orderPrice: this.getPendingOrderPrice(order),
+          size: String(order.sz),
+          sizeDecimal: new Decimal(String(order.sz)),
+          orderType: order.ordType ?? 'trigger',
+          conditionType: this.getSpotConditionType(order),
+        }),
+      )
+      .filter(
+        (order, index, orders) =>
+          orders.findIndex(({ algoId }) => algoId === order.algoId) === index,
+      )
       .sort((left, right) => right.triggerPrice - left.triggerPrice);
 
     const ordersToCancel: typeof eligibleOrders = [];
     let remainingSize = eligibleOrders.reduce(
-      (total, order) => total + order.size,
-      0,
+      (total, order) => total.plus(order.sizeDecimal),
+      new Decimal(0),
     );
 
     for (const order of [...eligibleOrders].reverse()) {
-      if (remainingSize <= boughtCoinAmount + sizeTolerance) {
+      if (
+        remainingSize.lessThanOrEqualTo(sellableBalance.plus(sizeTolerance))
+      ) {
         break;
       }
 
       ordersToCancel.push(order);
-      remainingSize -= order.size;
+      remainingSize = remainingSize.minus(order.sizeDecimal);
     }
-    const cancelledOrderIds = new Set(
+    const orderIdsToCancel = new Set(
       ordersToCancel.map(({ algoId }) => algoId),
     );
     const keptOrders = eligibleOrders.filter(
-      ({ algoId }) => !cancelledOrderIds.has(algoId),
+      ({ algoId }) => !orderIdsToCancel.has(algoId),
     );
-    const keptSize = keptOrders.reduce((total, order) => total + order.size, 0);
+    const keptSize = keptOrders.reduce(
+      (total, order) => total.plus(order.sizeDecimal),
+      new Decimal(0),
+    );
+    const publicKeptOrders = keptOrders.map(
+      ({ sizeDecimal, ...order }) => order,
+    );
+    const publicOrdersToCancel = ordersToCancel.map(
+      ({ sizeDecimal, ...order }) => order,
+    );
+    const cleanupScope: SellOrderCleanupResult['cleanupScope'] =
+      cleanAllSellOrders
+        ? 'all_sell_orders_no_balance'
+        : 'excess_trigger_sell_orders';
 
     const baseResult = {
       coin: normalizedCoin,
       instId,
       testing,
-      currentPrice,
-      boughtCoinAmount,
+      currentPrice: cleanupCurrentPrice,
+      sellableBalance: sellableBalance.toFixed(),
+      cleanupScope,
+      conditionalOrderCount: conditionalOrders.length,
       eligibleOrderCount: eligibleOrders.length,
       keptOrderCount: keptOrders.length,
-      keptSize: Number(keptSize.toFixed(8)),
+      keptSize: keptSize.toFixed(),
       cancelOrderCount: ordersToCancel.length,
-      cancelSize: Number(
-        ordersToCancel
-          .reduce((total, order) => total + order.size, 0)
-          .toFixed(8),
-      ),
-      keptOrders,
-      ordersToCancel,
+      cancelSize: ordersToCancel
+        .reduce((total, order) => total.plus(order.sizeDecimal), new Decimal(0))
+        .toFixed(),
+      keptOrders: publicKeptOrders,
+      ordersToCancel: publicOrdersToCancel,
     };
 
     if (testing) {
       return { status: 'preview', ...baseResult };
     }
     if (ordersToCancel.length === 0) {
-      const table = this.formatSellOrderCleanupTable(
-        keptOrders,
-        ordersToCancel,
-        new Set(),
-        moment().format('YYYY-MM-DD HH:mm:ss'),
-        currentPrice,
-        averageCost,
-      );
-      this.logger.log(
-        table,
-        'Sell order cleanup table',
-        `${normalizedCoin}_clean`,
-      );
-      return {
-        status: 'clean',
+      const result: SellOrderCleanupResult = {
+        status: 'nothing_to_cancel',
         ...baseResult,
         cancelledOrderCount: 0,
         failedOrderCount: 0,
         responses: [],
       };
+      this.logSellOrderCleanupSummary(result);
+      return result;
     }
 
     const { responses, cancelledOrderCount, failedOrderCount } =
@@ -1425,7 +1470,7 @@ export class OkxService {
           instId: orderInstId,
         })),
       );
-    const result = {
+    const result: SellOrderCleanupResult = {
       status: failedOrderCount === 0 ? 'cleaned' : 'partially_cleaned',
       ...baseResult,
       cancelledOrderCount,
@@ -1433,30 +1478,17 @@ export class OkxService {
       responses,
     };
     const successfullyCleanedOrderIds = new Set<string>(
-      responses.flatMap((response: any) =>
+      responses.flatMap((response) =>
         (response?.data ?? [])
-          .filter((item: any) => String(item.sCode) === '0')
-          .map((item: any) => String(item.algoId)),
+          .filter((item) => String(item.sCode) === '0')
+          .map((item) => String(item.algoId)),
       ),
     );
-    const table = this.formatSellOrderCleanupTable(
-      keptOrders,
-      ordersToCancel,
-      successfullyCleanedOrderIds,
-      moment().format('YYYY-MM-DD HH:mm:ss'),
-      currentPrice,
-      averageCost,
-    );
-    this.logger.log(
-      table,
-      'Sell order cleanup table',
-      `${normalizedCoin}_clean`,
-    );
-    this.logger.log(
-      JSON.stringify(result, null, 2),
-      'Clean excess sell orders',
-      normalizedCoin,
-    );
+    const cancelledOrderIds = Array.from(successfullyCleanedOrderIds);
+    const failedOrderIds = ordersToCancel
+      .map(({ algoId }) => algoId)
+      .filter((algoId) => !successfullyCleanedOrderIds.has(algoId));
+    this.logSellOrderCleanupSummary(result, cancelledOrderIds, failedOrderIds);
     return result;
   }
 
@@ -1470,7 +1502,7 @@ export class OkxService {
     }
     const pendingOrders = await this.getPendingSpotOrdersByType(ordType);
     const matchedOrders = pendingOrders.filter(
-      (order: any) =>
+      (order) =>
         (!side || order.side === side) &&
         Boolean(order.algoId) &&
         Boolean(order.instId),
@@ -1480,7 +1512,7 @@ export class OkxService {
       ordType,
       testing,
       matchedOrderCount: matchedOrders.length,
-      orders: matchedOrders.map((order: any) => ({
+      orders: matchedOrders.map((order) => ({
         algoId: String(order.algoId),
         instId: order.instId,
         ordType: order.ordType,
@@ -1505,7 +1537,7 @@ export class OkxService {
 
     const { responses, cancelledOrderCount, failedOrderCount } =
       await this.cancelAlgoOrders(
-        matchedOrders.map((order: any) => ({
+        matchedOrders.map((order) => ({
           algoId: order.algoId,
           instId: order.instId,
         })),
@@ -1524,7 +1556,7 @@ export class OkxService {
     return result;
   }
 
-  async getAccountBalance(ccy?: string) {
+  async getAccountBalance(ccy?: string): Promise<OkxAccountBalanceResponse> {
     const method = 'GET';
     const requestPath = ccy
       ? `/api/v5/account/balance?ccy=${encodeURIComponent(ccy)}`
@@ -1545,11 +1577,82 @@ export class OkxService {
       'OK-ACCESS-PASSPHRASE': this.config.get<string>('okx.passphrase'),
       'Content-Type': 'application/json',
     };
-    const response = await axios.get(
+    const response = await axios.get<OkxAccountBalanceResponse>(
       this.config.get<string>('okx.baseUrl') + requestPath,
       { headers },
     );
     return response.data;
+  }
+
+  private getSpotBalanceDetail(
+    balanceData: OkxAccountBalanceResponse,
+    coin: string,
+  ): OkxBalanceDetail | undefined {
+    const normalizedCoin = coin.trim().toUpperCase();
+    return (balanceData?.data?.[0]?.details ?? []).find(
+      (detail) =>
+        String(detail?.ccy ?? '')
+          .trim()
+          .toUpperCase() === normalizedCoin,
+    );
+  }
+
+  /**
+   * Base-currency units immediately available for a new SPOT sell order.
+   * OKX business field: availBal. cashBal and eq are intentionally excluded.
+   */
+  private getSpotSellableBalance(
+    balance: OkxBalanceDetail | undefined,
+    coin: string,
+  ): number {
+    return new Decimal(
+      this.getSpotSellableBalanceValue(balance, coin),
+    ).toNumber();
+  }
+
+  private getSpotSellableBalanceValue(
+    balance: OkxBalanceDetail | undefined,
+    coin: string,
+  ): string {
+    if (!balance) return '0';
+    const rawBalance = balance.availBal;
+    if (
+      rawBalance === undefined ||
+      rawBalance === null ||
+      String(rawBalance).trim() === ''
+    ) {
+      throw new Error(`Missing OKX availBal for ${coin.toUpperCase()}`);
+    }
+    const sellableBalance = this.parseDecimal(rawBalance);
+    if (!sellableBalance || sellableBalance.isNegative()) {
+      throw new Error(
+        `Invalid OKX availBal for ${coin.toUpperCase()}: ${rawBalance}`,
+      );
+    }
+    return String(rawBalance).trim();
+  }
+
+  /** Total SPOT cash units held, including any frozen amount. */
+  private getSpotCashBalance(
+    balance: OkxBalanceDetail | undefined,
+    coin: string,
+  ): number {
+    if (!balance) return 0;
+    const rawBalance = balance.cashBal;
+    if (
+      rawBalance === undefined ||
+      rawBalance === null ||
+      String(rawBalance).trim() === ''
+    ) {
+      throw new Error(`Missing OKX cashBal for ${coin.toUpperCase()}`);
+    }
+    const cashBalance = Number(rawBalance);
+    if (!Number.isFinite(cashBalance) || cashBalance < 0) {
+      throw new Error(
+        `Invalid OKX cashBal for ${coin.toUpperCase()}: ${rawBalance}`,
+      );
+    }
+    return cashBalance;
   }
 
   async getAllSpotBoughtCoins(): Promise<AllSpotBoughtCoins> {
@@ -1561,7 +1664,7 @@ export class OkxService {
     const coins = details
       .map((balance: any): SpotBoughtCoin | null => {
         const coin = String(balance.ccy ?? '').toUpperCase();
-        const amount = Number(balance.cashBal ?? balance.eq ?? 0);
+        const amount = this.getSpotCashBalance(balance, coin);
         const averageCost = Number(balance.openAvgPx ?? 0);
         const currentPrice = tickers.get(`${coin}-USDT`);
 
@@ -1622,19 +1725,21 @@ export class OkxService {
     this.validateSellPercentage(percentage);
 
     const instId = `${normalizedCoin}-USDT`;
-    const coinConfig = this.config.get<any>(`coin.${normalizedCoin}`);
+    const coinConfig = this.config.get<SpotCoinConfig>(
+      `coin.${normalizedCoin}`,
+    );
     if (!coinConfig) {
       throw new Error(`No configuration found for coin: ${normalizedCoin}`);
     }
 
     const balanceData = await this.getAccountBalance(normalizedCoin);
-    const balance = (balanceData?.data?.[0]?.details ?? []).find(
-      (detail: any) => String(detail.ccy).toUpperCase() === normalizedCoin,
+    const balance = this.getSpotBalanceDetail(balanceData, normalizedCoin);
+    const size = new Decimal(
+      this.getSpotSellableBalanceValue(balance, normalizedCoin),
     );
-    const availableBalance = String(balance?.availBal ?? '0');
-    const size = Number(availableBalance);
+    const availableBalance = size.toFixed();
 
-    if (!Number.isFinite(size) || size <= 0) {
+    if (!size.greaterThan(0)) {
       return {
         status: 'no_available_balance',
         coin: normalizedCoin,
@@ -1657,7 +1762,7 @@ export class OkxService {
     }
 
     const { priceToFixed } = coinConfig;
-    const sizeToSell = (size * percentage) / 100;
+    const sizeToSell = size.mul(percentage).div(100);
     const normalizedSize = this.normalizeSpotSize(
       sizeToSell,
       instrument,
@@ -1714,7 +1819,9 @@ export class OkxService {
       throw new Error(`Invalid coin: ${coin}`);
     }
 
-    const coinConfig = this.config.get<any>(`coin.${normalizedCoin}`);
+    const coinConfig = this.config.get<SpotCoinConfig>(
+      `coin.${normalizedCoin}`,
+    );
     if (!coinConfig) {
       throw new Error(`No configuration found for coin: ${normalizedCoin}`);
     }
@@ -1796,18 +1903,20 @@ export class OkxService {
     this.validateSellPercentage(percentage);
 
     const instId = `${normalizedCoin}-USDT`;
-    const coinConfig = this.config.get<any>(`coin.${normalizedCoin}`);
+    const coinConfig = this.config.get<SpotCoinConfig>(
+      `coin.${normalizedCoin}`,
+    );
     if (!coinConfig) {
       throw new Error(`No configuration found for coin: ${normalizedCoin}`);
     }
 
     const balanceData = await this.getAccountBalance(normalizedCoin);
-    const balance = (balanceData?.data?.[0]?.details ?? []).find(
-      (detail: any) => String(detail.ccy).toUpperCase() === normalizedCoin,
+    const balance = this.getSpotBalanceDetail(balanceData, normalizedCoin);
+    const size = new Decimal(
+      this.getSpotSellableBalanceValue(balance, normalizedCoin),
     );
-    const availableBalance = String(balance?.availBal ?? '0');
-    const size = Number(availableBalance);
-    if (!Number.isFinite(size) || size <= 0) {
+    const availableBalance = size.toFixed();
+    if (!size.greaterThan(0)) {
       return {
         status: 'no_available_balance',
         coin: normalizedCoin,
@@ -1830,7 +1939,7 @@ export class OkxService {
     }
 
     const { priceToFixed } = coinConfig;
-    const sizeToSell = (size * percentage) / 100;
+    const sizeToSell = size.mul(percentage).div(100);
     const normalizedSize = this.normalizeSpotSize(
       sizeToSell,
       instrument,
@@ -2001,7 +2110,9 @@ export class OkxService {
       null,
       coin,
     );
-    const coinConfig = this.config.get<any>(`coin.${coin.toUpperCase()}`);
+    const coinConfig = this.config.get<SpotCoinConfig>(
+      `coin.${coin.toUpperCase()}`,
+    );
     minBuyPriceRatio = coinConfig?.minBuyPriceRatio ?? minBuyPriceRatio;
     maxBuyPriceRatio = coinConfig?.maxBuyPriceRatio ?? maxBuyPriceRatio;
     this.logger.log(
@@ -2062,9 +2173,8 @@ export class OkxService {
       }
 
       const coinBalanceData = await this.getAccountBalance(coin);
-      const numberOfBoughtCoin = Number(
-        coinBalanceData?.data[0]?.details[0]?.availBal ?? 0,
-      );
+      const balance = this.getSpotBalanceDetail(coinBalanceData, coin);
+      const numberOfBoughtCoin = this.getSpotCashBalance(balance, coin);
       const numberOfCoinWillBeBought =
         totalNnumberOfCoinWillBeBought - numberOfBoughtCoin;
       const totalCostByUsdt = totalNnumberOfCoinWillBeBought * maxBuyPrice;
@@ -2268,7 +2378,9 @@ export class OkxService {
       );
     }
 
-    const coinConfig = this.config.get<any>(`coin.${normalizedCoin}`);
+    const coinConfig = this.config.get<SpotCoinConfig>(
+      `coin.${normalizedCoin}`,
+    );
     this.logger.log(
       `Placing trigger BUY range for ${normalizedCoin} with config: ${JSON.stringify(coinConfig)}`,
       null,
@@ -2317,9 +2429,8 @@ export class OkxService {
     }
 
     const coinBalanceData = await this.getAccountBalance(coin);
-    const numberOfBoughtCoin = Number(
-      coinBalanceData?.data[0]?.details[0]?.availBal ?? 0,
-    );
+    const balance = this.getSpotBalanceDetail(coinBalanceData, coin);
+    const numberOfBoughtCoin = this.getSpotCashBalance(balance, coin);
     const avarageCost = Number(
       coinBalanceData?.data[0]?.details[0]?.openAvgPx ?? 0,
     );
@@ -2526,7 +2637,9 @@ export class OkxService {
     const stopLossSellPriceRatio = this.config.get<number>(
       'stopLossSellPriceRatio',
     );
-    const coinConfig = this.config.get<any>(`coin.${coin.toUpperCase()}`);
+    const coinConfig = this.config.get<SpotCoinConfig>(
+      `coin.${coin.toUpperCase()}`,
+    );
     if (!coinConfig) throw new Error(`No config for ${coin}`);
 
     minClosePriceRatio = coinConfig?.minClosePriceRatio ?? minClosePriceRatio;
@@ -2576,9 +2689,8 @@ export class OkxService {
         null,
         coin,
       );
-      const availableCoin = Number(
-        coinBalanceData?.data[0]?.details[0]?.availBal ?? 0,
-      );
+      const balance = this.getSpotBalanceDetail(coinBalanceData, coin);
+      const availableCoin = this.getSpotSellableBalance(balance, coin);
 
       const coinToSell = Math.min(totalCoinWillBeSold, availableCoin);
       if (coinToSell <= 0) return data;
@@ -2742,7 +2854,9 @@ export class OkxService {
         `Invalid configuration: stopLossRatio (${stopLossRatio}) must be between 0 and 1`,
       );
     }
-    const coinConfig = this.config.get<any>(`coin.${normalizedCoin}`);
+    const coinConfig = this.config.get<SpotCoinConfig>(
+      `coin.${normalizedCoin}`,
+    );
     if (!coinConfig) {
       throw new Error(`No configuration found for coin: ${normalizedCoin}`);
     }
@@ -2753,14 +2867,13 @@ export class OkxService {
       throw new Error(`Instrument info not available for ${instId}`);
     }
     const balanceData = await this.getAccountBalance(normalizedCoin);
-    const balance =
-      (balanceData?.data?.[0]?.details ?? []).find(
-        (detail: any) => String(detail.ccy).toUpperCase() === normalizedCoin,
-      ) ?? balanceData?.data?.[0]?.details?.[0];
-    const positionSize = Number(
-      balance?.cashBal ?? balance?.eq ?? balance?.availBal ?? 0,
+    const balance = this.getSpotBalanceDetail(balanceData, normalizedCoin);
+    const sellableBalance = this.getSpotSellableBalance(
+      balance,
+      normalizedCoin,
     );
-    if (!Number.isFinite(positionSize) || positionSize <= 0) {
+    const positionSize = sellableBalance;
+    if (positionSize <= 0) {
       return {
         status: 'no_spot_balance',
         coin: normalizedCoin,
@@ -2775,7 +2888,7 @@ export class OkxService {
     const conditionalOrders =
       await this.getPendingConditionalSpotOrders(normalizedCoin);
     const stopLossOrders = conditionalOrders.filter(
-      (order: any) =>
+      (order) =>
         order.instId === instId &&
         order.side === 'sell' &&
         Number(order.slTriggerPx) > 0 &&
@@ -2783,7 +2896,7 @@ export class OkxService {
     );
     const protectedSize = Math.min(
       positionSize,
-      stopLossOrders.reduce((total: number, order: any) => {
+      stopLossOrders.reduce((total: number, order) => {
         const size = Number(order.sz ?? 0);
         return total + (Number.isFinite(size) && size > 0 ? size : 0);
       }, 0),
@@ -3199,7 +3312,24 @@ export class OkxService {
   }
 
   async cleanSellOrdersForAllCoins(testing: boolean = true) {
-    const coins = await this.getBoughtCoinsForTakeProfit();
+    const [boughtCoins, pendingOrders] = await Promise.all([
+      this.getBoughtCoinsForTakeProfit(),
+      this.getPendingSpotOrdersByType('all'),
+    ]);
+    const pendingSellCoins = pendingOrders
+      .filter(
+        (order) =>
+          order.side === 'sell' &&
+          Boolean(order.algoId) &&
+          /^[A-Z0-9]+-USDT$/.test(String(order.instId ?? '').toUpperCase()),
+      )
+      .map((order) => String(order.instId).split('-')[0].toUpperCase());
+    const coins = Array.from(
+      new Set([
+        ...boughtCoins.map((coin) => coin.toUpperCase()),
+        ...pendingSellCoins,
+      ]),
+    ).sort();
     const results = [];
 
     for (const [index, coin] of coins.entries()) {

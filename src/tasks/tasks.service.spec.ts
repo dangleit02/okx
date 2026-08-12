@@ -18,9 +18,11 @@ describe('TasksService autoSellSpotForDown', () => {
     };
     const logger = { log: jest.fn() };
     const okxService = {
-      sellAtPriceAllCoins: jest.fn().mockResolvedValue([
-        { coin: 'BTC', action: 'place_auto_sell_order', result: [] },
-      ]),
+      sellAtPriceAllCoins: jest
+        .fn()
+        .mockResolvedValue([
+          { coin: 'BTC', action: 'place_auto_sell_order', result: [] },
+        ]),
     };
     const service = new TasksService(
       config as any,
@@ -48,9 +50,11 @@ describe('TasksService autoSellSpotForDown', () => {
     };
     const logger = { log: jest.fn() };
     const okxService = {
-      cleanSellOrdersForAllCoins: jest.fn().mockResolvedValue([
-        { coin: 'BTC', result: { status: 'clean' } },
-      ]),
+      cleanSellOrdersForAllCoins: jest
+        .fn()
+        .mockResolvedValue([
+          { coin: 'BTC', result: { status: 'nothing_to_cancel' } },
+        ]),
       sellAtPriceAllCoins: jest.fn(),
     };
     const service = new TasksService(
@@ -74,9 +78,9 @@ describe('TasksService autoSellSpotForDown', () => {
     const logger = { log: jest.fn() };
     const okxService = {
       cleanSellOrdersForAllCoins: jest.fn().mockResolvedValue([
-        { coin: 'DOGE', result: { status: 'clean' } },
+        { coin: 'DOGE', result: { status: 'nothing_to_cancel' } },
         { coin: 'ETC', result: { status: 'failed' } },
-        { coin: 'XLM', result: { status: 'clean' } },
+        { coin: 'XLM', result: { status: 'nothing_to_cancel' } },
       ]),
     };
     const service = new TasksService(
@@ -100,7 +104,8 @@ describe('TasksService autoSellSpotForDown', () => {
   it('waits for auto-sell to finish before starting cleanup', async () => {
     const config = {
       get: jest.fn((key: string) => {
-        if (key === 'runSpotTaskForSell' || key === 'runSpotTaskForClean') return true;
+        if (key === 'runSpotTaskForSell' || key === 'runSpotTaskForClean')
+          return true;
         if (key === 'runSpotTaskHavingStopLoss') return false;
         return undefined;
       }),
@@ -147,9 +152,15 @@ describe('TasksService future long/short refresh', () => {
     };
     const logger = { log: jest.fn() };
     const future = {
-      cancelFutureOrdersForOneCoin: jest.fn().mockResolvedValue({ cancelled: [] }),
-      cleanProtectiveCloseByPriceStepsOrdersForOneCoin: jest.fn().mockResolvedValue({ status: 'clean' }),
-      reconcilePositionStopLoss: jest.fn().mockResolvedValue({ status: 'reconciled' }),
+      cancelFutureOrdersForOneCoin: jest
+        .fn()
+        .mockResolvedValue({ cancelled: [] }),
+      cleanProtectiveCloseByPriceStepsOrdersForOneCoin: jest
+        .fn()
+        .mockResolvedValue({ status: 'nothing_to_cancel' }),
+      reconcilePositionStopLoss: jest
+        .fn()
+        .mockResolvedValue({ status: 'reconciled' }),
       tradeOneCoin: jest.fn().mockResolvedValue([]),
     };
     const service = new TasksService(
@@ -169,18 +180,28 @@ describe('TasksService future long/short refresh', () => {
       'trigger',
       false,
     );
-    expect(future.cleanProtectiveCloseByPriceStepsOrdersForOneCoin).toHaveBeenCalledTimes(2);
-    expect(future.cleanProtectiveCloseByPriceStepsOrdersForOneCoin).toHaveBeenCalledWith('BTC', 'short', false);
-    expect(future.reconcilePositionStopLoss).toHaveBeenCalledWith('BTC', 'short', false);
-    expect(future.tradeOneCoin).toHaveBeenCalledWith(expect.objectContaining({
-      coin: 'BTC',
-      direction: 'short',
-      isTesting: false,
-      removeExistingOrders: false,
-      enableProtectiveClose: true,
-      protectiveCloseOnly: true,
-      autoTrade: true,
-    }));
+    expect(
+      future.cleanProtectiveCloseByPriceStepsOrdersForOneCoin,
+    ).toHaveBeenCalledTimes(2);
+    expect(
+      future.cleanProtectiveCloseByPriceStepsOrdersForOneCoin,
+    ).toHaveBeenCalledWith('BTC', 'short', false);
+    expect(future.reconcilePositionStopLoss).toHaveBeenCalledWith(
+      'BTC',
+      'short',
+      false,
+    );
+    expect(future.tradeOneCoin).toHaveBeenCalledWith(
+      expect.objectContaining({
+        coin: 'BTC',
+        direction: 'short',
+        isTesting: false,
+        removeExistingOrders: false,
+        enableProtectiveClose: true,
+        protectiveCloseOnly: true,
+        autoTrade: true,
+      }),
+    );
     expect(future.tradeOneCoin).toHaveBeenCalledTimes(1);
   });
 
@@ -194,9 +215,15 @@ describe('TasksService future long/short refresh', () => {
     };
     const logger = { log: jest.fn() };
     const future = {
-      cancelFutureOrdersForOneCoin: jest.fn().mockResolvedValue({ cancelled: [] }),
-      cleanProtectiveCloseByPriceStepsOrdersForOneCoin: jest.fn().mockResolvedValue({ status: 'clean' }),
-      reconcilePositionStopLoss: jest.fn().mockResolvedValue({ status: 'reconciled' }),
+      cancelFutureOrdersForOneCoin: jest
+        .fn()
+        .mockResolvedValue({ cancelled: [] }),
+      cleanProtectiveCloseByPriceStepsOrdersForOneCoin: jest
+        .fn()
+        .mockResolvedValue({ status: 'nothing_to_cancel' }),
+      reconcilePositionStopLoss: jest
+        .fn()
+        .mockResolvedValue({ status: 'reconciled' }),
       tradeOneCoin: jest.fn().mockResolvedValue([]),
     };
     const service = new TasksService(
@@ -216,13 +243,23 @@ describe('TasksService future long/short refresh', () => {
       'trigger',
       false,
     );
-    expect(future.reconcilePositionStopLoss).toHaveBeenCalledWith('ETH', 'long', false);
-    expect(future.cleanProtectiveCloseByPriceStepsOrdersForOneCoin).toHaveBeenCalledTimes(2);
+    expect(future.reconcilePositionStopLoss).toHaveBeenCalledWith(
+      'ETH',
+      'long',
+      false,
+    );
+    expect(
+      future.cleanProtectiveCloseByPriceStepsOrdersForOneCoin,
+    ).toHaveBeenCalledTimes(2);
     expect(future.tradeOneCoin).toHaveBeenCalledTimes(1);
-    expect(future.cancelFutureOrdersForOneCoin.mock.invocationCallOrder[0])
-      .toBeLessThan(future.reconcilePositionStopLoss.mock.invocationCallOrder[0]);
-    expect(future.reconcilePositionStopLoss.mock.invocationCallOrder[0])
-      .toBeLessThan(future.tradeOneCoin.mock.invocationCallOrder[0]);
+    expect(
+      future.cancelFutureOrdersForOneCoin.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      future.reconcilePositionStopLoss.mock.invocationCallOrder[0],
+    );
+    expect(
+      future.reconcilePositionStopLoss.mock.invocationCallOrder[0],
+    ).toBeLessThan(future.tradeOneCoin.mock.invocationCallOrder[0]);
   });
 
   it('runs the one-way refresh through its separate config flag and service', async () => {
@@ -235,9 +272,15 @@ describe('TasksService future long/short refresh', () => {
     };
     const logger = { log: jest.fn() };
     const oneway = {
-      cancelFutureOrdersForOneCoin: jest.fn().mockResolvedValue({ cancelled: [] }),
-      cleanProtectiveCloseByPriceStepsOrdersForOneCoin: jest.fn().mockResolvedValue({ status: 'clean' }),
-      reconcilePositionStopLoss: jest.fn().mockResolvedValue({ status: 'reconciled' }),
+      cancelFutureOrdersForOneCoin: jest
+        .fn()
+        .mockResolvedValue({ cancelled: [] }),
+      cleanProtectiveCloseByPriceStepsOrdersForOneCoin: jest
+        .fn()
+        .mockResolvedValue({ status: 'nothing_to_cancel' }),
+      reconcilePositionStopLoss: jest
+        .fn()
+        .mockResolvedValue({ status: 'reconciled' }),
       tradeOneCoin: jest.fn().mockResolvedValue([]),
     };
     const service = new TasksService(
@@ -257,13 +300,21 @@ describe('TasksService future long/short refresh', () => {
       'trigger',
       false,
     );
-    expect(oneway.reconcilePositionStopLoss).toHaveBeenCalledWith('BTC', 'short', false);
-    expect(oneway.cleanProtectiveCloseByPriceStepsOrdersForOneCoin).toHaveBeenCalledTimes(2);
-    expect(oneway.tradeOneCoin).toHaveBeenCalledWith(expect.objectContaining({
-      direction: 'short',
-      autoTrade: true,
-      enableProtectiveClose: true,
-    }));
+    expect(oneway.reconcilePositionStopLoss).toHaveBeenCalledWith(
+      'BTC',
+      'short',
+      false,
+    );
+    expect(
+      oneway.cleanProtectiveCloseByPriceStepsOrdersForOneCoin,
+    ).toHaveBeenCalledTimes(2);
+    expect(oneway.tradeOneCoin).toHaveBeenCalledWith(
+      expect.objectContaining({
+        direction: 'short',
+        autoTrade: true,
+        enableProtectiveClose: true,
+      }),
+    );
   });
 
   it('polls stop-loss reconciliation for every enabled future mode and direction', async () => {
@@ -277,14 +328,36 @@ describe('TasksService future long/short refresh', () => {
       }),
     };
     const logger = { log: jest.fn(), error: jest.fn() };
-    const hedge = { reconcilePositionStopLoss: jest.fn().mockResolvedValue({ status: 'already_protected' }) };
-    const oneway = { reconcilePositionStopLoss: jest.fn().mockResolvedValue({ status: 'already_protected' }) };
-    const service = new TasksService(config as any, logger as any, {} as any, hedge as any, oneway as any);
+    const hedge = {
+      reconcilePositionStopLoss: jest
+        .fn()
+        .mockResolvedValue({ status: 'already_protected' }),
+    };
+    const oneway = {
+      reconcilePositionStopLoss: jest
+        .fn()
+        .mockResolvedValue({ status: 'already_protected' }),
+    };
+    const service = new TasksService(
+      config as any,
+      logger as any,
+      {} as any,
+      hedge as any,
+      oneway as any,
+    );
 
     const results = await service.reconcileFutureStopLosses();
 
-    expect(hedge.reconcilePositionStopLoss).toHaveBeenCalledWith('ETH', 'long', false);
-    expect(oneway.reconcilePositionStopLoss).toHaveBeenCalledWith('BTC', 'short', false);
+    expect(hedge.reconcilePositionStopLoss).toHaveBeenCalledWith(
+      'ETH',
+      'long',
+      false,
+    );
+    expect(oneway.reconcilePositionStopLoss).toHaveBeenCalledWith(
+      'BTC',
+      'short',
+      false,
+    );
     expect(results).toHaveLength(2);
   });
 });
