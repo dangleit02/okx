@@ -7,6 +7,8 @@ import { TradeOneCoinParams } from 'src/interfaces/interface';
 
 @Injectable()
 export class OkxFutureService {
+    private instrumentCache = new Map<string, any>();
+
     constructor(private config: ConfigService, private readonly logger: AppLogger) { }
 
     private signRequest(secret: string, message: string) {
@@ -50,6 +52,59 @@ export class OkxFutureService {
         } catch (err) {
             this.logger.error(`Error fetching ticker for ${instId}`, err.response?.data || err.message);
             return null;
+        }
+    }
+
+    private async fetchInstrument(instId: string) {
+        if (this.instrumentCache.has(instId)) return this.instrumentCache.get(instId);
+        const url = `${this.config.get<string>('okx.baseUrl')}/api/v5/public/instruments?instType=SWAP&instId=${encodeURIComponent(instId)}`;
+        const response = await axios.get(url);
+        const raw = response.data?.data?.[0];
+        if (!raw) throw new Error(`Instrument info not available for ${instId}`);
+        const instrument = {
+            ...raw,
+            ctVal: Number(raw.ctVal),
+            lotSz: Number(raw.lotSz),
+            minSz: Number(raw.minSz || raw.lotSz),
+            tickSz: Number(raw.tickSz),
+        };
+        if (![instrument.ctVal, instrument.lotSz, instrument.minSz, instrument.tickSz].every(value => Number.isFinite(value) && value > 0)) {
+            throw new Error(`Invalid SWAP instrument metadata for ${instId}: ${JSON.stringify(raw)}`);
+        }
+        this.instrumentCache.set(instId, instrument);
+        return instrument;
+    }
+
+    private decimalPlaces(value: number) {
+        const normalized = value.toString().toLowerCase();
+        if (normalized.includes('e-')) return Number(normalized.split('e-')[1]);
+        return normalized.split('.')[1]?.length ?? 0;
+    }
+
+    private formatSize(rawSize: number, instrument: any) {
+        const multiplier = Math.floor((rawSize + instrument.lotSz * 1e-10) / instrument.lotSz);
+        const size = multiplier * instrument.lotSz;
+        if (size < instrument.minSz) {
+            throw new Error(`Futures size is below minimum for ${instrument.instId}: rawSize=${rawSize}, minSz=${instrument.minSz}, lotSz=${instrument.lotSz}`);
+        }
+        return size.toFixed(this.decimalPlaces(instrument.lotSz));
+    }
+
+    private formatPrice(rawPrice: number, instrument: any) {
+        const price = Math.round(rawPrice / instrument.tickSz) * instrument.tickSz;
+        return price.toFixed(this.decimalPlaces(instrument.tickSz));
+    }
+
+    private contractsForNotional(amountUsdt: number, price: number, instrument: any) {
+        return amountUsdt / (price * instrument.ctVal);
+    }
+
+    private assertOkxTradeAccepted(responseData: any, operation: string) {
+        const rejectedItem = responseData?.data?.find(
+            (item: any) => item?.sCode !== undefined && String(item.sCode) !== '0',
+        );
+        if (String(responseData?.code) !== '0' || rejectedItem) {
+            throw new Error(`OKX rejected ${operation}: ${JSON.stringify(responseData)}`);
         }
     }
 
@@ -202,12 +257,13 @@ export class OkxFutureService {
 
         const coinCfg = this.config.get<any>(`coin.${coin.toUpperCase()}`);
         if (!coinCfg) throw new Error(`No config for coin ${coin}`);
-        const { szToFixed, priceToFixed } = coinCfg;
+        const { priceToFixed } = coinCfg;
 
         if (amountOfUsdtPerStep <= 10)
             throw new Error(`amountOfUsdtPerStep must > 10`);
 
         const instId = `${coin.toUpperCase()}-USDT-SWAP`;
+        const instrument = await this.fetchInstrument(instId);
         const currentPrice = await this.getTicker(instId);
         log(`Current price: ${currentPrice}`);
 
@@ -231,7 +287,9 @@ export class OkxFutureService {
         // ====== RISK ===== //
         const amountRisk = maxUsdt * riskPerTrade;
 
-        const totalSafeSize = amountRisk / Math.abs(maxPrice - stopLossPrice);
+        const totalSafeSize = amountRisk / (
+            Math.abs(maxPrice - stopLossPrice) * instrument.ctVal
+        );
         if (totalSafeSize <= 0) return data;
 
         const posData = await this.getOpenPosition(instId);
@@ -244,7 +302,7 @@ export class OkxFutureService {
         const sizeToOpen = totalSafeSize - currentSize;
         if (sizeToOpen <= 0) return data;
 
-        const costUsdt = sizeToOpen * (stopLossPrice + maxPrice) / 2;
+        const costUsdt = sizeToOpen * instrument.ctVal * (stopLossPrice + maxPrice) / 2;
         const steps = Math.ceil(costUsdt / amountOfUsdtPerStep);
 
         log(`Total safe size: ${totalSafeSize}, sizeToOpen: ${sizeToOpen}, costUsdt: ${costUsdt}, steps: ${steps}`);
@@ -253,7 +311,7 @@ export class OkxFutureService {
 
         const arr = Array.from({ length: steps + 1 }, (_, i) => i);
 
-        let newTotalCost = avgPrice * currentSize;
+        let newTotalCost = avgPrice * currentSize * instrument.ctVal;
         let newSize = currentSize;
 
         for await (let step of arr) {
@@ -269,14 +327,18 @@ export class OkxFutureService {
             if (isLong && triggerPx < minPrice) break;
             if (!isLong && triggerPx > minPrice) break;
 
-            const sz = amountOfUsdtPerStep / orderPx;
+            const sz = this.contractsForNotional(
+                amountOfUsdtPerStep,
+                orderPx,
+                instrument,
+            );
 
             log(`Step ${step}: order ${orderPx}, trigger ${triggerPx}, sz ${sz}`);
 
             const res = await this.openPosition(
                 coin,
                 direction,
-                sz.toFixed(szToFixed),
+                sz.toString(),
                 triggerPx.toFixed(priceToFixed),
                 orderPx.toFixed(priceToFixed),
                 isTesting,
@@ -286,9 +348,9 @@ export class OkxFutureService {
             data.push({ step, data: res.data, body: res.body });
 
             // update average cost
-            newTotalCost += orderPx * sz;
+            newTotalCost += orderPx * sz * instrument.ctVal;
             newSize += sz;
-            const newAvg = newTotalCost / newSize;
+            const newAvg = newTotalCost / (newSize * instrument.ctVal);
             log(`New avg cost = ${newAvg}`);
         }
 
@@ -306,7 +368,7 @@ export class OkxFutureService {
         const amountOfUsdtPerStep = this.config.get<number>('amountOfUsdtPerStep');
         const coinConfig = this.config.get<any>(`coin.${coin.toUpperCase()}`);
         if (!coinConfig) throw new Error(`No configuration found for coin: ${coin.toUpperCase()}`);
-        const { priceToFixed, szToFixed } = coinConfig;
+        const { priceToFixed } = coinConfig;
         const minClosePriceRatio = coinConfig.minClosePriceRatio
             ?? this.config.get<number>('minClosePriceRatio');
         const maxClosePriceRatio = coinConfig.maxClosePriceRatio
@@ -318,6 +380,7 @@ export class OkxFutureService {
         const percentageOfPositionToClosePerStep = 0.05; // 5% position per step
 
         const instId = `${coin.toUpperCase()}-USDT-SWAP`;
+        const instrument = await this.fetchInstrument(instId);
         const currentPrice = await this.getTicker(instId);
         if (!currentPrice || currentPrice <= 0) throw new Error(`Invalid current price: ${currentPrice}`);
 
@@ -362,8 +425,12 @@ export class OkxFutureService {
 
             // Tính size đóng
             let sz = currentSize * percentageOfPositionToClosePerStep;
-            if (sz * orderPrice < amountOfUsdtPerStep) {
-                sz = amountOfUsdtPerStep / orderPrice;
+            if (sz * orderPrice * instrument.ctVal < amountOfUsdtPerStep) {
+                sz = this.contractsForNotional(
+                    amountOfUsdtPerStep,
+                    orderPrice,
+                    instrument,
+                );
             }
 
             // Tránh vượt quá position hiện tại
@@ -373,12 +440,12 @@ export class OkxFutureService {
 
             totalSizeClosed += sz;
 
-            this.logger.log(`Step index=${stepIndex}, sz=${sz.toFixed(szToFixed)}, orderPrice=-1, triggerPx=${triggerPx.toFixed(priceToFixed)}, testing=${testing}`);
+            this.logger.log(`Step index=${stepIndex}, raw sz=${sz}, orderPrice=-1, triggerPx=${triggerPx.toFixed(priceToFixed)}, testing=${testing}`);
 
             const res = await this.closePartialPosition(
                 coin,
                 posSide,
-                sz.toFixed(szToFixed),
+                sz.toString(),
                 triggerPx.toFixed(priceToFixed),
                 '-1',
                 testing
@@ -403,17 +470,26 @@ export class OkxFutureService {
     ) {
         const timestamp = new Date().toISOString();
         const instId = `${coin.toUpperCase()}-USDT-SWAP`;
+        const instrument = await this.fetchInstrument(instId);
         const tdMode = 'isolated';
+        const formattedSize = this.formatSize(Number(sz), instrument);
+        const formattedTriggerPx = triggerPx
+            ? this.formatPrice(Number(triggerPx), instrument)
+            : undefined;
+        const formattedOrderPx = orderPx !== '-1'
+            ? this.formatPrice(Number(orderPx), instrument)
+            : '-1';
+        const formattedStopLossPx = this.formatPrice(Number(stopLossPx), instrument);
 
         // xác định side đúng:
         // mở long  -> buy
         // mở short -> sell
         const side = posSide === 'long' ? 'buy' : 'sell';
-        const parsedStopLoss = Number(stopLossPx);
+        const parsedStopLoss = Number(formattedStopLossPx);
         if (!stopLossPx || !Number.isFinite(parsedStopLoss) || parsedStopLoss <= 0) {
             throw new Error(`A valid stopLossPx is required for every ${posSide} entry order`);
         }
-        const referenceEntryPrice = Number(orderPx !== '-1' ? orderPx : triggerPx);
+        const referenceEntryPrice = Number(formattedOrderPx !== '-1' ? formattedOrderPx : formattedTriggerPx);
         if (Number.isFinite(referenceEntryPrice)) {
             const invalidStopLoss = posSide === 'long'
                 ? parsedStopLoss >= referenceEntryPrice
@@ -429,7 +505,7 @@ export class OkxFutureService {
         // -------------------------
         // 1) Nếu có triggerPx → mở lệnh trigger
         // -------------------------
-        if (triggerPx) {
+        if (formattedTriggerPx) {
             requestPath = '/api/v5/trade/order-algo';
 
             body = {
@@ -438,9 +514,9 @@ export class OkxFutureService {
                 ordType: 'trigger',
                 posSide,
                 side,         // buy long / sell short
-                sz,
-                triggerPx,
-                orderPx,      // -1 = market
+                sz: formattedSize,
+                triggerPx: formattedTriggerPx,
+                orderPx: formattedOrderPx,
             };
         }
 
@@ -456,11 +532,11 @@ export class OkxFutureService {
                 side,
                 posSide,
                 ordType: 'market',
-                sz,
+                sz: formattedSize,
             };
         }
         body.attachAlgoOrds = [{
-            slTriggerPx: stopLossPx,
+            slTriggerPx: formattedStopLossPx,
             slTriggerPxType: 'last',
             slOrdPx: '-1',
         }];
@@ -482,6 +558,7 @@ export class OkxFutureService {
             let res;
             if (!testing) {
                 res = await axios.post(url, body, { headers });
+                this.assertOkxTradeAccepted(res.data, 'legacy future open order');
             }
 
             return { data: res?.data, body };
@@ -548,16 +625,23 @@ export class OkxFutureService {
     ) {
         const timestamp = new Date().toISOString();
         const requestPath = '/api/v5/trade/order-algo';
+        const instId = `${coin.toUpperCase()}-USDT-SWAP`;
+        const instrument = await this.fetchInstrument(instId);
+        const formattedSize = this.formatSize(Number(sz), instrument);
+        const formattedTriggerPx = this.formatPrice(Number(triggerPx), instrument);
+        const formattedOrderPx = orderPx && orderPx !== '-1'
+            ? this.formatPrice(Number(orderPx), instrument)
+            : '-1';
 
         const body: any = {
-            instId: `${coin.toUpperCase()}-USDT-SWAP`,
+            instId,
             tdMode: 'isolated',
             side: posSide === 'long' ? 'sell' : 'buy', // nếu đang long thì sell để đóng
             posSide, // long hoặc short
             ordType: 'trigger',
-            sz, // số lượng cần đóng (ví dụ: 0.5)
-            triggerPx, // giá kích hoạt
-            orderPx: orderPx ?? '-1', // '-1' = market
+            sz: formattedSize,
+            triggerPx: formattedTriggerPx,
+            orderPx: formattedOrderPx,
             reduceOnly: true, // chỉ đóng vị thế hiện tại
         };
 
@@ -578,6 +662,7 @@ export class OkxFutureService {
             let res;
             if (!testing) {
                 res = await axios.post(url, body, { headers });
+                this.assertOkxTradeAccepted(res.data, 'legacy future close order');
             }
             return { data: res?.data, body };
         } catch (error) {

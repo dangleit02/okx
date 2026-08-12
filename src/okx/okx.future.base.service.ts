@@ -110,6 +110,17 @@ export abstract class OkxFutureBaseService {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  protected assertOkxTradeAccepted(responseData: any, operation: string) {
+    const rejectedItem = responseData?.data?.find(
+      (item: any) => item?.sCode !== undefined && String(item.sCode) !== '0',
+    );
+    if (String(responseData?.code) !== '0' || rejectedItem) {
+      throw new Error(
+        `OKX rejected ${operation}: ${JSON.stringify(responseData)}`,
+      );
+    }
+  }
+
   // ---------- instrument cache & helpers ----------
   // cache instId => instrument data
   private instrumentCache: Map<string, any> = new Map();
@@ -1152,6 +1163,7 @@ export abstract class OkxFutureBaseService {
       let res;
       if (!testing) {
         res = await axios.post(url, body, { headers });
+        this.assertOkxTradeAccepted(res.data, 'future open order');
       }
       this.logger.log(
         `FUTURE ${this.getPositionMode()} open order result: coin=${coin.toUpperCase()}, direction=${direction}, testing=${testing}, result=${JSON.stringify(res?.data ?? { preview: true })}`,
@@ -1261,6 +1273,7 @@ export abstract class OkxFutureBaseService {
       let res;
       if (!testing) {
         res = await axios.post(url, body, { headers });
+        this.assertOkxTradeAccepted(res.data, 'future close order');
       }
       this.logger.log(
         `FUTURE ${this.getPositionMode()} close order result: coin=${coin.toUpperCase()}, direction=${direction}, testing=${testing}, result=${JSON.stringify(res?.data ?? { preview: true })}`,

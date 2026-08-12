@@ -200,6 +200,28 @@ export class OkxService {
     return instrument;
   }
 
+  private normalizeSpotSize(
+    rawSize: number,
+    instrument: any,
+    rounding: 'floor' | 'ceil',
+  ) {
+    const lotSize = Number(instrument.lotSz);
+    const minimumSize = Number(instrument.minSz);
+    const units =
+      rounding === 'ceil'
+        ? Math.ceil(rawSize / lotSize - 1e-10)
+        : Math.floor(rawSize / lotSize + 1e-10);
+    const value = units * lotSize;
+    const formatted = value.toFixed(this.decimalPlaces(lotSize));
+    return {
+      value,
+      formatted,
+      meetsMinimum: value >= minimumSize,
+      lotSize,
+      minimumSize,
+    };
+  }
+
   private async cancelAlgoOrders(
     orders: Array<{ algoId: string; instId: string }>,
     maxAttempts: number = 3,
@@ -1629,18 +1651,24 @@ export class OkxService {
         `Invalid current price fetched for ${instId}: ${currentPrice}`,
       );
     }
+    const instrument = await this.fetchSpotInstrument(instId);
+    if (!instrument) {
+      throw new Error(`Instrument info not available for ${instId}`);
+    }
 
-    const { priceToFixed, szToFixed } = coinConfig;
+    const { priceToFixed } = coinConfig;
     const sizeToSell = (size * percentage) / 100;
-    const sizeFactor = 10 ** szToFixed;
-    const formattedSize = (
-      Math.floor(sizeToSell * sizeFactor) / sizeFactor
-    ).toFixed(szToFixed);
+    const normalizedSize = this.normalizeSpotSize(
+      sizeToSell,
+      instrument,
+      'floor',
+    );
+    const formattedSize = normalizedSize.formatted;
     const triggerPrice = currentPrice * (1 - 0.002);
     const formattedTriggerPrice = triggerPrice.toFixed(priceToFixed);
-    if (Number(formattedSize) <= 0) {
+    if (!normalizedSize.meetsMinimum) {
       throw new Error(
-        `Available balance ${availableBalance} is below the order size precision for ${normalizedCoin}`,
+        `Available balance ${availableBalance} is below minimum size ${normalizedSize.minimumSize} for ${normalizedCoin}`,
       );
     }
 
@@ -1713,7 +1741,7 @@ export class OkxService {
     const sizeFactor = 10 ** szToFixed;
     const rawSize = amountUsdt / Number(formattedTriggerPrice);
     const formattedSize = (
-      Math.floor(rawSize * sizeFactor) / sizeFactor
+      Math.ceil(rawSize * sizeFactor) / sizeFactor
     ).toFixed(szToFixed);
     if (Number(formattedSize) <= 0) {
       throw new Error(
@@ -1721,12 +1749,10 @@ export class OkxService {
       );
     }
 
-    const order = await this.placeOneOrder(
+    const order = await this.placeSpotConditionalBuy(
       normalizedCoin,
-      'buy',
-      formattedSize,
+      amountUsdt.toString(),
       formattedTriggerPrice,
-      undefined,
       testing,
     );
     const result = {
@@ -1735,11 +1761,13 @@ export class OkxService {
       instId,
       testing,
       amountUsdt,
+      orderAmountUsdt: amountUsdt,
+      orderSizeUnit: 'USDT',
       sizeToBuy: formattedSize,
       currentPrice,
       triggerPrice: Number(formattedTriggerPrice),
       orderPrice: -1,
-      ordType: 'trigger',
+      ordType: 'conditional',
       executionType: 'market_on_trigger',
       order,
     };
@@ -1796,16 +1824,22 @@ export class OkxService {
         `Invalid current price fetched for ${instId}: ${currentPrice}`,
       );
     }
+    const instrument = await this.fetchSpotInstrument(instId);
+    if (!instrument) {
+      throw new Error(`Instrument info not available for ${instId}`);
+    }
 
-    const { priceToFixed, szToFixed } = coinConfig;
+    const { priceToFixed } = coinConfig;
     const sizeToSell = (size * percentage) / 100;
-    const sizeFactor = 10 ** szToFixed;
-    const formattedSize = (
-      Math.floor(sizeToSell * sizeFactor) / sizeFactor
-    ).toFixed(szToFixed);
-    if (Number(formattedSize) <= 0) {
+    const normalizedSize = this.normalizeSpotSize(
+      sizeToSell,
+      instrument,
+      'floor',
+    );
+    const formattedSize = normalizedSize.formatted;
+    if (!normalizedSize.meetsMinimum) {
       throw new Error(
-        `Available balance ${availableBalance} is below the order size precision for ${normalizedCoin}`,
+        `Available balance ${availableBalance} is below minimum size ${normalizedSize.minimumSize} for ${normalizedCoin}`,
       );
     }
 
@@ -1988,6 +2022,10 @@ export class OkxService {
     }
 
     const instId = `${coin.toUpperCase()}-USDT`;
+    const instrument = await this.fetchSpotInstrument(instId);
+    if (!instrument) {
+      throw new Error(`Instrument info not available for ${instId}`);
+    }
     let currentPrice = await this.getTicker(instId);
     let count = 0;
     while (true) {
@@ -2090,10 +2128,11 @@ export class OkxService {
           const orderPx = maxBuyPrice - step * priceDistanceBetweenEachStep;
           const triggerPx = orderPx - orderPx * 0.002; // giá kích hoạt thấp hơn giá đặt lệnh giới hạn một chút
           const sz = amountOfUsdtPerStep / orderPx;
+          const normalizedSize = this.normalizeSpotSize(sz, instrument, 'ceil');
 
-          if (sz <= 0) {
+          if (sz <= 0 || !normalizedSize.meetsMinimum) {
             this.logger.log(
-              `BUY ${coin} sz ${sz} <= 0, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`,
+              `BUY ${coin} size ${normalizedSize.formatted} is below minimum size ${normalizedSize.minimumSize}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}`,
               null,
               coin,
             );
@@ -2129,7 +2168,7 @@ export class OkxService {
           let res = await this.placeOneOrder(
             coin,
             'buy',
-            sz.toFixed(szToFixed),
+            normalizedSize.formatted,
             triggerPx.toFixed(priceToFixed),
             orderPx.toFixed(priceToFixed),
             testing,
@@ -2141,15 +2180,15 @@ export class OkxService {
           const stopLossTriggerPx = stopLossOrderPx + stopLossOrderPx * 0.002; // trigger cao hơn order
           res = await this.placeSpotConditionalStopLoss(
             coin,
-            sz.toFixed(szToFixed),
+            normalizedSize.formatted,
             stopLossTriggerPx.toFixed(priceToFixed),
             testing,
           );
 
           data.push({ type: 'STOPLOSS', step, body: res.body });
 
-          newTotalCost += orderPx * sz;
-          newBoughtCoin += sz;
+          newTotalCost += orderPx * normalizedSize.value;
+          newBoughtCoin += normalizedSize.value;
           newAvarageCost = newTotalCost / newBoughtCoin;
           this.logger.log(
             `BUY ${coin} newTotalCost ${newTotalCost}, newBoughtCoin ${newBoughtCoin}, newWvarageCost ${newAvarageCost}`,
@@ -2240,6 +2279,11 @@ export class OkxService {
         `No configuration found for coin: ${JSON.stringify(coin)}`,
       );
     }
+    const instId = `${normalizedCoin}-USDT`;
+    const instrument = await this.fetchSpotInstrument(instId);
+    if (!instrument) {
+      throw new Error(`Instrument info not available for ${instId}`);
+    }
 
     const amountOfUsdtPerStep =
       coinConfig?.amountOfUsdtPerStep ??
@@ -2327,10 +2371,11 @@ export class OkxService {
         const orderPx = maxBuyPrice - step * priceDistanceBetweenEachStep;
         const triggerPx = orderPx - orderPx * 0.002;
         const sz = amountOfUsdtPerStep / orderPx;
+        const normalizedSize = this.normalizeSpotSize(sz, instrument, 'ceil');
 
-        if (sz <= 0) {
+        if (sz <= 0 || !normalizedSize.meetsMinimum) {
           this.logger.log(
-            `BUY ${coin} sz ${sz} <= 0, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}, Size: ${sz.toFixed(szToFixed)}`,
+            `BUY ${coin} size ${normalizedSize.formatted} is below minimum size ${normalizedSize.minimumSize}, Step ${step}, Order Price: ${orderPx.toFixed(priceToFixed)}, Trigger Price: ${triggerPx.toFixed(priceToFixed)}`,
             null,
             coin,
           );
@@ -2358,15 +2403,15 @@ export class OkxService {
         const res = await this.placeOneOrder(
           coin,
           'buy',
-          sz.toFixed(szToFixed),
+          normalizedSize.formatted,
           triggerPx.toFixed(priceToFixed),
           orderPx.toFixed(priceToFixed),
           testing,
         );
         data.push({ type: 'BUY', step, body: res.body });
 
-        newTotalCost += orderPx * sz;
-        newBoughtCoin += sz;
+        newTotalCost += orderPx * normalizedSize.value;
+        newBoughtCoin += normalizedSize.value;
         newAvarageCost = newTotalCost / newBoughtCoin;
         this.logger.log(
           `BUY ${coin} newTotalCost ${newTotalCost}, newBoughtCoin ${newBoughtCoin}, newAvarageCost ${newAvarageCost}`,
@@ -2701,8 +2746,12 @@ export class OkxService {
     if (!coinConfig) {
       throw new Error(`No configuration found for coin: ${normalizedCoin}`);
     }
-    const { priceToFixed, szToFixed } = coinConfig;
+    const { priceToFixed } = coinConfig;
     const instId = `${normalizedCoin}-USDT`;
+    const instrument = await this.fetchSpotInstrument(instId);
+    if (!instrument) {
+      throw new Error(`Instrument info not available for ${instId}`);
+    }
     const balanceData = await this.getAccountBalance(normalizedCoin);
     const balance =
       (balanceData?.data?.[0]?.details ?? []).find(
@@ -2740,7 +2789,7 @@ export class OkxService {
       }, 0),
     );
     const missingSize = Math.max(0, positionSize - protectedSize);
-    const sizeTolerance = 0.5 * 10 ** -szToFixed;
+    const sizeTolerance = Number(instrument.lotSz) / 2;
     if (missingSize <= sizeTolerance) {
       return {
         status: 'already_protected',
@@ -2754,13 +2803,15 @@ export class OkxService {
       };
     }
 
-    const sizeFactor = 10 ** szToFixed;
-    const formattedMissingSize = (
-      Math.floor((missingSize + sizeTolerance * 1e-6) * sizeFactor) / sizeFactor
-    ).toFixed(szToFixed);
-    if (Number(formattedMissingSize) <= 0) {
+    const normalizedMissingSize = this.normalizeSpotSize(
+      missingSize,
+      instrument,
+      'floor',
+    );
+    const formattedMissingSize = normalizedMissingSize.formatted;
+    if (!normalizedMissingSize.meetsMinimum) {
       throw new Error(
-        `Missing spot stop-loss size is below precision for ${normalizedCoin}: ${missingSize}`,
+        `Missing spot stop-loss size is below minimum for ${normalizedCoin}: ${missingSize}, minSz=${normalizedMissingSize.minimumSize}`,
       );
     }
     const currentPrice = await this.getTicker(instId);
@@ -2882,6 +2933,67 @@ export class OkxService {
     return { data: responseData, body };
   }
 
+  async placeSpotConditionalBuy(
+    coin: string,
+    amountUsdt: string,
+    triggerPx: string,
+    testing: boolean = true,
+  ) {
+    const normalizedCoin = coin.toUpperCase();
+    if (!Number.isFinite(Number(amountUsdt)) || Number(amountUsdt) <= 0) {
+      throw new Error(`Invalid spot conditional buy amount: ${amountUsdt}`);
+    }
+    if (!Number.isFinite(Number(triggerPx)) || Number(triggerPx) <= 0) {
+      throw new Error(
+        `Invalid spot conditional buy trigger price: ${triggerPx}`,
+      );
+    }
+
+    const timestamp = new Date().toISOString();
+    const requestPath = '/api/v5/trade/order-algo';
+    const body = {
+      instId: `${normalizedCoin}-USDT`,
+      tdMode: 'cash',
+      side: 'buy',
+      ordType: 'conditional',
+      sz: amountUsdt,
+      tgtCcy: 'quote_ccy',
+      slTriggerPx: triggerPx,
+      slTriggerPxType: 'last',
+      slOrdPx: '-1',
+    };
+    const bodyString = JSON.stringify(body);
+    const headers = this.buildHeaders(
+      timestamp,
+      'POST',
+      requestPath,
+      bodyString,
+    );
+    let responseData: any;
+    if (!testing) {
+      const response = await axios.post(
+        this.config.get<string>('okx.baseUrl') + requestPath,
+        bodyString,
+        { headers },
+      );
+      responseData = response.data;
+      const rejectedItem = responseData?.data?.find(
+        (item: any) => item.sCode && String(item.sCode) !== '0',
+      );
+      if (String(responseData?.code) !== '0' || rejectedItem) {
+        throw new Error(
+          `OKX rejected spot conditional buy: ${JSON.stringify(responseData)}`,
+        );
+      }
+    }
+    this.logger.log(
+      `SPOT conditional buy: coin=${normalizedCoin}, testing=${testing}, amountUsdt=${amountUsdt}, triggerPx=${triggerPx}, slOrdPx=-1, result=${JSON.stringify(responseData ?? { preview: true })}`,
+      null,
+      normalizedCoin,
+    );
+    return { data: responseData, body };
+  }
+
   async placeSpotConditionalTakeProfit(
     coin: string,
     sz: string,
@@ -2997,6 +3109,15 @@ export class OkxService {
       let res;
       if (!testing) {
         res = await axios.post(url, body, { headers });
+        const responseData = res.data;
+        const rejectedItem = responseData?.data?.find(
+          (item: any) => String(item?.sCode) !== '0',
+        );
+        if (String(responseData?.code) !== '0' || rejectedItem) {
+          throw new Error(
+            `OKX rejected trigger order: ${JSON.stringify(responseData)}`,
+          );
+        }
       }
       return { data: res?.data, body };
     } catch (error) {

@@ -1252,10 +1252,13 @@ describe('OkxService place spot stop loss near current price', () => {
       }),
     };
     const logger = { log: jest.fn() };
-    return {
-      service: new OkxService(config as any, logger as any, {} as any),
-      logger,
-    };
+    const service = new OkxService(config as any, logger as any, {} as any);
+    jest.spyOn(service as any, 'fetchSpotInstrument').mockResolvedValue({
+      instId: 'BTC-USDT',
+      lotSz: 0.00000001,
+      minSz: 0.00000001,
+    });
+    return { service, logger };
   };
 
   it('previews a near-current conditional stop-loss using the requested balance percentage', async () => {
@@ -1388,11 +1391,13 @@ describe('OkxService place spot buy near current price', () => {
         status: 'preview',
         coin: 'BTC',
         amountUsdt: 120,
-        sizeToBuy: '0.00199600',
+        orderAmountUsdt: 120,
+        orderSizeUnit: 'USDT',
+        sizeToBuy: '0.00199601',
         currentPrice: 60000,
         triggerPrice: 60120,
         orderPrice: -1,
-        ordType: 'trigger',
+        ordType: 'conditional',
         executionType: 'market_on_trigger',
       }),
     );
@@ -1400,10 +1405,16 @@ describe('OkxService place spot buy near current price', () => {
       expect.objectContaining({
         instId: 'BTC-USDT',
         side: 'buy',
-        ordType: 'trigger',
-        triggerPx: '60120.00',
-        orderPx: '-1',
+        ordType: 'conditional',
+        sz: '120',
+        tgtCcy: 'quote_ccy',
+        slTriggerPx: '60120.00',
+        slTriggerPxType: 'last',
+        slOrdPx: '-1',
       }),
+    );
+    expect(Number(result.sizeToBuy) * result.triggerPrice).toBeGreaterThanOrEqual(
+      result.amountUsdt,
     );
   });
 
@@ -1421,6 +1432,11 @@ describe('OkxService place spot buy near current price', () => {
       { log: jest.fn() } as any,
       {} as any,
     );
+    jest.spyOn(service as any, 'fetchSpotInstrument').mockResolvedValue({
+      instId: 'LTC-USDT',
+      lotSz: 0.0001,
+      minSz: 0.0001,
+    });
     jest.spyOn(service as any, 'getTicker').mockResolvedValue(2500);
 
     await expect(service.placeSpotBuyNearCurrentPrice('ETH')).resolves.toEqual(
@@ -1429,6 +1445,73 @@ describe('OkxService place spot buy near current price', () => {
     await expect(
       service.placeSpotBuyNearCurrentPrice('ETH', 0),
     ).rejects.toThrow('Invalid amountUsdt');
+  });
+
+  it('submits the requested USDT amount as quote currency', async () => {
+    const config = {
+      get: jest.fn((key: string) => {
+        if (key === 'coin.BTC') return { priceToFixed: 1, szToFixed: 7 };
+        if (key === 'okx.baseUrl') return 'https://www.okx.test';
+        return 'value';
+      }),
+    };
+    const service = new OkxService(
+      config as any,
+      { log: jest.fn() } as any,
+      {} as any,
+    );
+    jest.spyOn(service as any, 'fetchSpotInstrument').mockResolvedValue({
+      instId: 'LTC-USDT',
+      lotSz: 0.0001,
+      minSz: 0.0001,
+    });
+    jest.spyOn(service as any, 'getTicker').mockResolvedValue(63498.9);
+    const post = jest.spyOn(axios, 'post').mockResolvedValue({
+      data: { code: '0', data: [{ algoId: '1', sCode: '0', sMsg: '' }] },
+    });
+
+    const result = await service.placeSpotBuyNearCurrentPrice('BTC', 60, false);
+
+    expect(result.status).toBe('submitted');
+    expect(JSON.parse(post.mock.calls[0][1] as string)).toEqual(
+      expect.objectContaining({
+        side: 'buy',
+        ordType: 'conditional',
+        sz: '60',
+        tgtCcy: 'quote_ccy',
+        slTriggerPx: '63625.9',
+        slOrdPx: '-1',
+      }),
+    );
+  });
+
+  it('rejects an HTTP 200 response containing an OKX item error', async () => {
+    const config = {
+      get: jest.fn((key: string) =>
+        key === 'okx.baseUrl' ? 'https://www.okx.test' : 'value',
+      ),
+    };
+    const service = new OkxService(
+      config as any,
+      { log: jest.fn() } as any,
+      {} as any,
+    );
+    jest.spyOn(axios, 'post').mockResolvedValue({
+      data: {
+        code: '1',
+        data: [
+          {
+            sCode: '51020',
+            sMsg: 'Your order should meet or exceed the minimum order amount.',
+          },
+        ],
+        msg: '',
+      },
+    });
+
+    await expect(
+      service.placeSpotConditionalBuy('BTC', '60', '60120.00', false),
+    ).rejects.toThrow('OKX rejected spot conditional buy');
   });
 });
 
@@ -1477,6 +1560,11 @@ describe('OkxService buy trigger range direction', () => {
       { log: jest.fn() } as any,
       {} as any,
     );
+    jest.spyOn(service as any, 'fetchSpotInstrument').mockResolvedValue({
+      instId: 'LTC-USDT',
+      lotSz: 0.0001,
+      minSz: 0.0001,
+    });
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
       data: [{ details: [{ availBal: '1', openAvgPx: '50' }] }],
     });
@@ -1510,6 +1598,11 @@ describe('OkxService buy trigger range direction', () => {
       { log: jest.fn() } as any,
       {} as any,
     );
+    jest.spyOn(service as any, 'fetchSpotInstrument').mockResolvedValue({
+      instId: 'LTC-USDT',
+      lotSz: 0.0001,
+      minSz: 0.0001,
+    });
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
       data: [{ details: [{ availBal: '0', openAvgPx: '0' }] }],
     });
@@ -1566,6 +1659,11 @@ describe('OkxService auto sell size and profit logging', () => {
     };
     const logger = { log: jest.fn(), error: jest.fn() };
     const service = new OkxService(config as any, logger as any, {} as any);
+    jest.spyOn(service as any, 'fetchSpotInstrument').mockResolvedValue({
+      instId: 'BTC-USDT',
+      lotSz: 0.0001,
+      minSz: 0.0001,
+    });
     jest.spyOn(service as any, 'fetchSpotInstrument').mockResolvedValue({
       instId: 'ALGO-USDT',
       lotSz: 0.0001,
@@ -1658,6 +1756,11 @@ describe('OkxService sell percentage at a requested trigger price', () => {
     };
     const logger = { log: jest.fn() };
     const service = new OkxService(config as any, logger as any, {} as any);
+    jest.spyOn(service as any, 'fetchSpotInstrument').mockResolvedValue({
+      instId: 'BTC-USDT',
+      lotSz: 0.0001,
+      minSz: 0.0001,
+    });
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
       data: [{ details: [{ ccy: 'BTC', availBal: '1.23459' }] }],
     });
@@ -1799,6 +1902,11 @@ describe('OkxService conditional spot stop-loss coverage', () => {
       logger as any,
       emailService as any,
     );
+    jest.spyOn(service as any, 'fetchSpotInstrument').mockResolvedValue({
+      instId: 'BTC-USDT',
+      lotSz: 0.0001,
+      minSz: 0.0001,
+    });
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
       data: [{ details: [{ ccy: 'BTC', cashBal: '2', availBal: '2' }] }],
     });

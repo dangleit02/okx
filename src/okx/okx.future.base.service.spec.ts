@@ -261,6 +261,35 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
     expect(result.body.reduceOnly).toBeUndefined();
   });
 
+  it('rejects an HTTP 200 response containing an OKX open-order item error', async () => {
+    const { service } = createService();
+    jest.spyOn(service as any, 'setLeverage').mockResolvedValue({ code: '0' });
+    jest.spyOn(axios, 'post').mockResolvedValue({
+      data: {
+        code: '1',
+        data: [{ sCode: '51020', sMsg: 'Minimum order amount' }],
+      },
+    });
+
+    await expect(
+      service.openPosition('BTC', 'long', '1', '100', '101', false, '90'),
+    ).rejects.toThrow('OKX rejected future open order');
+  });
+
+  it('rejects an HTTP 200 response containing an OKX close-order item error', async () => {
+    const { service } = createService();
+    jest.spyOn(axios, 'post').mockResolvedValue({
+      data: {
+        code: '1',
+        data: [{ sCode: '51020', sMsg: 'Minimum order amount' }],
+      },
+    });
+
+    await expect(
+      service.closePartialPosition('BTC', 'long', '1', '90', '-1', false),
+    ).rejects.toThrow('OKX rejected future close order');
+  });
+
   it('previews a hedge long market entry 0.2% above current with an automatic stop loss', async () => {
     const { service } = createService(true);
 
