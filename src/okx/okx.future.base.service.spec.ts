@@ -564,7 +564,13 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
     (service as any).getTicker.mockResolvedValue(200);
     jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
       data: [
-        { instId: 'BTC-USDT-SWAP', posSide: 'long', pos: '100', avgPx: '0' },
+        {
+          instId: 'BTC-USDT-SWAP',
+          posSide: 'long',
+          pos: '100',
+          availPos: '1',
+          avgPx: '0',
+        },
       ],
     });
 
@@ -584,6 +590,7 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
         body: expect.objectContaining({
           triggerPx: '188.4',
           orderPx: '-1',
+          sz: '5',
           reduceOnly: true,
         }),
       }),

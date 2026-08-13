@@ -238,6 +238,11 @@ export abstract class OkxFutureBaseService {
     }
   }
 
+  /** Total open contracts, including contracts reserved by other close orders. */
+  private getTotalPositionSize(position?: OkxPosition): Decimal {
+    return this.parseDecimal(position?.pos ?? '0')?.abs() ?? new Decimal(0);
+  }
+
   // format size: floor to lot size multiple, ensure >= minSz
   protected formatSize(rawSz: number, inst: any) {
     const lot = Number(inst.lotSz || inst.minSz || 1);
@@ -796,8 +801,8 @@ export abstract class OkxFutureBaseService {
     ).map((order) => String(order.instId ?? '').split('-')[0]);
     const positionCoins = (positionResponse?.data ?? []).flatMap((position) => {
       if (!this.selectPositionForDirection([position], direction)) return [];
-      const size = Math.abs(Number(position.pos ?? 0));
-      if (!Number.isFinite(size) || size <= 0) return [];
+      const size = this.getTotalPositionSize(position);
+      if (!size.greaterThan(0)) return [];
       return [String(position.instId ?? '').split('-')[0]];
     });
 
@@ -840,8 +845,7 @@ export abstract class OkxFutureBaseService {
       positionResponse?.data ?? [],
       direction,
     );
-    const positionSize = this.parseDecimal(position?.pos ?? '0');
-    const normalizedPositionSize = positionSize?.abs() ?? new Decimal(0);
+    const normalizedPositionSize = this.getTotalPositionSize(position);
     const pendingCloseOrders: OkxAlgoOrder[] = [
       ...pendingTriggerOrders.map((order) => ({
         ...order,
@@ -1973,8 +1977,7 @@ export abstract class OkxFutureBaseService {
       positionResponse?.data ?? [],
       direction,
     );
-    const rawPositionSize = Math.abs(Number(position?.pos ?? 0));
-    const positionSize = Number.isFinite(rawPositionSize) ? rawPositionSize : 0;
+    const positionSize = this.getTotalPositionSize(position).toNumber();
     const stopLossOrders = this.getPositionStopLossOrders(
       conditionalOrders,
       direction,
@@ -2305,8 +2308,8 @@ export abstract class OkxFutureBaseService {
       response?.data ?? [],
       direction,
     );
-    const size = Math.abs(Number(position?.pos ?? 0));
-    if (!position || !Number.isFinite(size) || size <= 0) {
+    const size = this.getTotalPositionSize(position).toNumber();
+    if (!position || size <= 0) {
       return { instId, position: undefined, size: 0 };
     }
     return { instId, position, size };
@@ -2577,7 +2580,7 @@ export abstract class OkxFutureBaseService {
 
     const posData = await this.getOpenPosition(instId);
     const pos = this.selectPositionForDirection(posData?.data ?? [], direction);
-    const currentSize = Math.abs(Number(pos?.pos ?? 0));
+    const currentSize = this.getTotalPositionSize(pos).toNumber();
     const avgPrice = Number(pos?.avgPx ?? 0);
 
     log(`Open pos size ${currentSize}, avgPrice=${avgPrice}`);
@@ -2698,7 +2701,7 @@ export abstract class OkxFutureBaseService {
 
     const posData = await this.getOpenPosition(instId);
     const pos = this.selectPositionForDirection(posData?.data ?? [], direction);
-    const currentSize = Math.abs(Number(pos?.pos ?? 0));
+    const currentSize = this.getTotalPositionSize(pos).toNumber();
     const avgPrice = Number(pos?.avgPx ?? 0);
 
     if (!currentSize || currentSize <= 0) {

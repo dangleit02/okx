@@ -294,7 +294,9 @@ export class OkxFutureService {
 
         const posData = await this.getOpenPosition(instId);
         const pos = posData?.data?.[0];
-        const currentSize = Number(pos?.pos ?? 0);
+        // `pos` is the total position. Do not size from `availPos`, which may
+        // exclude contracts already reserved by another close order.
+        const currentSize = Math.abs(Number(pos?.pos ?? 0));
         const avgPrice = Number(pos?.avgPx ?? 0);
 
         log(`Open pos size ${currentSize}, avgPrice=${avgPrice}`);
@@ -386,7 +388,7 @@ export class OkxFutureService {
 
         const posData = await this.getOpenPosition(instId);
         const pos = posData?.data?.[0];
-        const currentSize = Number(pos?.pos ?? 0);
+        const currentSize = Math.abs(Number(pos?.pos ?? 0));
         const avgPrice = Number(pos?.avgPx ?? 0);
 
         if (!currentSize || currentSize <= 0) return data;

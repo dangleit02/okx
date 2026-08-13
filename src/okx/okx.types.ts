@@ -80,6 +80,7 @@ export interface OkxCancelBatchResult {
 export interface OkxPosition {
   instId?: string;
   pos?: string;
+  availPos?: string;
   posSide?: OkxPositionSide;
   avgPx?: string;
   markPx?: string;
@@ -106,6 +107,7 @@ export interface SellOrderCleanupResult {
   testing: boolean;
   currentPrice: number;
   sellableBalance: string;
+  totalBalance: string;
   cleanupScope: 'all_sell_orders_no_balance' | 'excess_trigger_sell_orders';
   conditionalOrderCount: number;
   eligibleOrderCount: number;

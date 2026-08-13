@@ -35,7 +35,7 @@ describe('OkxFutureService legacy futures sizing', () => {
       code: '0',
       data: [],
     });
-    return { service };
+    return { service, logger };
   };
 
   afterEach(() => jest.restoreAllMocks());
@@ -75,5 +75,40 @@ describe('OkxFutureService legacy futures sizing', () => {
 
     const body = (axios.post as jest.Mock).mock.calls[0][1];
     expect(body.sz).toBe('0.09');
+  });
+
+  it('subtracts the total short position even when no contracts are available', async () => {
+    const { service, logger } = createService();
+    jest.spyOn(service, 'getOpenPosition').mockResolvedValue({
+      code: '0',
+      data: [
+        {
+          instId: 'BTC-USDT-SWAP',
+          posSide: 'short',
+          pos: '-100',
+          availPos: '0',
+          avgPx: '100',
+        },
+      ],
+    } as any);
+    const openPosition = jest.spyOn(service, 'openPosition').mockResolvedValue({
+      data: undefined,
+      body: {},
+    });
+
+    await service.tradeOneCoin({
+      coin: 'BTC',
+      direction: 'short',
+      isTesting: true,
+      autoTrade: true,
+    });
+
+    expect(openPosition).toHaveBeenCalled();
+    const sizingLog = logger.log.mock.calls
+      .flat()
+      .map(String)
+      .find((message) => message.includes('sizeToOpen:'));
+    const sizeToOpen = Number(sizingLog?.match(/sizeToOpen: ([\d.]+)/)?.[1]);
+    expect(sizeToOpen).toBeCloseTo(66.6666666667, 8);
   });
 });

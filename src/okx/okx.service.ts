@@ -1224,6 +1224,7 @@ export class OkxService {
         status: result.status,
         coin: result.coin,
         sellableBalance: result.sellableBalance,
+        totalBalance: result.totalBalance,
         currentPrice: result.currentPrice,
         keptOrderCount: result.keptOrderCount,
         cancelOrderCount: result.cancelOrderCount,
@@ -1318,6 +1319,9 @@ export class OkxService {
     const sellableBalance = new Decimal(
       this.getSpotSellableBalanceValue(balance, normalizedCoin),
     );
+    const totalBalance = new Decimal(
+      this.getSpotCashBalanceValue(balance, normalizedCoin),
+    );
     const configuredSizeDecimals = Number(
       this.config.get<SpotCoinConfig>(`coin.${normalizedCoin}`)?.szToFixed,
     );
@@ -1326,7 +1330,7 @@ export class OkxService {
         ? configuredSizeDecimals
         : 8;
     const sizeTolerance = new Decimal(10).pow(-sizeDecimals).div(2);
-    const cleanAllSellOrders = sellableBalance.lessThanOrEqualTo(sizeTolerance);
+    const cleanAllSellOrders = totalBalance.lessThanOrEqualTo(sizeTolerance);
     if (
       !cleanAllSellOrders &&
       (!Number.isFinite(currentPrice) || currentPrice <= 0)
@@ -1400,7 +1404,7 @@ export class OkxService {
 
     for (const order of [...eligibleOrders].reverse()) {
       if (
-        remainingSize.lessThanOrEqualTo(sellableBalance.plus(sizeTolerance))
+        remainingSize.lessThanOrEqualTo(totalBalance.plus(sizeTolerance))
       ) {
         break;
       }
@@ -1435,6 +1439,7 @@ export class OkxService {
       testing,
       currentPrice: cleanupCurrentPrice,
       sellableBalance: sellableBalance.toFixed(),
+      totalBalance: totalBalance.toFixed(),
       cleanupScope,
       conditionalOrderCount: conditionalOrders.length,
       eligibleOrderCount: eligibleOrders.length,
@@ -1637,7 +1642,14 @@ export class OkxService {
     balance: OkxBalanceDetail | undefined,
     coin: string,
   ): number {
-    if (!balance) return 0;
+    return new Decimal(this.getSpotCashBalanceValue(balance, coin)).toNumber();
+  }
+
+  private getSpotCashBalanceValue(
+    balance: OkxBalanceDetail | undefined,
+    coin: string,
+  ): string {
+    if (!balance) return '0';
     const rawBalance = balance.cashBal;
     if (
       rawBalance === undefined ||
@@ -1646,13 +1658,13 @@ export class OkxService {
     ) {
       throw new Error(`Missing OKX cashBal for ${coin.toUpperCase()}`);
     }
-    const cashBalance = Number(rawBalance);
-    if (!Number.isFinite(cashBalance) || cashBalance < 0) {
+    const cashBalance = this.parseDecimal(rawBalance);
+    if (!cashBalance || cashBalance.isNegative()) {
       throw new Error(
         `Invalid OKX cashBal for ${coin.toUpperCase()}: ${rawBalance}`,
       );
     }
-    return cashBalance;
+    return String(rawBalance).trim();
   }
 
   async getAllSpotBoughtCoins(): Promise<AllSpotBoughtCoins> {
@@ -2690,9 +2702,9 @@ export class OkxService {
         coin,
       );
       const balance = this.getSpotBalanceDetail(coinBalanceData, coin);
-      const availableCoin = this.getSpotSellableBalance(balance, coin);
+      const totalCoinBalance = this.getSpotCashBalance(balance, coin);
 
-      const coinToSell = Math.min(totalCoinWillBeSold, availableCoin);
+      const coinToSell = Math.min(totalCoinWillBeSold, totalCoinBalance);
       if (coinToSell <= 0) return data;
       const normalizedCoinToSell =
         Math.floor((coinToSell + lotSize * 1e-8) / lotSize) * lotSize;

@@ -1069,7 +1069,7 @@ describe('OkxService clean excess sell orders', () => {
     return { service, logger };
   };
 
-  it('uses availBal, not cashBal, to cap sell orders', async () => {
+  it('uses total cashBal, including locked coins, to cap sell orders', async () => {
     const { service } = createService();
     const cancelAlgoOrders = jest.spyOn(service as any, 'cancelAlgoOrders');
     const conditionalStopLossOrders = jest.spyOn(
@@ -1084,18 +1084,20 @@ describe('OkxService clean excess sell orders', () => {
         status: 'preview',
         currentPrice: 100,
         sellableBalance: '4',
+        totalBalance: '100',
         eligibleOrderCount: 3,
-        keptOrderCount: 1,
-        keptSize: '2',
-        cancelOrderCount: 2,
-        cancelSize: '4',
+        keptOrderCount: 3,
+        keptSize: '6',
+        cancelOrderCount: 0,
+        cancelSize: '0',
       }),
     );
-    expect(result.keptOrders.map((order) => order.algoId)).toEqual(['high']);
-    expect(result.ordersToCancel.map((order) => order.algoId)).toEqual([
-      'low',
+    expect(result.keptOrders.map((order) => order.algoId)).toEqual([
+      'high',
       'middle',
+      'low',
     ]);
+    expect(result.ordersToCancel).toEqual([]);
     expect(result.keptOrders.map((order) => order.algoId)).not.toContain(
       'equal',
     );
@@ -1114,6 +1116,15 @@ describe('OkxService clean excess sell orders', () => {
 
   it('cancels sell orders from the lowest trigger price first', async () => {
     const { service, logger } = createService();
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [
+        {
+          details: [
+            { ccy: 'ETC', cashBal: '4', availBal: '4', openAvgPx: '80' },
+          ],
+        },
+      ],
+    });
     const cancelAlgoOrders = jest
       .spyOn(service as any, 'cancelAlgoOrders')
       .mockResolvedValue({
@@ -1152,6 +1163,7 @@ describe('OkxService clean excess sell orders', () => {
       status: 'cleaned',
       coin: 'ETC',
       sellableBalance: '4',
+      totalBalance: '4',
       currentPrice: 100,
       keptOrderCount: 1,
       cancelOrderCount: 2,
@@ -1253,7 +1265,9 @@ describe('OkxService clean excess sell orders', () => {
         },
       ]);
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
-      data: [{ details: [{ ccy: 'ETC', availBal: '0.3' }] }],
+      data: [
+        { details: [{ ccy: 'ETC', cashBal: '0.3', availBal: '0.3' }] },
+      ],
     });
 
     await expect(service.cleanSellOrdersForOneCoin('ETC')).resolves.toEqual(
@@ -1823,7 +1837,14 @@ describe('OkxService auto sell size and profit logging', () => {
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
       data: [
         {
-          details: [{ ccy: 'ALGO', availBal: '0.00001', openAvgPx: '0' }],
+          details: [
+            {
+              ccy: 'ALGO',
+              cashBal: '0.00001',
+              availBal: '0.00001',
+              openAvgPx: '0',
+            },
+          ],
         },
       ],
     });
@@ -1851,7 +1872,14 @@ describe('OkxService auto sell size and profit logging', () => {
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
       data: [
         {
-          details: [{ ccy: 'DOT', availBal: '0.000001', openAvgPx: '0' }],
+          details: [
+            {
+              ccy: 'DOT',
+              cashBal: '0.000001',
+              availBal: '0.000001',
+              openAvgPx: '0',
+            },
+          ],
         },
       ],
     });
@@ -1872,7 +1900,13 @@ describe('OkxService auto sell size and profit logging', () => {
   it('logs N/A profit when the average cost is unavailable', async () => {
     const { service, logger } = createService();
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
-      data: [{ details: [{ ccy: 'ALGO', availBal: '1', openAvgPx: '0' }] }],
+      data: [
+        {
+          details: [
+            { ccy: 'ALGO', cashBal: '1', availBal: '1', openAvgPx: '0' },
+          ],
+        },
+      ],
     });
     const placeOneOrder = jest
       .spyOn(service, 'placeOneOrder')
@@ -1889,6 +1923,36 @@ describe('OkxService auto sell size and profit logging', () => {
     );
     expect(logger.log.mock.calls.flat().join(' ')).not.toContain('Infinity');
     expect(placeOneOrder).toHaveBeenCalled();
+  });
+
+  it('sizes auto sell orders from cashBal when most coins are locked', async () => {
+    const { service } = createService();
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [
+        {
+          details: [
+            {
+              ccy: 'ALGO',
+              cashBal: '100',
+              availBal: '0.00001',
+              frozenBal: '99.99999',
+              openAvgPx: '0.09',
+            },
+          ],
+        },
+      ],
+    });
+    const placeOneOrder = jest
+      .spyOn(service, 'placeOneOrder')
+      .mockImplementation(
+        async (_coin, _side, sz, triggerPx, orderPx) =>
+          ({ body: { sz, triggerPx, orderPx } }) as any,
+      );
+
+    await service.autoSellFromMinPriceToStopLossPriceForDown('ALGO', true);
+
+    expect(placeOneOrder).toHaveBeenCalled();
+    expect(Number(placeOneOrder.mock.calls[0][2])).toBeGreaterThan(1);
   });
 });
 
