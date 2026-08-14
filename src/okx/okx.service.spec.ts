@@ -1154,6 +1154,17 @@ describe('OkxService clean excess sell orders', () => {
         failedOrderCount: 0,
       }),
     );
+    const cleanupTableCall = logger.log.mock.calls.find(
+      ([, context, coin]) =>
+        context === 'Sell order cleanup table' && coin === 'ETC_clean',
+    );
+    expect(cleanupTableCall).toBeDefined();
+    expect(cleanupTableCall[0]).toContain(
+      'STATUS  | ALGO ID | CURRENT PRICE | CURRENT PROFIT (%)',
+    );
+    expect(cleanupTableCall[0]).toMatch(/CLEANED\s+\| low\s+\| 100\s+\| 25/);
+    expect(cleanupTableCall[0]).toMatch(/CLEANED\s+\| middle\s+\| 100\s+\| 25/);
+    expect(cleanupTableCall[0]).toMatch(/KEPT\s+\| high\s+\| 100\s+\| 25/);
     const cleanupSummaryCall = logger.log.mock.calls.find(
       ([, context, coin]) =>
         context === 'Sell order cleanup summary' && coin === 'ETC_clean',
@@ -1175,6 +1186,38 @@ describe('OkxService clean excess sell orders', () => {
     expect(cleanupSummaryCall[0]).not.toContain('responses');
     expect(cleanupSummaryCall[0]).not.toContain('keptOrders');
     expect(cleanupSummaryCall[0]).not.toContain('ordersToCancel');
+  });
+
+  it('keeps the highest trigger sell order when its size alone exceeds the remaining balance', async () => {
+    const { service } = createService();
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [
+        {
+          details: [
+            { ccy: 'ETC', cashBal: '0.5', availBal: '0.5', openAvgPx: '80' },
+          ],
+        },
+      ],
+    });
+
+    const result = await service.cleanSellOrdersForOneCoin('ETC');
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'preview',
+        totalBalance: '0.5',
+        eligibleOrderCount: 3,
+        keptOrderCount: 1,
+        keptSize: '2',
+        cancelOrderCount: 2,
+        cancelSize: '4',
+      }),
+    );
+    expect(result.keptOrders.map((order) => order.algoId)).toEqual(['high']);
+    expect(result.ordersToCancel.map((order) => order.algoId)).toEqual([
+      'low',
+      'middle',
+    ]);
   });
 
   it('keeps an order whose rounded size is within half a coin size unit of the balance', async () => {
@@ -1265,9 +1308,7 @@ describe('OkxService clean excess sell orders', () => {
         },
       ]);
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
-      data: [
-        { details: [{ ccy: 'ETC', cashBal: '0.3', availBal: '0.3' }] },
-      ],
+      data: [{ details: [{ ccy: 'ETC', cashBal: '0.3', availBal: '0.3' }] }],
     });
 
     await expect(service.cleanSellOrdersForOneCoin('ETC')).resolves.toEqual(

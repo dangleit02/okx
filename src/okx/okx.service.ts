@@ -1238,6 +1238,74 @@ export class OkxService {
     );
   }
 
+  private logSellOrderCleanupTable(
+    result: SellOrderCleanupResult,
+    successfullyCleanedOrderIds: Set<string>,
+    averageCost: number,
+  ) {
+    const formatProfitPercentage = (price: number) =>
+      Number.isFinite(price) &&
+      price > 0 &&
+      Number.isFinite(averageCost) &&
+      averageCost > 0
+        ? String(
+            Number((((price - averageCost) / averageCost) * 100).toFixed(2)),
+          )
+        : '';
+    const cleanedAt = moment().format('YYYY-MM-DD HH:mm:ss');
+    const headers = [
+      'STATUS',
+      'ALGO ID',
+      'CURRENT PRICE',
+      'CURRENT PROFIT (%)',
+      'CREATED AT',
+      'CLEANED AT',
+      'TRIGGER PRICE',
+      'ORDER PRICE',
+      'ORDER PROFIT (%)',
+    ];
+    const cleanedRows = result.ordersToCancel.map((order) => {
+      const cleaned = successfullyCleanedOrderIds.has(order.algoId);
+      return [
+        cleaned ? 'CLEANED' : 'CLEAN_FAILED',
+        order.algoId,
+        String(result.currentPrice),
+        formatProfitPercentage(result.currentPrice),
+        order.createdAt,
+        cleaned ? cleanedAt : '',
+        String(order.triggerPrice),
+        String(order.orderPrice),
+        formatProfitPercentage(order.orderPrice),
+      ];
+    });
+    const keptRows = result.keptOrders.map((order) => [
+      'KEPT',
+      order.algoId,
+      String(result.currentPrice),
+      formatProfitPercentage(result.currentPrice),
+      order.createdAt,
+      '',
+      String(order.triggerPrice),
+      String(order.orderPrice),
+      formatProfitPercentage(order.orderPrice),
+    ]);
+    const rows = [...cleanedRows, ...keptRows];
+    const widths = headers.map((header, index) =>
+      Math.max(header.length, ...rows.map((row) => row[index].length)),
+    );
+    const formatRow = (row: string[]) =>
+      row.map((value, index) => value.padEnd(widths[index])).join(' | ');
+    const separator = widths.map((width) => '-'.repeat(width)).join('-+-');
+    const table = [
+      '',
+      formatRow(headers),
+      separator,
+      ...rows.map(formatRow),
+    ].join('\n');
+
+    this.logger.log(table, 'Sell order cleanup table', `${result.coin}_clean`);
+  }
+
   private getHttpError(error: unknown): HttpErrorLike | undefined {
     return typeof error === 'object' && error !== null
       ? (error as HttpErrorLike)
@@ -1322,6 +1390,7 @@ export class OkxService {
     const totalBalance = new Decimal(
       this.getSpotCashBalanceValue(balance, normalizedCoin),
     );
+    const averageCost = Number(balance?.openAvgPx ?? 0);
     const configuredSizeDecimals = Number(
       this.config.get<SpotCoinConfig>(`coin.${normalizedCoin}`)?.szToFixed,
     );
@@ -1401,16 +1470,21 @@ export class OkxService {
       (total, order) => total.plus(order.sizeDecimal),
       new Decimal(0),
     );
+    let remainingOrderCount = eligibleOrders.length;
 
     for (const order of [...eligibleOrders].reverse()) {
       if (
-        remainingSize.lessThanOrEqualTo(totalBalance.plus(sizeTolerance))
+        remainingSize.lessThanOrEqualTo(totalBalance.plus(sizeTolerance)) ||
+        // A positive holding should retain its highest trigger even when that
+        // order alone is oversized; zero-balance cleanup still removes all.
+        (!cleanAllSellOrders && remainingOrderCount === 1)
       ) {
         break;
       }
 
       ordersToCancel.push(order);
       remainingSize = remainingSize.minus(order.sizeDecimal);
+      remainingOrderCount--;
     }
     const orderIdsToCancel = new Set(
       ordersToCancel.map(({ algoId }) => algoId),
@@ -1464,6 +1538,7 @@ export class OkxService {
         failedOrderCount: 0,
         responses: [],
       };
+      this.logSellOrderCleanupTable(result, new Set(), averageCost);
       this.logSellOrderCleanupSummary(result);
       return result;
     }
@@ -1493,6 +1568,11 @@ export class OkxService {
     const failedOrderIds = ordersToCancel
       .map(({ algoId }) => algoId)
       .filter((algoId) => !successfullyCleanedOrderIds.has(algoId));
+    this.logSellOrderCleanupTable(
+      result,
+      successfullyCleanedOrderIds,
+      averageCost,
+    );
     this.logSellOrderCleanupSummary(result, cancelledOrderIds, failedOrderIds);
     return result;
   }
