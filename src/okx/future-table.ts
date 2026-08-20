@@ -1,3 +1,8 @@
+import * as moment from 'moment';
+
+const formatStatisticsTimestamp = () =>
+  `UPDATED AT: ${moment().format('YYYY-MM-DD HH:mm:ss')}`;
+
 const formatTable = (headers: string[], rows: string[][]) => {
   const widths = headers.map((header, index) =>
     Math.max(header.length, ...rows.map((row) => row[index].length)),
@@ -10,16 +15,22 @@ const formatTable = (headers: string[], rows: string[][]) => {
 
 const formatPercentage = (price?: number, referencePrice?: number) => {
   if (
-    price === undefined
-    || referencePrice === undefined
-    || !Number.isFinite(price)
-    || !Number.isFinite(referencePrice)
-    || referencePrice <= 0
-  ) return '';
-  return String(Number((((price - referencePrice) / referencePrice) * 100).toFixed(2)));
+    price === undefined ||
+    referencePrice === undefined ||
+    !Number.isFinite(price) ||
+    !Number.isFinite(referencePrice) ||
+    referencePrice <= 0
+  )
+    return '';
+  return String(
+    Number((((price - referencePrice) / referencePrice) * 100).toFixed(2)),
+  );
 };
 
-const formatPriceWithPercentage = (price?: number, percentage?: string | number) => {
+const formatPriceWithPercentage = (
+  price?: number,
+  percentage?: string | number,
+) => {
   if (price === undefined || !Number.isFinite(price)) return '';
   if (percentage === undefined || percentage === '') return String(price);
   return `${price} (${percentage}%)`;
@@ -31,28 +42,49 @@ const formatOrderPrice = (price?: number) => {
 };
 
 export const formatFutureOrdersAsTable = (result: any): string => {
-  const detailItems = (result.coins ?? []).flatMap((coin: any) =>
-    (coin.orders ?? []).map((order: any) => ({ coin, order })),
-  ).sort((left: any, right: any) => (
-    left.coin.coin.localeCompare(right.coin.coin)
-    || (left.order.triggerPrice ?? Number.POSITIVE_INFINITY)
-      - (right.order.triggerPrice ?? Number.POSITIVE_INFINITY)
-    || String(left.order.orderType).localeCompare(String(right.order.orderType))
-  ));
+  const detailItems = (result.coins ?? [])
+    .flatMap((coin: any) =>
+      (coin.orders ?? []).map((order: any) => ({ coin, order })),
+    )
+    .sort(
+      (left: any, right: any) =>
+        left.coin.coin.localeCompare(right.coin.coin) ||
+        (left.order.triggerPrice ?? Number.POSITIVE_INFINITY) -
+          (right.order.triggerPrice ?? Number.POSITIVE_INFINITY) ||
+        String(left.order.orderType).localeCompare(
+          String(right.order.orderType),
+        ),
+    );
 
-  const groups = new Map<string, { coin: any; orderType: string; orders: any[] }>();
+  const groups = new Map<
+    string,
+    { coin: any; orderType: string; orders: any[] }
+  >();
   for (const item of detailItems) {
-    const orderType = String(item.order.orderType ?? item.order.ordType ?? '').toUpperCase();
+    const orderType = String(
+      item.order.orderType ?? item.order.ordType ?? '',
+    ).toUpperCase();
     const key = `${item.coin.coin}|${orderType}`;
-    if (!groups.has(key)) groups.set(key, { coin: item.coin, orderType, orders: [] });
+    if (!groups.has(key))
+      groups.set(key, { coin: item.coin, orderType, orders: [] });
     groups.get(key)!.orders.push(item.order);
   }
   const summaryItems = Array.from(groups.values()).sort((left, right) => {
-    const leftFrom = Math.min(...left.orders.map((order) => order.triggerPrice ?? Number.POSITIVE_INFINITY));
-    const rightFrom = Math.min(...right.orders.map((order) => order.triggerPrice ?? Number.POSITIVE_INFINITY));
-    return left.coin.coin.localeCompare(right.coin.coin)
-      || leftFrom - rightFrom
-      || left.orderType.localeCompare(right.orderType);
+    const leftFrom = Math.min(
+      ...left.orders.map(
+        (order) => order.triggerPrice ?? Number.POSITIVE_INFINITY,
+      ),
+    );
+    const rightFrom = Math.min(
+      ...right.orders.map(
+        (order) => order.triggerPrice ?? Number.POSITIVE_INFINITY,
+      ),
+    );
+    return (
+      left.coin.coin.localeCompare(right.coin.coin) ||
+      leftFrom - rightFrom ||
+      left.orderType.localeCompare(right.orderType)
+    );
   });
   const summaryRows = summaryItems.map(({ coin, orderType, orders }) => {
     const prices = orders
@@ -66,8 +98,14 @@ export const formatFutureOrdersAsTable = (result: any): string => {
       result.direction.toUpperCase(),
       result.intent.toUpperCase(),
       String(coin.currentPrice ?? ''),
-      formatPriceWithPercentage(fromPrice, formatPercentage(fromPrice, coin.currentPrice)),
-      formatPriceWithPercentage(toPrice, formatPercentage(toPrice, coin.currentPrice)),
+      formatPriceWithPercentage(
+        fromPrice,
+        formatPercentage(fromPrice, coin.currentPrice),
+      ),
+      formatPriceWithPercentage(
+        toPrice,
+        formatPercentage(toPrice, coin.currentPrice),
+      ),
       String(orders.length),
     ];
   });
@@ -83,23 +121,37 @@ export const formatFutureOrdersAsTable = (result: any): string => {
   ]);
 
   return [
+    formatStatisticsTimestamp(),
     'TABLE SUMMARY',
     formatTable(
-      ['COIN', 'ORDER TYPE', 'DIRECTION', 'INTENT', 'CURRENT PRICE', 'FROM PRICE', 'TO PRICE', 'ORDER COUNT'],
+      [
+        'COIN',
+        'ORDER TYPE',
+        'DIRECTION',
+        'INTENT',
+        'CURRENT PRICE',
+        'FROM PRICE',
+        'TO PRICE',
+        'ORDER COUNT',
+      ],
       summaryRows,
     ),
     '',
     'TABLE DETAIL',
-    formatTable(['COIN', 'ORDER TYPE', 'TRIGGER PRICE', 'ORDER PRICE', 'SIZE'], detailRows),
+    formatTable(
+      ['COIN', 'ORDER TYPE', 'TRIGGER PRICE', 'ORDER PRICE', 'SIZE'],
+      detailRows,
+    ),
   ].join('\n');
 };
 
 export const formatFuturePositionsAsTable = (result: any): string => {
   const rows = [...(result.positions ?? [])]
-    .sort((left, right) => (
-      left.coin.localeCompare(right.coin)
-      || left.direction.localeCompare(right.direction)
-    ))
+    .sort(
+      (left, right) =>
+        left.coin.localeCompare(right.coin) ||
+        left.direction.localeCompare(right.direction),
+    )
     .map((position) => [
       position.coin,
       position.direction.toUpperCase(),
@@ -112,8 +164,18 @@ export const formatFuturePositionsAsTable = (result: any): string => {
       String(position.unrealizedPnl),
     ]);
 
-  return formatTable(
-    ['COIN', 'DIRECTION', 'SIZE', 'AVERAGE PRICE', 'CURRENT PRICE', 'UNREALIZED PNL (USDT)'],
-    rows,
-  );
+  return [
+    formatStatisticsTimestamp(),
+    formatTable(
+      [
+        'COIN',
+        'DIRECTION',
+        'SIZE',
+        'AVERAGE PRICE',
+        'CURRENT PRICE',
+        'UNREALIZED PNL (USDT)',
+      ],
+      rows,
+    ),
+  ].join('\n');
 };

@@ -159,6 +159,9 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
       ],
     });
 
+    expect(result).toMatch(
+      /^UPDATED AT: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\n/,
+    );
     expect(result.indexOf('BTC')).toBeLessThan(result.indexOf('ETH'));
     expect(result).toContain('90 (-10%)');
     expect(result).toContain('110 (10%)');
@@ -190,6 +193,9 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
       ],
     });
 
+    expect(result).toMatch(
+      /^UPDATED AT: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\n/,
+    );
     expect(result.indexOf('BTC')).toBeLessThan(result.indexOf('ETH'));
     expect(result).toContain('110 (10%)');
     expect(result).toContain('190 (-5%)');

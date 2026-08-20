@@ -18,6 +18,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { AppLogger } from '../logger/logger.service';
 import * as _ from 'lodash';
+import * as moment from 'moment';
 import { parseBool } from '../common/util';
 
 @Controller()
@@ -88,7 +89,16 @@ export class SpotController {
       row.map((value, index) => value.padEnd(widths[index])).join(' | ');
     const separator = widths.map((width) => '-'.repeat(width)).join('-+-');
 
-    return [formatRow(headers), separator, ...rows.map(formatRow)].join('\n');
+    return [
+      this.formatStatisticsTimestamp(),
+      formatRow(headers),
+      separator,
+      ...rows.map(formatRow),
+    ].join('\n');
+  }
+
+  private formatStatisticsTimestamp(): string {
+    return `UPDATED AT: ${moment().format('YYYY-MM-DD HH:mm:ss')}`;
   }
 
   @Get('orders-one-coin/:coin')
@@ -157,6 +167,7 @@ export class SpotController {
       .join(', ');
 
     return [
+      this.formatStatisticsTimestamp(),
       `${result.instId} pending ${side.toUpperCase()} orders`,
       `Filter: ${filter || 'none'}`,
       `Summary: ${result.summary.orderCount} orders | ${result.summary.totalAmount} ${result.quoteCurrency}`,
@@ -327,7 +338,11 @@ export class SpotController {
       String(totalBoughtUsdtByCoin.get(coin.coin.toUpperCase()) ?? 0),
       coin.error ?? '',
     ]);
-    const tables = ['TABLE SUMMARY', formatTable(summaryHeaders, summaryRows)];
+    const tables = [
+      this.formatStatisticsTimestamp(),
+      'TABLE SUMMARY',
+      formatTable(summaryHeaders, summaryRows),
+    ];
 
     if (hasRanges) {
       const detailHeaders = [

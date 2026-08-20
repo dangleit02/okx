@@ -172,6 +172,9 @@ describe('SpotController buy order total response format', () => {
   it('returns bought spot coins as a table by default', async () => {
     const result = await controller.getAllSpotBoughtCoins();
 
+    expect(result).toMatch(
+      /^UPDATED AT: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\n/,
+    );
     expect(result).toContain(
       'COIN | NUMBER OF COIN | AMOUNT (USDT) | AVERAGE COST | CURRENT PRICE | PROFIT (USDT)',
     );
@@ -269,6 +272,9 @@ describe('SpotController buy order total response format', () => {
   it('returns a compact all-coins table by default', async () => {
     const result = await controller.getOrdersTotalForAllCoins('buy');
 
+    expect(result).toMatch(
+      /^UPDATED AT: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\n/,
+    );
     expect(result).toContain('TABLE SUMMARY');
     expect(result).toMatch(
       /COIN \| ORDER TYPE \| CURRENT PRICE \| AVERAGE COST \| FROM PRICE\s+\| TO PRICE\s+\| ORDER COUNT \| TOTAL AMOUNT \(USDT\) \| TOTAL BOUGHT \(USDT\) \| ERROR/,
@@ -443,6 +449,9 @@ describe('SpotController buy order total response format', () => {
       'table',
     );
 
+    expect(result).toMatch(
+      /^UPDATED AT: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\n/,
+    );
     expect(result).toContain('BTC-USDT pending BUY orders');
     expect(result).toContain('FROM PRICE');
     expect(result).toContain('TO PRICE');
@@ -483,6 +492,9 @@ describe('SpotController buy order total response format', () => {
       'table',
     );
 
+    expect(result).toMatch(
+      /^UPDATED AT: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\n/,
+    );
     expect(result).toContain('ETH-USDT pending SELL orders');
     expect(okxService.getPendingOrdersTotalForCoin).toHaveBeenCalledWith(
       'eth',
