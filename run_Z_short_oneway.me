@@ -69,5 +69,9 @@ curl -X DELETE 'http://localhost:3030/future-oneway/cancel-orders/BTC?direction=
 curl -X DELETE 'http://localhost:3030/future-oneway/cancel-orders-one-coin/BTC?direction=short&intent=close&ordType=trigger&testing=false' \
   -H 'Content-Type: application/json'
 
+# Preview alias hủy conditional close orders/stop-loss SHORT, không hủy.
+curl -X DELETE 'http://localhost:3030/future-oneway/cancel-orders-one-coin/BTC?direction=short&intent=close&ordType=conditional&testing=true' \
+  -H 'Content-Type: application/json'
+
 curl -X DELETE 'http://localhost:3030/future-oneway/cancel-all-orders?direction=short&intent=all&ordType=trigger&testing=false' \
   -H 'Content-Type: application/json'

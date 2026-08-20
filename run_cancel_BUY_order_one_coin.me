@@ -18,5 +18,9 @@ bán giá cao nhất tháng
   curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/XLM?side=buy&minPrice=0.14571&maxPrice=0.16496&ordType=trigger&testing=false' \
     -H "Content-Type: application/json"
 
+# Preview BUY conditional orders trong khoảng giá, không hủy.
+  curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/LTC?side=buy&minPrice=50&maxPrice=100&ordType=conditional&testing=true' \
+    -H "Content-Type: application/json"
+
   curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/AAVE?side=buy&minPrice=71.86&maxPrice=81.84&ordType=trigger&testing=false' \
     -H "Content-Type: application/json"

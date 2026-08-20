@@ -72,6 +72,10 @@ curl -X DELETE 'http://localhost:3030/future-hedge/cancel-orders/BTC?direction=l
 curl -X DELETE 'http://localhost:3030/future-hedge/cancel-orders-one-coin/BTC?direction=long&intent=close&ordType=trigger&testing=false' \
   -H 'Content-Type: application/json'
 
+# Preview alias hủy conditional close orders/stop-loss LONG, không hủy.
+curl -X DELETE 'http://localhost:3030/future-hedge/cancel-orders-one-coin/BTC?direction=long&intent=close&ordType=conditional&testing=true' \
+  -H 'Content-Type: application/json'
+
 # 12. Hủy tất cả trigger orders LONG.
 curl -X DELETE 'http://localhost:3030/future-hedge/cancel-all-orders?direction=long&intent=all&ordType=trigger&testing=false' \
   -H 'Content-Type: application/json'

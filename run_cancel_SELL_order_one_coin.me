@@ -17,6 +17,10 @@ bán giá cao nhất tháng
 # Preview SELL trigger orders trong khoảng giá, không hủy.
   curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/BTC?side=sell&minPrice=60000&maxPrice=70000&ordType=trigger&testing=true' \
     -H "Content-Type: application/json"
+
+# Preview SELL conditional orders/stop-loss trong khoảng giá, không hủy.
+  curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/BTC?side=sell&minPrice=50000&maxPrice=60000&ordType=conditional&testing=true' \
+    -H "Content-Type: application/json"
   
 # WARNING: hủy thật SELL trigger orders trong khoảng giá.
   curl -X DELETE 'http://localhost:3030/cancel-orders-one-coin/AAVE?side=sell&minPrice=71.86&maxPrice=81.84&ordType=trigger&testing=false' \
