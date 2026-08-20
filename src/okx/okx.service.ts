@@ -1981,12 +1981,13 @@ export class OkxService {
     return result;
   }
 
-  private async placeSpotConditionalExitAtTriggerPrice(
+  private async placeSpotExitAtTriggerPrice(
     coin: string,
     triggerPrice: number,
     percentage: number,
     conditionType: Exclude<SpotConditionType, 'unknown'>,
     testing: boolean = true,
+    currentPriceOverride?: number,
   ) {
     const normalizedCoin = coin?.trim().toUpperCase();
     if (!normalizedCoin || !/^[A-Z0-9]+$/.test(normalizedCoin)) {
@@ -2022,7 +2023,7 @@ export class OkxService {
       };
     }
 
-    const currentPrice = await this.getTicker(instId);
+    const currentPrice = currentPriceOverride ?? (await this.getTicker(instId));
     if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
       throw new Error(
         `Invalid current price fetched for ${instId}: ${currentPrice}`,
@@ -2056,6 +2057,9 @@ export class OkxService {
           : 'at_current_price';
 
     const isStopLoss = conditionType === 'stop_loss';
+    const formattedOrderPrice = isStopLoss
+      ? '-1'
+      : (Number(formattedTriggerPrice) * (1 - 0.002)).toFixed(priceToFixed);
     const order = isStopLoss
       ? await this.placeSpotConditionalStopLoss(
           normalizedCoin,
@@ -2063,10 +2067,12 @@ export class OkxService {
           formattedTriggerPrice,
           testing,
         )
-      : await this.placeSpotConditionalTakeProfit(
+      : await this.placeOneOrder(
           normalizedCoin,
+          'sell',
           formattedSize,
           formattedTriggerPrice,
+          formattedOrderPrice,
           testing,
         );
     const result = {
@@ -2079,10 +2085,10 @@ export class OkxService {
       sizeToSell: formattedSize,
       currentPrice,
       triggerPrice: Number(formattedTriggerPrice),
-      orderPrice: -1,
-      ordType: 'conditional',
+      orderPrice: Number(formattedOrderPrice),
+      ordType: isStopLoss ? 'conditional' : 'trigger',
       conditionType,
-      executionType: 'market',
+      executionType: isStopLoss ? 'market' : 'limit',
       priceDirection,
       estimatedValueUsdt: Number(
         (Number(formattedSize) * triggerPrice).toFixed(8),
@@ -2122,12 +2128,13 @@ export class OkxService {
         `Spot stop-loss trigger price ${triggerPrice} must be below current price ${currentPrice}`,
       );
     }
-    return this.placeSpotConditionalExitAtTriggerPrice(
+    return this.placeSpotExitAtTriggerPrice(
       normalizedCoin,
       triggerPrice,
       percentage,
       'stop_loss',
       testing,
+      currentPrice,
     );
   }
 
@@ -2155,12 +2162,13 @@ export class OkxService {
         `Spot take-profit trigger price ${triggerPrice} must be above current price ${currentPrice}`,
       );
     }
-    return this.placeSpotConditionalExitAtTriggerPrice(
+    return this.placeSpotExitAtTriggerPrice(
       normalizedCoin,
       triggerPrice,
       percentage,
       'take_profit',
       testing,
+      currentPrice,
     );
   }
 

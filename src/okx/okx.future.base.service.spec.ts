@@ -495,6 +495,34 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
     );
   });
 
+  it('uses market execution when the short close price equals current price', async () => {
+    const { service } = createService(false);
+    jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
+      data: [{ instId: 'BTC-USDT-SWAP', pos: '-2', avgPx: '110' }],
+    });
+
+    const result: any = await service.closePositionAtTriggerPrice(
+      'BTC',
+      'short',
+      100,
+      100,
+      true,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        closeType: 'market_on_trigger',
+        executionType: 'market',
+        body: expect.objectContaining({
+          side: 'buy',
+          ordType: 'conditional',
+          slOrdPx: '-1',
+          reduceOnly: true,
+        }),
+      }),
+    );
+  });
+
   it('uses market execution for every short close price above current price', async () => {
     const { service } = createService(false);
     jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({

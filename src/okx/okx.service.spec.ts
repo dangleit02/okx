@@ -2109,16 +2109,16 @@ describe('OkxService sell percentage at a requested trigger price', () => {
     );
   });
 
-  it('uses a conditional market take-profit when the sell price is above current price', async () => {
+  it('uses a trigger limit take-profit when the sell price is above current price', async () => {
     const { service } = createService();
-    const placeTakeProfit = jest
-      .spyOn(service, 'placeSpotConditionalTakeProfit')
+    const placeTriggerLimit = jest
+      .spyOn(service, 'placeOneOrder')
       .mockResolvedValue({
         data: { code: '0', data: [{ algoId: '123' }] },
         body: {
-          ordType: 'conditional',
-          tpTriggerPx: '70000.00',
-          tpOrdPx: '-1',
+          ordType: 'trigger',
+          triggerPx: '70000.00',
+          orderPx: '69860.00',
         },
       } as any);
 
@@ -2133,17 +2133,19 @@ describe('OkxService sell percentage at a requested trigger price', () => {
       expect.objectContaining({
         status: 'submitted',
         triggerPrice: 70000,
-        orderPrice: -1,
-        ordType: 'conditional',
+        orderPrice: 69860,
+        ordType: 'trigger',
         conditionType: 'take_profit',
-        executionType: 'market',
+        executionType: 'limit',
         priceDirection: 'above_current_price',
       }),
     );
-    expect(placeTakeProfit).toHaveBeenCalledWith(
+    expect(placeTriggerLimit).toHaveBeenCalledWith(
       'BTC',
+      'sell',
       '0.3086',
       '70000.00',
+      '69860.00',
       false,
     );
   });
@@ -2287,6 +2289,9 @@ describe('OkxService conditional spot stop-loss coverage', () => {
     await expect(
       service.placeSpotStopLossAtTriggerPrice('BTC', 110, 100, true),
     ).rejects.toThrow('must be below current price');
+    await expect(
+      service.placeSpotStopLossAtTriggerPrice('BTC', 100, 100, true),
+    ).rejects.toThrow('must be below current price');
   });
 
   it('rejects a manual spot take-profit at or below current price', async () => {
@@ -2294,6 +2299,9 @@ describe('OkxService conditional spot stop-loss coverage', () => {
 
     await expect(
       service.placeSpotTakeProfitAtTriggerPrice('BTC', 90, 100, true),
+    ).rejects.toThrow('must be above current price');
+    await expect(
+      service.placeSpotTakeProfitAtTriggerPrice('BTC', 100, 100, true),
     ).rejects.toThrow('must be above current price');
   });
 });
