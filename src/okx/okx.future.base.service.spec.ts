@@ -1072,7 +1072,7 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
     ]);
   });
 
-  it('cleans only excess long protective-close triggers and ignores entries and take-profit-above-current orders', async () => {
+  it('keeps two long close orders when one order alone is below the position USD', async () => {
     const { service } = createService(true);
     jest.spyOn(service as any, 'getOpenPosition').mockResolvedValue({
       data: [
@@ -1133,11 +1133,15 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
         status: 'preview',
         positionSize: '1',
         protectiveCloseByPriceStepsOrderCount: 2,
-        cancelOrderCount: 1,
+        keptOrderCount: 2,
+        cancelOrderCount: 0,
       }),
     );
-    expect(result.keptOrders.map((order) => order.algoId)).toEqual(['near']);
-    expect(result.ordersToCancel.map((order) => order.algoId)).toEqual(['far']);
+    expect(result.keptOrders.map((order) => order.algoId)).toEqual([
+      'near',
+      'far',
+    ]);
+    expect(result.ordersToCancel).toEqual([]);
   });
 
   it('keeps the nearest short protective close and cleans the farther excess trigger in oneway mode', async () => {
@@ -1152,7 +1156,7 @@ describe('OkxFutureBaseService protected entry and close orders', () => {
         side: 'buy',
         triggerPx: '110',
         ordPx: '-1',
-        sz: '0.6',
+        sz: '1',
       },
       {
         algoId: 'far',

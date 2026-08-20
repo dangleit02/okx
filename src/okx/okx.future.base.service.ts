@@ -918,22 +918,36 @@ export abstract class OkxFutureBaseService {
       (total, order) => total.plus(order.sizeDecimal),
       new Decimal(0),
     );
-    const sizeTolerance = normalizedPositionSize.greaterThan(0)
-      ? new Decimal(String(inst.lotSz || inst.minSz || 1)).div(2)
-      : new Decimal(0);
+    const contractValue = new Decimal(String(inst?.ctVal || 1));
+    const positionUsd = normalizedPositionSize
+      .times(currentPrice ?? 0)
+      .times(contractValue);
+    const getOrderUsd = (order: (typeof protectiveCloseOrders)[number]) => {
+      const effectivePrice =
+        Number.isFinite(order.orderPrice) && order.orderPrice > 0
+          ? order.orderPrice
+          : order.triggerPrice;
+      return order.sizeDecimal.times(effectivePrice).times(contractValue);
+    };
     const ordersToCancel: typeof protectiveCloseOrders = [];
-    let remainingProtectiveCloseSize = totalProtectiveCloseSize;
+    let remainingProtectiveCloseUsd = protectiveCloseOrders.reduce(
+      (total, order) => total.plus(getOrderUsd(order)),
+      new Decimal(0),
+    );
     for (const order of [...protectiveCloseOrders].reverse()) {
+      const orderUsdAfterCancellation = remainingProtectiveCloseUsd.minus(
+        getOrderUsd(order),
+      );
+
+      // Retain the smallest nearest-price set whose close notional still
+      // covers the position's current USDT value.
       if (
-        remainingProtectiveCloseSize.lessThanOrEqualTo(
-          normalizedPositionSize.plus(sizeTolerance),
-        )
+        normalizedPositionSize.greaterThan(0) &&
+        orderUsdAfterCancellation.lessThan(positionUsd)
       )
         break;
       ordersToCancel.push(order);
-      remainingProtectiveCloseSize = remainingProtectiveCloseSize.minus(
-        order.sizeDecimal,
-      );
+      remainingProtectiveCloseUsd = orderUsdAfterCancellation;
     }
     const cancelledIds = new Set(ordersToCancel.map(({ algoId }) => algoId));
     const keptOrders = protectiveCloseOrders.filter(

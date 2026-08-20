@@ -1114,7 +1114,7 @@ describe('OkxService clean excess sell orders', () => {
     expect(conditionalStopLossOrders).not.toHaveBeenCalled();
   });
 
-  it('cancels sell orders from the lowest trigger price first', async () => {
+  it('cancels lowest sell orders only while the remaining USD covers the coin USD', async () => {
     const { service, logger } = createService();
     jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
       data: [
@@ -1131,13 +1131,10 @@ describe('OkxService clean excess sell orders', () => {
         responses: [
           {
             code: '0',
-            data: [
-              { algoId: 'low', sCode: '0' },
-              { algoId: 'middle', sCode: '0' },
-            ],
+            data: [{ algoId: 'low', sCode: '0' }],
           },
         ],
-        cancelledOrderCount: 2,
+        cancelledOrderCount: 1,
         failedOrderCount: 0,
       });
 
@@ -1145,12 +1142,11 @@ describe('OkxService clean excess sell orders', () => {
 
     expect(cancelAlgoOrders).toHaveBeenCalledWith([
       { algoId: 'low', instId: 'ETC-USDT' },
-      { algoId: 'middle', instId: 'ETC-USDT' },
     ]);
     expect(result).toEqual(
       expect.objectContaining({
         status: 'cleaned',
-        cancelledOrderCount: 2,
+        cancelledOrderCount: 1,
         failedOrderCount: 0,
       }),
     );
@@ -1163,7 +1159,7 @@ describe('OkxService clean excess sell orders', () => {
       'STATUS  | ALGO ID | CURRENT PRICE | CURRENT PROFIT (%)',
     );
     expect(cleanupTableCall[0]).toMatch(/CLEANED\s+\| low\s+\| 100\s+\| 25/);
-    expect(cleanupTableCall[0]).toMatch(/CLEANED\s+\| middle\s+\| 100\s+\| 25/);
+    expect(cleanupTableCall[0]).toMatch(/KEPT\s+\| middle\s+\| 100\s+\| 25/);
     expect(cleanupTableCall[0]).toMatch(/KEPT\s+\| high\s+\| 100\s+\| 25/);
     const cleanupSummaryCall = logger.log.mock.calls.find(
       ([, context, coin]) =>
@@ -1176,11 +1172,11 @@ describe('OkxService clean excess sell orders', () => {
       sellableBalance: '4',
       totalBalance: '4',
       currentPrice: 100,
-      keptOrderCount: 1,
-      cancelOrderCount: 2,
-      cancelledOrderCount: 2,
+      keptOrderCount: 2,
+      cancelOrderCount: 1,
+      cancelledOrderCount: 1,
       failedOrderCount: 0,
-      cancelledOrderIds: ['low', 'middle'],
+      cancelledOrderIds: ['low'],
       failedOrderIds: [],
     });
     expect(cleanupSummaryCall[0]).not.toContain('responses');
@@ -1217,6 +1213,62 @@ describe('OkxService clean excess sell orders', () => {
     expect(result.ordersToCancel.map((order) => order.algoId)).toEqual([
       'low',
       'middle',
+    ]);
+  });
+
+  it('keeps two XRP sell orders for a remaining coin value of 18.22611353 USDT', async () => {
+    const { service } = createService();
+    jest.spyOn(service as any, 'getTicker').mockResolvedValue(1);
+    jest
+      .spyOn(service as any, 'getPendingTriggerSpotOrders')
+      .mockResolvedValue([
+        {
+          algoId: 'xrp-high',
+          instId: 'XRP-USDT',
+          side: 'sell',
+          triggerPx: '0.9',
+          ordPx: '1',
+          sz: '10',
+        },
+        {
+          algoId: 'xrp-middle',
+          instId: 'XRP-USDT',
+          side: 'sell',
+          triggerPx: '0.8',
+          ordPx: '1',
+          sz: '10',
+        },
+        {
+          algoId: 'xrp-low',
+          instId: 'XRP-USDT',
+          side: 'sell',
+          triggerPx: '0.7',
+          ordPx: '1',
+          sz: '10',
+        },
+      ]);
+    jest.spyOn(service, 'getAccountBalance').mockResolvedValue({
+      data: [
+        {
+          details: [
+            {
+              ccy: 'XRP',
+              cashBal: '18.22611353',
+              availBal: '18.22611353',
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = await service.cleanSellOrdersForOneCoin('XRP');
+
+    expect(result.keptOrders.map((order) => order.algoId)).toEqual([
+      'xrp-high',
+      'xrp-middle',
+    ]);
+    expect(result.ordersToCancel.map((order) => order.algoId)).toEqual([
+      'xrp-low',
     ]);
   });
 

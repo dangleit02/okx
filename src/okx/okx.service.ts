@@ -1466,25 +1466,28 @@ export class OkxService {
       .sort((left, right) => right.triggerPrice - left.triggerPrice);
 
     const ordersToCancel: typeof eligibleOrders = [];
-    let remainingSize = eligibleOrders.reduce(
-      (total, order) => total.plus(order.sizeDecimal),
+    const balanceUsd = totalBalance.times(cleanupCurrentPrice);
+    let remainingOrderUsd = eligibleOrders.reduce(
+      (total, order) => total.plus(order.sizeDecimal.times(order.orderPrice)),
       new Decimal(0),
     );
-    let remainingOrderCount = eligibleOrders.length;
 
     for (const order of [...eligibleOrders].reverse()) {
+      const orderUsd = order.sizeDecimal.times(order.orderPrice);
+      const orderUsdAfterCancellation = remainingOrderUsd.minus(orderUsd);
+
+      // Keep the smallest nearest-price set whose sell notional still covers
+      // the coin's current USDT value. Checking the value *after* cancellation
+      // prevents cleanup from removing one order too many.
       if (
-        remainingSize.lessThanOrEqualTo(totalBalance.plus(sizeTolerance)) ||
-        // A positive holding should retain its highest trigger even when that
-        // order alone is oversized; zero-balance cleanup still removes all.
-        (!cleanAllSellOrders && remainingOrderCount === 1)
+        !cleanAllSellOrders &&
+        orderUsdAfterCancellation.lessThan(balanceUsd)
       ) {
         break;
       }
 
       ordersToCancel.push(order);
-      remainingSize = remainingSize.minus(order.sizeDecimal);
-      remainingOrderCount--;
+      remainingOrderUsd = orderUsdAfterCancellation;
     }
     const orderIdsToCancel = new Set(
       ordersToCancel.map(({ algoId }) => algoId),
